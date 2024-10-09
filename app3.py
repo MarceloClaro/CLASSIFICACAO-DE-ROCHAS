@@ -534,10 +534,11 @@ def visualize_activations(model, image, class_names):
     # Gerar o mapa de ativação
     activation_map = cam_extractor(pred_class, out)
 
-    # Converter o mapa de ativação para uma imagem
-    activation_map = activation_map[0].cpu()
-    activation_map = resize(activation_map, input_tensor.shape[-2:])
-    activation_map = to_pil_image(activation_map, mode='F')
+    # Converter o mapa de ativação para uma imagem e garantir o formato correto
+    activation_map = activation_map[0].squeeze().cpu().numpy()  # Garantir que é uma matriz numpy
+    
+    # Redimensionar o mapa de ativação para corresponder ao tamanho da imagem original
+    activation_map_resized = np.array(Image.fromarray(activation_map).resize(input_tensor.shape[-2:], resample=Image.BILINEAR))
 
     # Exibir a imagem original e o mapa de ativação sobreposto
     fig, ax = plt.subplots(1, 2, figsize=(10, 5))
@@ -546,11 +547,12 @@ def visualize_activations(model, image, class_names):
     ax[0].axis('off')
 
     ax[1].imshow(image)
-    ax[1].imshow(activation_map, cmap='jet', alpha=0.5)
+    ax[1].imshow(activation_map_resized, cmap='jet', alpha=0.5)
     ax[1].set_title('Grad-CAM')
     ax[1].axis('off')
 
     st.pyplot(fig)
+
 
 def main():
     st.title("Classificação e Clustering de Imagens com Aprendizado Profundo")
