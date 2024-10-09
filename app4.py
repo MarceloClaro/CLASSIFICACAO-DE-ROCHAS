@@ -201,6 +201,42 @@ def plot_metrics(epochs, train_losses, valid_losses, train_accuracies, valid_acc
 
     st.pyplot(fig)
 
+def compute_metrics(model, dataloader, classes):
+    """
+    Calcula métricas detalhadas e exibe matriz de confusão e relatório de classificação.
+    """
+    model.eval()
+    all_preds = []
+    all_labels = []
+    all_probs = []
+
+    with torch.no_grad():
+        for inputs, labels in dataloader:
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+
+            outputs = model(inputs)
+            probabilities = torch.nn.functional.softmax(outputs, dim=1)
+            _, preds = torch.max(outputs, 1)
+
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+            all_probs.extend(probabilities.cpu().numpy())
+
+    # Relatório de Classificação
+    report = classification_report(all_labels, all_preds, target_names=classes, output_dict=True)
+    st.text("Relatório de Classificação:")
+    st.write(pd.DataFrame(report).transpose())
+
+    # Matriz de Confusão Normalizada
+    cm = confusion_matrix(all_labels, all_preds, normalize='true')
+    fig, ax = plt.subplots()
+    sns.heatmap(cm, annot=True, fmt='.2f', cmap='Blues', xticklabels=classes, yticklabels=classes, ax=ax)
+    ax.set_xlabel('Predito')
+    ax.set_ylabel('Verdadeiro')
+    ax.set_title('Matriz de Confusão Normalizada')
+    st.pyplot(fig)
+
 def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience):
     """
     Função principal para treinamento do modelo.
@@ -349,10 +385,6 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     # Avaliação Final no Conjunto de Teste
     st.write("**Avaliação no Conjunto de Teste**")
     compute_metrics(model, test_loader, full_dataset.classes)
-
-    # Análise de Erros
-    st.write("**Análise de Erros**")
-    error_analysis(model, test_loader, full_dataset.classes)
 
     # Salvar o modelo e os labels em um arquivo ZIP
     zip_file = save_model_and_labels(model, full_dataset.classes)
