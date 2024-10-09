@@ -11,3 +11,4 @@ scikit-learn
 pandas
 streamlit
 torchcam
+tensorflow-addons
