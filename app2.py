@@ -87,14 +87,14 @@ def seed_worker(worker_id):
 
 def visualize_data(dataset, classes):
     """
-    Exibe algumas imagens do dataset com suas classes.
+    Exibe algumas imagens do conjunto de dados com suas classes.
     """
     st.write("Visualização de algumas imagens do conjunto de dados:")
     fig, axes = plt.subplots(1, 5, figsize=(15, 3))
     for i in range(5):
         idx = np.random.randint(len(dataset))
         image, label = dataset[idx]
-        image = image.permute(1, 2, 0).numpy()
+        image = np.array(image)  # Converter a imagem PIL em array NumPy
         axes[i].imshow(image)
         axes[i].set_title(classes[label])
         axes[i].axis('off')
