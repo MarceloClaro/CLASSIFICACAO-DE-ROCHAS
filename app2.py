@@ -4,20 +4,22 @@ import shutil
 import tempfile
 import random
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from PIL import Image
 import torch
 from torch import nn, optim
-from torch.utils.data import DataLoader, random_split, WeightedRandomSampler
+from torch.utils.data import DataLoader, random_split
 from torchvision import transforms, models, datasets
 from sklearn.cluster import AgglomerativeClustering, KMeans
 from sklearn.metrics import (adjusted_rand_score, normalized_mutual_info_score,
                              confusion_matrix, classification_report,
-                             precision_score, recall_score, f1_score,
                              roc_auc_score, roc_curve)
+from sklearn.preprocessing import label_binarize
 from sklearn.decomposition import PCA
 import streamlit as st
+import gc
 
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -34,42 +36,54 @@ def set_seed(seed):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
-# Transformações comuns para as imagens
-common_transforms = transforms.Compose([
+set_seed(42)  # Definir a seed para reprodutibilidade
+
+# Definir as transformações para aumento de dados (aplicando transformações aleatórias)
+train_transforms = transforms.Compose([
+    transforms.RandomApply([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(degrees=90),
+        transforms.ColorJitter(),
+        transforms.RandomResizedCrop(224, scale=(0.8, 1.0)),
+        transforms.RandomAffine(degrees=0, shear=10),
+    ], p=0.5),
     transforms.Resize(256),
     transforms.CenterCrop(224),
     transforms.ToTensor(),
 ])
 
-# Dataset personalizado com aumento de dados
-class AugmentedDataset(torch.utils.data.Dataset):
-    """
-    Dataset que aplica transformações de aumento de dados às imagens originais.
-    """
-    def __init__(self, dataset):
+# Transformações para validação e teste
+test_transforms = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+])
+
+# Dataset personalizado
+class CustomDataset(torch.utils.data.Dataset):
+    def __init__(self, dataset, transform=None):
         self.dataset = dataset
-        self.transforms_list = [
-            transforms.Compose([]),  # Imagem original
-            transforms.Compose([transforms.RandomHorizontalFlip(p=1)]),  # Inversão horizontal
-            transforms.Compose([transforms.RandomRotation((45, 45))]),  # Rotação de 45 graus
-            transforms.Compose([transforms.RandomRotation((90, 90))]),   # Rotação de 90 graus
-            transforms.Compose([transforms.ColorJitter(brightness=0.5, contrast=0.5)]),  # Variação de brilho e contraste
-            transforms.Compose([transforms.RandomResizedCrop(224, scale=(0.8, 1.0))]),  # Zoom
-            transforms.Compose([transforms.RandomAffine(degrees=0, shear=10)]),  # Shear
-        ]
+        self.transform = transform
 
     def __len__(self):
-        return len(self.dataset) * len(self.transforms_list)
+        return len(self.dataset)
 
     def __getitem__(self, idx):
-        original_idx = idx // len(self.transforms_list)
-        transform_idx = idx % len(self.transforms_list)
-        image, label = self.dataset[original_idx]
-        transform = self.transforms_list[transform_idx]
-        image = transform(image)
-        image = common_transforms(image)
+        image, label = self.dataset[idx]
+        if self.transform:
+            image = self.transform(image)
         return image, label
+
+def seed_worker(worker_id):
+    """
+    Função para definir a seed em cada worker do DataLoader.
+    """
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
 
 def visualize_data(dataset, classes):
     """
@@ -90,38 +104,56 @@ def plot_class_distribution(dataset, classes):
     """
     Exibe a distribuição das classes no conjunto de dados.
     """
-    labels = [label for _, label in dataset]
+    labels = [classes[label] for _, label in dataset]
     fig, ax = plt.subplots()
     sns.countplot(labels, ax=ax)
-    ax.set_xticklabels(classes)
+    ax.set_xticklabels(classes, rotation=45)
     ax.set_title("Distribuição das Classes")
     st.pyplot(fig)
 
-class CustomResNet(nn.Module):
+def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
     """
-    Modelo ResNet personalizado com Dropout.
+    Retorna o modelo pré-treinado selecionado.
     """
-    def __init__(self, num_classes, dropout_p=0.5):
-        super(CustomResNet, self).__init__()
-        self.model = models.resnet18(pretrained=True)
-        num_ftrs = self.model.fc.in_features
-        # Congelar as camadas convolucionais
-        for param in self.model.parameters():
+    if model_name == 'ResNet18':
+        model = models.resnet18(pretrained=True)
+    elif model_name == 'ResNet50':
+        model = models.resnet50(pretrained=True)
+    elif model_name == 'DenseNet121':
+        model = models.densenet121(pretrained=True)
+    else:
+        st.error("Modelo não suportado.")
+        return None
+
+    if not fine_tune:
+        for param in model.parameters():
             param.requires_grad = False
-        # Adicionar Dropout e camada totalmente conectada
-        self.model.fc = nn.Sequential(
+
+    if model_name.startswith('ResNet'):
+        num_ftrs = model.fc.in_features
+        model.fc = nn.Sequential(
             nn.Dropout(p=dropout_p),
             nn.Linear(num_ftrs, num_classes)
         )
+    elif model_name.startswith('DenseNet'):
+        num_ftrs = model.classifier.in_features
+        model.classifier = nn.Sequential(
+            nn.Dropout(p=dropout_p),
+            nn.Linear(num_ftrs, num_classes)
+        )
+    else:
+        st.error("Modelo não suportado.")
+        return None
 
-    def forward(self, x):
-        x = self.model(x)
-        return x
+    model = model.to(device)
+    return model
 
-def train_model(data_dir, num_classes, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience):
+def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience):
     """
     Função principal para treinamento do modelo.
     """
+    set_seed(42)
+
     # Carregar o dataset original sem transformações
     full_dataset = datasets.ImageFolder(root=data_dir)
 
@@ -129,46 +161,52 @@ def train_model(data_dir, num_classes, epochs, learning_rate, batch_size, train_
     visualize_data(full_dataset, full_dataset.classes)
     plot_class_distribution(full_dataset, full_dataset.classes)
 
-    # Criar o dataset aumentado
-    augmented_dataset = AugmentedDataset(full_dataset)
+    # Criar o dataset personalizado com aumento de dados
+    train_dataset = CustomDataset(full_dataset, transform=train_transforms)
+    valid_dataset = CustomDataset(full_dataset, transform=test_transforms)
+    test_dataset = CustomDataset(full_dataset, transform=test_transforms)
 
-    # Obter o número de classes detectadas
-    detected_classes = len(full_dataset.classes)
-    if detected_classes != num_classes:
-        st.error(f"O número de classes detectadas ({detected_classes}) não coincide com o número fornecido ({num_classes}).")
-        return None
+    # Dividir os índices para treino, validação e teste
+    dataset_size = len(full_dataset)
+    indices = list(range(dataset_size))
+    np.random.shuffle(indices)
 
-    # Dividir o dataset em treino, validação e teste
-    dataset_size = len(augmented_dataset)
-    test_size = int((1 - train_split - valid_split) * dataset_size)
-    valid_size = int(valid_split * dataset_size)
-    train_size = dataset_size - valid_size - test_size
+    train_end = int(train_split * dataset_size)
+    valid_end = int((train_split + valid_split) * dataset_size)
 
-    train_dataset, valid_dataset, test_dataset = random_split(
-        augmented_dataset, [train_size, valid_size, test_size],
-        generator=torch.Generator().manual_seed(42))
+    train_indices = indices[:train_end]
+    valid_indices = indices[train_end:valid_end]
+    test_indices = indices[valid_end:]
+
+    train_dataset = torch.utils.data.Subset(train_dataset, train_indices)
+    valid_dataset = torch.utils.data.Subset(valid_dataset, valid_indices)
+    test_dataset = torch.utils.data.Subset(test_dataset, test_indices)
 
     # Dataloaders
+    g = torch.Generator()
+    g.manual_seed(42)
+
     if use_weighted_loss:
-        # Calcular pesos para a perda ponderada
-        targets = [augmented_dataset[i][1] for i in train_dataset.indices]
+        targets = [full_dataset.targets[i] for i in train_indices]
         class_counts = np.bincount(targets)
+        class_counts = class_counts + 1e-6  # Para evitar divisão por zero
         class_weights = 1.0 / class_counts
         class_weights = torch.FloatTensor(class_weights).to(device)
         criterion = nn.CrossEntropyLoss(weight=class_weights)
     else:
         criterion = nn.CrossEntropyLoss()
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, worker_init_fn=seed_worker, generator=g)
+    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False, worker_init_fn=seed_worker, generator=g)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, worker_init_fn=seed_worker, generator=g)
 
     # Carregar o modelo
-    model = CustomResNet(num_classes, dropout_p=0.5)
-    model = model.to(device)
+    model = get_model(model_name, num_classes, dropout_p=0.5, fine_tune=fine_tune)
+    if model is None:
+        return None
 
     # Definir o otimizador com L2 regularization (weight_decay)
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=l2_lambda)
+    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=l2_lambda)
 
     # Listas para armazenar as perdas e acurácias
     train_losses = []
@@ -182,6 +220,7 @@ def train_model(data_dir, num_classes, epochs, learning_rate, batch_size, train_
 
     # Treinamento
     for epoch in range(epochs):
+        set_seed(42 + epoch)
         running_loss = 0.0
         running_corrects = 0
         model.train()
@@ -191,7 +230,12 @@ def train_model(data_dir, num_classes, epochs, learning_rate, batch_size, train_
             labels = labels.to(device)
 
             optimizer.zero_grad()
-            outputs = model(inputs)
+            try:
+                outputs = model(inputs)
+            except Exception as e:
+                st.error(f"Erro durante o treinamento: {e}")
+                return None
+
             _, preds = torch.max(outputs, 1)
             loss = criterion(outputs, labels)
             loss.backward()
@@ -200,8 +244,8 @@ def train_model(data_dir, num_classes, epochs, learning_rate, batch_size, train_
             running_loss += loss.item() * inputs.size(0)
             running_corrects += torch.sum(preds == labels.data)
 
-        epoch_loss = running_loss / train_size
-        epoch_acc = running_corrects.double() / train_size
+        epoch_loss = running_loss / len(train_dataset)
+        epoch_acc = running_corrects.double() / len(train_dataset)
         train_losses.append(epoch_loss)
         train_accuracies.append(epoch_acc.item())
 
@@ -222,8 +266,8 @@ def train_model(data_dir, num_classes, epochs, learning_rate, batch_size, train_
                 valid_running_loss += loss.item() * inputs.size(0)
                 valid_running_corrects += torch.sum(preds == labels.data)
 
-        valid_epoch_loss = valid_running_loss / valid_size
-        valid_epoch_acc = valid_running_corrects.double() / valid_size
+        valid_epoch_loss = valid_running_loss / len(valid_dataset)
+        valid_epoch_acc = valid_running_corrects.double() / len(valid_dataset)
         valid_losses.append(valid_epoch_loss)
         valid_accuracies.append(valid_epoch_acc.item())
 
@@ -251,11 +295,15 @@ def train_model(data_dir, num_classes, epochs, learning_rate, batch_size, train_
 
     # Avaliação Final no Conjunto de Teste
     st.write("**Avaliação no Conjunto de Teste**")
-    evaluate_model(model, test_loader, full_dataset.classes, num_classes)
+    compute_metrics(model, test_loader, full_dataset.classes)
 
     # Análise de Erros
     st.write("**Análise de Erros**")
     error_analysis(model, test_loader, full_dataset.classes)
+
+    # Liberar memória
+    del train_loader, valid_loader
+    gc.collect()
 
     return model, full_dataset.classes
 
@@ -284,9 +332,9 @@ def plot_metrics(epochs, train_losses, valid_losses, train_accuracies, valid_acc
 
     st.pyplot(fig)
 
-def evaluate_model(model, dataloader, classes, num_classes):
+def compute_metrics(model, dataloader, classes):
     """
-    Avalia o modelo no conjunto fornecido e exibe métricas detalhadas.
+    Calcula métricas detalhadas e exibe matriz de confusão e relatório de classificação.
     """
     model.eval()
     all_preds = []
@@ -307,21 +355,21 @@ def evaluate_model(model, dataloader, classes, num_classes):
             all_probs.extend(probabilities.cpu().numpy())
 
     # Relatório de Classificação
-    report = classification_report(all_labels, all_preds, target_names=classes)
+    report = classification_report(all_labels, all_preds, target_names=classes, output_dict=True)
     st.text("Relatório de Classificação:")
-    st.text(report)
+    st.write(pd.DataFrame(report).transpose())
 
-    # Matriz de Confusão
-    cm = confusion_matrix(all_labels, all_preds)
+    # Matriz de Confusão Normalizada
+    cm = confusion_matrix(all_labels, all_preds, normalize='true')
     fig, ax = plt.subplots()
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=classes, yticklabels=classes, ax=ax)
+    sns.heatmap(cm, annot=True, fmt='.2f', cmap='Blues', xticklabels=classes, yticklabels=classes, ax=ax)
     ax.set_xlabel('Predito')
     ax.set_ylabel('Verdadeiro')
-    ax.set_title('Matriz de Confusão')
+    ax.set_title('Matriz de Confusão Normalizada')
     st.pyplot(fig)
 
     # Curva ROC
-    if num_classes == 2:
+    if len(classes) == 2:
         fpr, tpr, thresholds = roc_curve(all_labels, [p[1] for p in all_probs])
         roc_auc = roc_auc_score(all_labels, [p[1] for p in all_probs])
         fig, ax = plt.subplots()
@@ -332,6 +380,11 @@ def evaluate_model(model, dataloader, classes, num_classes):
         ax.set_title('Curva ROC')
         ax.legend(loc='lower right')
         st.pyplot(fig)
+    else:
+        # Multiclasse
+        binarized_labels = label_binarize(all_labels, classes=range(len(classes)))
+        roc_auc = roc_auc_score(binarized_labels, np.array(all_probs), average='weighted', multi_class='ovr')
+        st.write(f"AUC-ROC Média Ponderada: {roc_auc:.4f}")
 
 def error_analysis(model, dataloader, classes):
     """
@@ -349,11 +402,13 @@ def error_analysis(model, dataloader, classes):
             outputs = model(inputs)
             _, preds = torch.max(outputs, 1)
 
-            for i in range(len(labels)):
-                if preds[i] != labels[i]:
-                    misclassified_images.append(inputs[i].cpu())
-                    misclassified_labels.append(labels[i].cpu())
-                    misclassified_preds.append(preds[i].cpu())
+            incorrect = preds != labels
+            if incorrect.any():
+                misclassified_images.extend(inputs[incorrect].cpu())
+                misclassified_labels.extend(labels[incorrect].cpu())
+                misclassified_preds.extend(preds[incorrect].cpu())
+                if len(misclassified_images) >= 5:
+                    break
 
     if misclassified_images:
         st.write("Algumas imagens mal classificadas:")
@@ -372,7 +427,8 @@ def extract_features(dataset, model, batch_size):
     """
     Extrai características de um conjunto de dados usando um modelo pré-treinado.
     """
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, worker_init_fn=seed_worker)
+
     features = []
     labels = []
 
@@ -437,7 +493,7 @@ def evaluate_image(model, image, classes):
     Avalia uma única imagem e retorna a classe predita e a confiança.
     """
     model.eval()
-    image = common_transforms(image).unsqueeze(0).to(device)
+    image = test_transforms(image).unsqueeze(0).to(device)
     with torch.no_grad():
         output = model(image)
         probabilities = torch.nn.functional.softmax(output, dim=1)
@@ -446,15 +502,21 @@ def evaluate_image(model, image, classes):
         class_name = classes[class_idx]
         return class_name, confidence.item()
 
-def main():
-    set_seed(42)  # Definir a seed para reprodutibilidade
+def visualize_activations(model, image, class_names):
+    """
+    Visualiza as ativações na imagem usando Grad-CAM.
+    """
+    st.write("Visualização de ativações com Grad-CAM não implementada nesta versão.")
 
+def main():
     st.title("Classificação e Clustering de Imagens com Aprendizado Profundo")
     st.write("Este aplicativo permite treinar um modelo de classificação de imagens e aplicar algoritmos de clustering para análise comparativa.")
 
     # Barra Lateral de Configurações
     st.sidebar.title("Configurações do Treinamento")
     num_classes = st.sidebar.number_input("Número de Classes:", min_value=1, step=1)
+    model_name = st.sidebar.selectbox("Modelo Pré-treinado:", options=['ResNet18', 'ResNet50', 'DenseNet121'])
+    fine_tune = st.sidebar.checkbox("Fine-Tuning Completo", value=False)
     epochs = st.sidebar.slider("Número de Épocas:", min_value=1, max_value=50, value=5, step=1)
     learning_rate = st.sidebar.select_slider("Taxa de Aprendizagem:", options=[0.1, 0.01, 0.001, 0.0001], value=0.001)
     batch_size = st.sidebar.selectbox("Tamanho de Lote:", options=[4, 8, 16, 32, 64], index=2)
@@ -481,7 +543,7 @@ def main():
         data_dir = temp_dir
 
         st.write("Iniciando o treinamento supervisionado...")
-        model_data = train_model(data_dir, num_classes, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience)
+        model_data = train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience)
 
         if model_data is None:
             st.error("Erro no treinamento do modelo.")
@@ -494,12 +556,20 @@ def main():
         # Extrair características usando o modelo pré-treinado (sem a camada final)
         st.write("Extraindo características para clustering...")
         # Remover a última camada do modelo para obter embeddings
-        feature_extractor = nn.Sequential(*list(model.model.children())[:-1])
+        if model_name.startswith('ResNet'):
+            feature_extractor = nn.Sequential(*list(model.children())[:-1])
+        elif model_name.startswith('DenseNet'):
+            feature_extractor = nn.Sequential(*list(model.features))
+            feature_extractor.add_module('global_pool', nn.AdaptiveAvgPool2d((1,1)))
+        else:
+            st.error("Modelo não suportado para extração de características.")
+            return
+
         feature_extractor = feature_extractor.to(device)
         feature_extractor.eval()
 
         # Carregar o dataset completo para extração de características
-        full_dataset = datasets.ImageFolder(root=data_dir, transform=common_transforms)
+        full_dataset = datasets.ImageFolder(root=data_dir, transform=test_transforms)
         features, labels = extract_features(full_dataset, feature_extractor, batch_size)
 
         # Aplicar algoritmos de clustering
@@ -531,6 +601,9 @@ def main():
                 class_name, confidence = evaluate_image(model, eval_image, classes)
                 st.write(f"**Classe Predita:** {class_name}")
                 st.write(f"**Confiança:** {confidence:.4f}")
+
+                # Visualizar ativações
+                visualize_activations(model, eval_image, classes)
 
         # Limpar o diretório temporário
         shutil.rmtree(temp_dir)
