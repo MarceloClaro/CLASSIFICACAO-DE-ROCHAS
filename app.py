@@ -4,6 +4,7 @@ import shutil
 import tempfile
 import numpy as np
 from PIL import Image
+from io import BytesIO
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader, random_split
@@ -206,9 +207,16 @@ def main():
             eval_image_file = st.file_uploader("Faça upload da imagem para avaliação", type=["png", "jpg", "jpeg", "bmp", "gif"])
 
             if eval_image_file is not None:
-                # Tentar abrir a imagem diretamente do arquivo enviado
                 try:
-                    eval_image = Image.open(eval_image_file).convert("RGB")
+                    # Obter os dados do arquivo como bytes
+                    image_bytes = eval_image_file.getvalue()
+                    # Verificar se os dados não estão vazios
+                    if image_bytes:
+                        # Abrir a imagem usando BytesIO
+                        eval_image = Image.open(BytesIO(image_bytes)).convert("RGB")
+                    else:
+                        st.error("O arquivo enviado está vazio.")
+                        return
                 except Exception as e:
                     st.error(f"Erro ao abrir a imagem: {e}")
                     return
