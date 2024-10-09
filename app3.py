@@ -622,7 +622,7 @@ def main():
     st.sidebar.write("""
     Projeto Geomaker + IA 
     
-    https://doi.org/10.5281/zenodo.13856575
+    https://doi.org/10.5281/zenodo.13910277
     - Professor: Marcelo Claro.
     Contatos: marceloclaro@gmail.com
     Whatsapp: (88)981587145
