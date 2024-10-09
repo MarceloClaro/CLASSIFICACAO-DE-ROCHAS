@@ -4,7 +4,6 @@ import shutil
 import tempfile
 import numpy as np
 from PIL import Image
-from io import BytesIO
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader, random_split
@@ -17,14 +16,16 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Transformações para as imagens de treinamento
 train_transforms = transforms.Compose([
-    transforms.Resize((224, 224)),
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
     transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
 ])
 
 # Transformações para as imagens de avaliação
 eval_transforms = transforms.Compose([
-    transforms.Resize((224, 224)),
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
     transforms.ToTensor(),
 ])
 
@@ -145,6 +146,7 @@ def train_model(data_dir, num_classes, epochs, learning_rate, batch_size, train_
 
 def evaluate_image(model, image, classes):
     model.eval()
+    # Aplicar as transformações de avaliação na imagem
     image = eval_transforms(image).unsqueeze(0).to(device)
     with torch.no_grad():
         output = model(image)
@@ -207,16 +209,11 @@ def main():
             eval_image_file = st.file_uploader("Faça upload da imagem para avaliação", type=["png", "jpg", "jpeg", "bmp", "gif"])
 
             if eval_image_file is not None:
+                # Redefinir o ponteiro do arquivo para o início
+                eval_image_file.seek(0)
+                # Tentar abrir a imagem diretamente do arquivo enviado
                 try:
-                    # Obter os dados do arquivo como bytes
-                    image_bytes = eval_image_file.getvalue()
-                    # Verificar se os dados não estão vazios
-                    if image_bytes:
-                        # Abrir a imagem usando BytesIO
-                        eval_image = Image.open(BytesIO(image_bytes)).convert("RGB")
-                    else:
-                        st.error("O arquivo enviado está vazio.")
-                        return
+                    eval_image = Image.open(eval_image_file).convert("RGB")
                 except Exception as e:
                     st.error(f"Erro ao abrir a imagem: {e}")
                     return
