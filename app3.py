@@ -603,6 +603,9 @@ def main():
 
     # Barra Lateral de Configurações
     st.sidebar.title("Configurações do Treinamento")
+      # Imagem e Contatos___________________________
+    
+  
     num_classes = st.sidebar.number_input("Número de Classes:", min_value=1, step=1)
     model_name = st.sidebar.selectbox("Modelo Pré-treinado:", options=['ResNet18', 'ResNet50', 'DenseNet121'])
     fine_tune = st.sidebar.checkbox("Fine-Tuning Completo", value=False)
@@ -614,12 +617,8 @@ def main():
     l2_lambda = st.sidebar.number_input("L2 Regularization (Weight Decay):", min_value=0.0, max_value=0.1, value=0.01, step=0.01)
     patience = st.sidebar.number_input("Paciência para Early Stopping:", min_value=1, max_value=10, value=3, step=1)
     use_weighted_loss = st.sidebar.checkbox("Usar Perda Ponderada para Classes Desbalanceadas", value=False)
-      # Imagem e Contatos___________________________
-    if os.path.exists("eu.ico"):
-        st.sidebar.image("eu.ico", width=80)
-    else:
-        st.sidebar.text("Imagem do contato não encontrada.")
-    
+    st.sidebar.image("eu.ico", width=80)
+   
     st.sidebar.write("""
     Projeto Geomaker + IA 
     
