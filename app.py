@@ -4,6 +4,7 @@ import shutil
 import tempfile
 import numpy as np
 from PIL import Image
+from io import BytesIO
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader, random_split
@@ -14,13 +15,14 @@ import matplotlib.pyplot as plt
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Transformações para as imagens de treinamento e avaliação
+# Transformações para as imagens de treinamento
 train_transforms = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
 ])
 
+# Transformações para as imagens de avaliação
 eval_transforms = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
@@ -30,7 +32,6 @@ def train_model(data_dir, num_classes, epochs, learning_rate, batch_size, train_
     # Criar o dataset completo
     full_dataset = datasets.ImageFolder(root=data_dir, transform=train_transforms)
     dataset_size = len(full_dataset)
-    indices = list(range(dataset_size))
     
     # Cálculo do tamanho dos conjuntos de treino e validação
     split = int(np.floor(train_valid_split * dataset_size))
@@ -206,8 +207,14 @@ def main():
             eval_image_file = st.file_uploader("Faça upload da imagem para avaliação", type=["png", "jpg", "jpeg", "bmp", "gif"])
 
             if eval_image_file is not None:
-                # Carregar a imagem
-                eval_image = Image.open(eval_image_file).convert("RGB")
+                # Ler os dados do arquivo em bytes
+                image_bytes = eval_image_file.read()
+                # Abrir a imagem usando BytesIO
+                try:
+                    eval_image = Image.open(BytesIO(image_bytes)).convert("RGB")
+                except Exception as e:
+                    st.error(f"Erro ao abrir a imagem: {e}")
+                    return
 
                 # Exibir a imagem
                 st.image(eval_image, caption='Imagem para avaliação', use_column_width=True)
