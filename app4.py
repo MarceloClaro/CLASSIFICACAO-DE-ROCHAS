@@ -12,18 +12,9 @@ import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms, models, datasets
-from sklearn.cluster import AgglomerativeClustering, KMeans
-from sklearn.metrics import (adjusted_rand_score, normalized_mutual_info_score,
-                             confusion_matrix, classification_report,
-                             roc_auc_score, roc_curve)
-from sklearn.preprocessing import label_binarize
-from sklearn.decomposition import PCA
+from sklearn.metrics import confusion_matrix, classification_report
 import streamlit as st
 import gc
-
-# Importações adicionais para Grad-CAM
-from torchcam.methods import SmoothGradCAMpp
-from torchvision.transforms.functional import normalize, resize, to_pil_image
 
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -172,8 +163,6 @@ def save_model_and_labels(model, labels, model_name="model.tflite", labels_name=
     """
     Salva o modelo em TensorFlow Lite e os labels em um arquivo de texto.
     """
-    # Convertendo o modelo para TFLite (Aqui você pode adicionar conversão a partir de PyTorch)
-    # Exemplo fictício de salvar um modelo convertido para TFLite
     # Salvar os labels
     with open(labels_name, 'w') as f:
         for idx, label in enumerate(labels):
