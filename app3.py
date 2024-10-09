@@ -571,6 +571,32 @@ def visualize_activations(model, image, class_names):
 
 
 def main():
+
+    # Definir o caminho do ícone
+    icon_path = "logo.png"  # Verifique se o arquivo logo.png está no diretório correto
+    
+    # Verificar se o arquivo de ícone existe antes de configurá-lo
+    if os.path.exists(icon_path):
+        st.set_page_config(page_title="Geomaker +IA", page_icon=icon_path, layout="wide")
+        logging.info(f"Ícone {icon_path} carregado com sucesso.")
+    else:
+        # Se o ícone não for encontrado, carrega sem favicon
+        st.set_page_config(page_title="Geomaker +IA", layout="wide")
+        logging.warning(f"Ícone {icon_path} não encontrado, carregando sem favicon.")
+    
+    # Layout da página
+    if os.path.exists('capa.png'):
+        st.image('capa.png', width=100, caption='Laboratório de Educação e Inteligência Artificial - Geomaker. "A melhor forma de prever o futuro é inventá-lo." - Alan Kay', use_column_width='always')
+    else:
+        st.warning("Imagem 'capa.png' não encontrada.")
+    
+    if os.path.exists("logo.png"):
+        st.sidebar.image("logo.png", width=200)
+    else:
+        st.sidebar.text("Imagem do logotipo não encontrada.")
+    
+    
+  #___________________________________________________________
     st.title("Classificação e Clustering de Imagens com Aprendizado Profundo")
     st.write("Este aplicativo permite treinar um modelo de classificação de imagens e aplicar algoritmos de clustering para análise comparativa.")
 
