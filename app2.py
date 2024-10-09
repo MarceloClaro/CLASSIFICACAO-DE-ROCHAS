@@ -102,14 +102,31 @@ def visualize_data(dataset, classes):
 
 def plot_class_distribution(dataset, classes):
     """
-    Exibe a distribuição das classes no conjunto de dados.
+    Exibe a distribuição das classes no conjunto de dados e mostra os valores quantitativos.
     """
-    labels = [classes[label] for _, label in dataset]
-    fig, ax = plt.subplots()
-    sns.countplot(labels, ax=ax)
+    # Extrair os rótulos das classes para todas as imagens no dataset
+    labels = [label for _, label in dataset]
+    
+    # Contagem de cada classe
+    class_counts = np.bincount(labels)
+    
+    # Plotar o gráfico com as contagens
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.countplot(x=labels, ax=ax, palette="Set2")
+    
+    # Adicionar os nomes das classes no eixo X
     ax.set_xticklabels(classes, rotation=45)
-    ax.set_title("Distribuição das Classes")
+    
+    # Adicionar as contagens acima das barras
+    for i, count in enumerate(class_counts):
+        ax.text(i, count, str(count), ha='center', va='bottom', fontweight='bold')
+    
+    ax.set_title("Distribuição das Classes (Quantidade de Imagens)")
+    ax.set_xlabel("Classes")
+    ax.set_ylabel("Número de Imagens")
+    
     st.pyplot(fig)
+
 
 def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
     """
