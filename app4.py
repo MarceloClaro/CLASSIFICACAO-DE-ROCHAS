@@ -12,8 +12,16 @@ import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms, models, datasets
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.cluster import AgglomerativeClustering, KMeans
+from sklearn.metrics import (adjusted_rand_score, normalized_mutual_info_score,
+                             confusion_matrix, classification_report,
+                             roc_auc_score, roc_curve)
+from sklearn.preprocessing import label_binarize
+from sklearn.decomposition import PCA
 import streamlit as st
+import onnx
+import tensorflow as tf
+from onnx_tf.backend import prepare
 import gc
 
 # Definir o dispositivo (CPU ou GPU)
@@ -24,7 +32,7 @@ sns.set_style('whitegrid')
 
 def set_seed(seed):
     """
-    Define a seed para garantir a reprodutibilidade.
+    Define uma seed para garantir a reprodutibilidade.
     """
     random.seed(seed)
     np.random.seed(seed)
@@ -159,83 +167,41 @@ def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
     model = model.to(device)
     return model
 
-def save_model_and_labels(model, labels, model_name="model.tflite", labels_name="labels.txt"):
+def save_model_as_tflite(model, model_name="model.tflite"):
     """
-    Salva o modelo em TensorFlow Lite e os labels em um arquivo de texto.
+    Salva o modelo PyTorch como TensorFlow Lite (TFLite) e compacta o arquivo.
     """
-    # Salvar os labels
-    with open(labels_name, 'w') as f:
-        for idx, label in enumerate(labels):
-            f.write(f"{idx}: {label}\n")
+    # Definir o caminho para o modelo ONNX temporário
+    onnx_path = "model.onnx"
+    tflite_model_path = model_name
 
-    # Compactar os arquivos
-    zip_name = "model_and_labels.zip"
+    # Definir um tensor de exemplo para o modelo
+    dummy_input = torch.randn(1, 3, 224, 224).to(device)
+
+    # Exportar o modelo PyTorch para ONNX
+    torch.onnx.export(model, dummy_input, onnx_path, input_names=["input"], output_names=["output"], opset_version=11)
+
+    # Carregar o modelo ONNX
+    onnx_model = onnx.load(onnx_path)
+
+    # Converter o modelo ONNX para TensorFlow
+    tf_rep = prepare(onnx_model)
+    tf_rep.export_graph("model.pb")
+
+    # Converter para TensorFlow Lite
+    converter = tf.lite.TFLiteConverter.from_saved_model("model.pb")
+    tflite_model = converter.convert()
+
+    # Salvar o modelo TFLite
+    with open(tflite_model_path, "wb") as f:
+        f.write(tflite_model)
+
+    # Compactar o modelo TFLite em um arquivo zip
+    zip_name = "model_tflite.zip"
     with zipfile.ZipFile(zip_name, 'w') as zipf:
-        zipf.write(model_name)
-        zipf.write(labels_name)
-    
+        zipf.write(tflite_model_path)
+
     return zip_name
-
-def plot_metrics(epochs, train_losses, valid_losses, train_accuracies, valid_accuracies):
-    """
-    Plota os gráficos de perda e acurácia.
-    """
-    epochs_range = range(1, len(train_losses)+1)
-    fig, ax = plt.subplots(1, 2, figsize=(14, 5))
-
-    # Gráfico de Perda
-    ax[0].plot(epochs_range, train_losses, label='Treino')
-    ax[0].plot(epochs_range, valid_losses, label='Validação')
-    ax[0].set_title('Perda por Época')
-    ax[0].set_xlabel('Épocas')
-    ax[0].set_ylabel('Perda')
-    ax[0].legend()
-
-    # Gráfico de Acurácia
-    ax[1].plot(epochs_range, train_accuracies, label='Treino')
-    ax[1].plot(epochs_range, valid_accuracies, label='Validação')
-    ax[1].set_title('Acurácia por Época')
-    ax[1].set_xlabel('Épocas')
-    ax[1].set_ylabel('Acurácia')
-    ax[1].legend()
-
-    st.pyplot(fig)
-
-def compute_metrics(model, dataloader, classes):
-    """
-    Calcula métricas detalhadas e exibe matriz de confusão e relatório de classificação.
-    """
-    model.eval()
-    all_preds = []
-    all_labels = []
-    all_probs = []
-
-    with torch.no_grad():
-        for inputs, labels in dataloader:
-            inputs = inputs.to(device)
-            labels = labels.to(device)
-
-            outputs = model(inputs)
-            probabilities = torch.nn.functional.softmax(outputs, dim=1)
-            _, preds = torch.max(outputs, 1)
-
-            all_preds.extend(preds.cpu().numpy())
-            all_labels.extend(labels.cpu().numpy())
-            all_probs.extend(probabilities.cpu().numpy())
-
-    # Relatório de Classificação
-    report = classification_report(all_labels, all_preds, target_names=classes, output_dict=True)
-    st.text("Relatório de Classificação:")
-    st.write(pd.DataFrame(report).transpose())
-
-    # Matriz de Confusão Normalizada
-    cm = confusion_matrix(all_labels, all_preds, normalize='true')
-    fig, ax = plt.subplots()
-    sns.heatmap(cm, annot=True, fmt='.2f', cmap='Blues', xticklabels=classes, yticklabels=classes, ax=ax)
-    ax.set_xlabel('Predito')
-    ax.set_ylabel('Verdadeiro')
-    ax.set_title('Matriz de Confusão Normalizada')
-    st.pyplot(fig)
 
 def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience):
     """
@@ -386,8 +352,12 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     st.write("**Avaliação no Conjunto de Teste**")
     compute_metrics(model, test_loader, full_dataset.classes)
 
-    # Salvar o modelo e os labels em um arquivo ZIP
-    zip_file = save_model_and_labels(model, full_dataset.classes)
+    # Análise de Erros
+    st.write("**Análise de Erros**")
+    error_analysis(model, test_loader, full_dataset.classes)
+
+    # Salvar o modelo como TensorFlow Lite e compactar
+    zip_file = save_model_as_tflite(model)
 
     # Liberar memória
     del train_loader, valid_loader
@@ -395,13 +365,38 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
 
     return model, full_dataset.classes, zip_file
 
-def main():
-    st.title("Classificação e Clustering de Imagens com Aprendizado Profundo")
-    st.write("Este aplicativo permite treinar um modelo de classificação de imagens e aplicar algoritmos de clustering para análise comparativa.")
+def plot_metrics(epochs, train_losses, valid_losses, train_accuracies, valid_accuracies):
+    """
+    Plota os gráficos de perda e acurácia.
+    """
+    epochs_range = range(1, len(train_losses)+1)
+    fig, ax = plt.subplots(1, 2, figsize=(14, 5))
 
-    # Barra Lateral de Configurações
-    st.sidebar.title("Configurações do Treinamento")
-    num_classes = st.sidebar.number_input("Número de Classes:", min_value=1, step=1)
+    # Gráfico de Perda
+    ax[0].plot(epochs_range, train_losses, label='Treino')
+    ax[0].plot(epochs_range, valid_losses, label='Validação')
+    ax[0].set_title('Perda por Época')
+    ax[0].set_xlabel('Épocas')
+    ax[0].set_ylabel('Perda')
+    ax[0].legend()
+
+    # Gráfico de Acurácia
+    ax[1].plot(epochs_range, train_accuracies, label='Treino')
+    ax[1].plot(epochs_range, valid_accuracies, label='Validação')
+    ax[1].set_title('Acurácia por Época')
+    ax[1].set_xlabel('Épocas')
+    ax[1].set_ylabel('Acurácia')
+    ax[1].legend()
+
+    st.pyplot(fig)
+
+# Função principal que será usada pelo Streamlit para rodar a aplicação
+def main():
+    st.title("Classificação de Imagens com Modelo Treinado e Salvo em TFLite")
+    st.sidebar.title("Configurações de Treinamento")
+
+    # Configurações via interface do Streamlit
+    num_classes = st.sidebar.number_input("Número de Classes:", min_value=2, step=1)
     model_name = st.sidebar.selectbox("Modelo Pré-treinado:", options=['ResNet18', 'ResNet50', 'DenseNet121'])
     fine_tune = st.sidebar.checkbox("Fine-Tuning Completo", value=False)
     epochs = st.sidebar.slider("Número de Épocas:", min_value=1, max_value=50, value=5, step=1)
@@ -409,18 +404,12 @@ def main():
     batch_size = st.sidebar.selectbox("Tamanho de Lote:", options=[4, 8, 16, 32, 64], index=2)
     train_split = st.sidebar.slider("Percentual de Treinamento:", min_value=0.5, max_value=0.9, value=0.7, step=0.05)
     valid_split = st.sidebar.slider("Percentual de Validação:", min_value=0.05, max_value=0.4, value=0.15, step=0.05)
-    l2_lambda = st.sidebar.number_input("L2 Regularization (Weight Decay):", min_value=0.0, max_value=0.1, value=0.01, step=0.01)
     patience = st.sidebar.number_input("Paciência para Early Stopping:", min_value=1, max_value=10, value=3, step=1)
-    use_weighted_loss = st.sidebar.checkbox("Usar Perda Ponderada para Classes Desbalanceadas", value=False)
 
-    # Verificar se a soma dos splits é válida
-    if train_split + valid_split > 0.95:
-        st.sidebar.error("A soma dos splits de treinamento e validação deve ser menor ou igual a 0.95.")
-
-    # Upload do arquivo ZIP
+    # Upload do arquivo ZIP com as imagens
     zip_file = st.file_uploader("Upload do arquivo ZIP com as imagens", type=["zip"])
 
-    if zip_file is not None and num_classes > 0 and train_split + valid_split <= 0.95:
+    if zip_file is not None:
         temp_dir = tempfile.mkdtemp()
         zip_path = os.path.join(temp_dir, "uploaded.zip")
         with open(zip_path, "wb") as f:
@@ -429,19 +418,17 @@ def main():
             zip_ref.extractall(temp_dir)
         data_dir = temp_dir
 
-        st.write("Iniciando o treinamento supervisionado...")
-        model_data = train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience)
+        st.write("Iniciando o treinamento...")
+        model_data = train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss=False, l2_lambda=0.01, patience=patience)
 
         if model_data is None:
-            st.error("Erro no treinamento do modelo.")
-            shutil.rmtree(temp_dir)
-            return
+            st.error("Erro no treinamento.")
+        else:
+            model, classes, zip_file = model_data
+            st.success("Treinamento concluído!")
 
-        model, classes, zip_path = model_data
-        st.success("Treinamento concluído!")
-
-        # Link para download do arquivo ZIP
-        st.write(f"Download o arquivo compactado com o modelo e os labels: [Download {zip_path}]")
+            # Link para download do modelo TFLite zipado
+            st.write(f"Baixar o modelo TFLite compactado: [Download {zip_file}]")
 
         # Limpar o diretório temporário
         shutil.rmtree(temp_dir)
