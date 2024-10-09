@@ -614,6 +614,22 @@ def main():
     l2_lambda = st.sidebar.number_input("L2 Regularization (Weight Decay):", min_value=0.0, max_value=0.1, value=0.01, step=0.01)
     patience = st.sidebar.number_input("Paciência para Early Stopping:", min_value=1, max_value=10, value=3, step=1)
     use_weighted_loss = st.sidebar.checkbox("Usar Perda Ponderada para Classes Desbalanceadas", value=False)
+      # Imagem e Contatos___________________________
+    if os.path.exists("eu.ico"):
+        st.sidebar.image("eu.ico", width=80)
+    else:
+        st.sidebar.text("Imagem do contato não encontrada.")
+    
+    st.sidebar.write("""
+    Projeto Geomaker + IA 
+    
+    https://doi.org/10.5281/zenodo.13856575
+    - Professor: Marcelo Claro.
+    Contatos: marceloclaro@gmail.com
+    Whatsapp: (88)981587145
+    Instagram: [marceloclaro.geomaker](https://www.instagram.com/marceloclaro.geomaker/)
+    
+    """)
 
     # Verificar se a soma dos splits é válida
     if train_split + valid_split > 0.95:
