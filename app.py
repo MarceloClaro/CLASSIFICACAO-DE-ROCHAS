@@ -14,43 +14,70 @@ import matplotlib.pyplot as plt
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Transformações para as imagens de treinamento
-train_transforms = transforms.Compose([
+# Transformações comuns para as imagens
+common_transforms = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(224),
-    transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
 ])
 
-# Transformações para as imagens de avaliação
+# Transformações para a imagem de avaliação
 eval_transforms = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(224),
     transforms.ToTensor(),
 ])
 
+# Dataset personalizado com aumento de dados
+class AugmentedDataset(torch.utils.data.Dataset):
+    def __init__(self, dataset):
+        self.dataset = dataset
+        self.transforms_list = [
+            transforms.Compose([]),  # Imagem original
+            transforms.Compose([transforms.RandomHorizontalFlip(p=1)]),  # Inversão horizontal
+            transforms.Compose([transforms.RandomRotation((45, 45))]),  # Rotação de 45 graus
+            transforms.Compose([transforms.RandomRotation((90, 90))])   # Rotação de 90 graus
+        ]
+
+    def __len__(self):
+        return len(self.dataset) * len(self.transforms_list)
+
+    def __getitem__(self, idx):
+        # Índice da imagem original
+        original_idx = idx // len(self.transforms_list)
+        # Índice da transformação
+        transform_idx = idx % len(self.transforms_list)
+
+        image, label = self.dataset[original_idx]
+        transform = self.transforms_list[transform_idx]
+        image = transform(image)
+        image = common_transforms(image)
+        return image, label
+
 def train_model(data_dir, num_classes, epochs, learning_rate, batch_size, train_valid_split):
-    # Criar o dataset completo
-    full_dataset = datasets.ImageFolder(root=data_dir, transform=train_transforms)
-    dataset_size = len(full_dataset)
-    
-    # Cálculo do tamanho dos conjuntos de treino e validação
-    split = int(np.floor(train_valid_split * dataset_size))
-    train_size = dataset_size - split
-    valid_size = split
+    # Carregar o dataset original sem transformações
+    full_dataset = datasets.ImageFolder(root=data_dir)
 
-    # Divisão dos dados
-    train_dataset, valid_dataset = random_split(full_dataset, [train_size, valid_size])
-
-    # Dataloaders
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
+    # Criar o dataset aumentado
+    augmented_dataset = AugmentedDataset(full_dataset)
 
     # Obter o número de classes detectadas
     detected_classes = len(full_dataset.classes)
     if detected_classes != num_classes:
         st.error(f"O número de classes detectadas ({detected_classes}) não coincide com o número fornecido ({num_classes}).")
         return None
+
+    # Dividir o dataset em treino e validação
+    dataset_size = len(augmented_dataset)
+    split = int(np.floor(train_valid_split * dataset_size))
+    train_size = dataset_size - split
+    valid_size = split
+
+    train_dataset, valid_dataset = random_split(augmented_dataset, [train_size, valid_size])
+
+    # Dataloaders
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
 
     # Carregar um modelo pré-treinado
     model = models.resnet18(pretrained=True)
