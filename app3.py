@@ -635,7 +635,8 @@ def main():
     
     # Dicionário de arquivos de áudio, com nomes amigáveis mapeando para o caminho do arquivo
     mp3_files = {
-        "Áudio explicativo 1": "leigo.mp3",
+        "Áudio explicativo para Leigos": "leigo.mp3",
+        "Áudio explicativo para Geografos": "geografo.mp3",
     }
     
     # Lista de arquivos MP3 para seleção
