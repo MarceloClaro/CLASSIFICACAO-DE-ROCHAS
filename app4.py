@@ -176,6 +176,31 @@ def save_model_and_labels(model, labels, model_name="model.tflite", labels_name=
     
     return zip_name
 
+def plot_metrics(epochs, train_losses, valid_losses, train_accuracies, valid_accuracies):
+    """
+    Plota os gráficos de perda e acurácia.
+    """
+    epochs_range = range(1, len(train_losses)+1)
+    fig, ax = plt.subplots(1, 2, figsize=(14, 5))
+
+    # Gráfico de Perda
+    ax[0].plot(epochs_range, train_losses, label='Treino')
+    ax[0].plot(epochs_range, valid_losses, label='Validação')
+    ax[0].set_title('Perda por Época')
+    ax[0].set_xlabel('Épocas')
+    ax[0].set_ylabel('Perda')
+    ax[0].legend()
+
+    # Gráfico de Acurácia
+    ax[1].plot(epochs_range, train_accuracies, label='Treino')
+    ax[1].plot(epochs_range, valid_accuracies, label='Validação')
+    ax[1].set_title('Acurácia por Época')
+    ax[1].set_xlabel('Épocas')
+    ax[1].set_ylabel('Acurácia')
+    ax[1].legend()
+
+    st.pyplot(fig)
+
 def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience):
     """
     Função principal para treinamento do modelo.
