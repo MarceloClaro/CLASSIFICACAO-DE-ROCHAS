@@ -11,3 +11,4 @@ torchcam
 onnx
 tensorflow
 onnx_tf
+tensorflow_addons
