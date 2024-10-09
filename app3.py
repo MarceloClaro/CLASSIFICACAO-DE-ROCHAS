@@ -637,6 +637,7 @@ def main():
     mp3_files = {
         "Áudio explicativo para Leigos": "leigo.mp3",
         "Áudio explicativo para Geografos": "geografo.mp3",
+        "Áudio explicativo para estudos na saúde": "saude.mp3",
     }
     
     # Lista de arquivos MP3 para seleção
