@@ -629,6 +629,68 @@ def main():
     Instagram: [marceloclaro.geomaker](https://www.instagram.com/marceloclaro.geomaker/)
     
     """)
+     # _____________________________________________
+    # Controle de Áudio
+    st.sidebar.title("Controle de Áudio")
+    
+    # Dicionário de arquivos de áudio, com nomes amigáveis mapeando para o caminho do arquivo
+    mp3_files = {
+        "Áudio explicativo 1": "leigo.mp3",
+    }
+    
+    # Lista de arquivos MP3 para seleção
+    selected_mp3 = st.sidebar.radio("Escolha um áudio explicativo:", options=list(mp3_files.keys()))
+    
+    # Controle de opção de repetição
+    loop = st.sidebar.checkbox("Repetir áudio")
+    
+    # Botão de Play para iniciar o áudio
+    play_button = st.sidebar.button("Play")
+    
+    # Placeholder para o player de áudio
+    audio_placeholder = st.sidebar.empty()
+    
+    # Função para verificar se o arquivo existe
+    def check_file_exists(mp3_path):
+        if not os.path.exists(mp3_path):
+            st.sidebar.error(f"Arquivo {mp3_path} não encontrado.")
+            return False
+        return True
+    
+    # Se o botão Play for pressionado e um arquivo de áudio estiver selecionado
+    if play_button and selected_mp3:
+        mp3_path = mp3_files[selected_mp3]
+        
+        # Verificação da existência do arquivo
+        if check_file_exists(mp3_path):
+            try:
+                # Abrindo o arquivo de áudio no modo binário
+                with open(mp3_path, "rb") as audio_file:
+                    audio_bytes = audio_file.read()
+                    
+                    # Codificando o arquivo em base64 para embutir no HTML
+                    audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
+                    
+                    # Controle de loop (repetição)
+                    loop_attr = "loop" if loop else ""
+                    
+                    # Gerando o player de áudio em HTML
+                    audio_html = f"""
+                    <audio id="audio-player" controls autoplay {loop_attr}>
+                      <source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3">
+                      Seu navegador não suporta o elemento de áudio.
+                    </audio>
+                    """
+                    
+                    # Inserindo o player de áudio na interface
+                    audio_placeholder.markdown(audio_html, unsafe_allow_html=True)
+            
+            except FileNotFoundError:
+                st.sidebar.error(f"Arquivo {mp3_path} não encontrado.")
+            except Exception as e:
+                st.sidebar.error(f"Erro ao carregar o arquivo: {str(e)}")
+    #______________________________________________________________________________________-
+
 
     # Verificar se a soma dos splits é válida
     if train_split + valid_split > 0.95:
