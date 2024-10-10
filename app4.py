@@ -19,10 +19,12 @@ from sklearn.metrics import (adjusted_rand_score, normalized_mutual_info_score,
 from sklearn.preprocessing import label_binarize
 from sklearn.decomposition import PCA
 import streamlit as st
-import onnx
-import tensorflow as tf
-from onnx_tf.backend import prepare
 import gc
+import logging
+import base64
+# Importações adicionais para Grad-CAM
+from torchcam.methods import SmoothGradCAMpp
+from torchvision.transforms.functional import normalize, resize, to_pil_image
 
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -32,7 +34,7 @@ sns.set_style('whitegrid')
 
 def set_seed(seed):
     """
-    Define uma seed para garantir a reprodutibilidade.
+    Define a seed para garantir a reprodutibilidade.
     """
     random.seed(seed)
     np.random.seed(seed)
@@ -166,42 +168,6 @@ def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
 
     model = model.to(device)
     return model
-
-def save_model_as_tflite(model, model_name="model.tflite"):
-    """
-    Salva o modelo PyTorch como TensorFlow Lite (TFLite) e compacta o arquivo.
-    """
-    # Definir o caminho para o modelo ONNX temporário
-    onnx_path = "model.onnx"
-    tflite_model_path = model_name
-
-    # Definir um tensor de exemplo para o modelo
-    dummy_input = torch.randn(1, 3, 224, 224).to(device)
-
-    # Exportar o modelo PyTorch para ONNX
-    torch.onnx.export(model, dummy_input, onnx_path, input_names=["input"], output_names=["output"], opset_version=11)
-
-    # Carregar o modelo ONNX
-    onnx_model = onnx.load(onnx_path)
-
-    # Converter o modelo ONNX para TensorFlow
-    tf_rep = prepare(onnx_model)
-    tf_rep.export_graph("model.pb")
-
-    # Converter para TensorFlow Lite
-    converter = tf.lite.TFLiteConverter.from_saved_model("model.pb")
-    tflite_model = converter.convert()
-
-    # Salvar o modelo TFLite
-    with open(tflite_model_path, "wb") as f:
-        f.write(tflite_model)
-
-    # Compactar o modelo TFLite em um arquivo zip
-    zip_name = "model_tflite.zip"
-    with zipfile.ZipFile(zip_name, 'w') as zipf:
-        zipf.write(tflite_model_path)
-
-    return zip_name
 
 def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience):
     """
@@ -356,14 +322,11 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     st.write("**Análise de Erros**")
     error_analysis(model, test_loader, full_dataset.classes)
 
-    # Salvar o modelo como TensorFlow Lite e compactar
-    zip_file = save_model_as_tflite(model)
-
     # Liberar memória
     del train_loader, valid_loader
     gc.collect()
 
-    return model, full_dataset.classes, zip_file
+    return model, full_dataset.classes
 
 def plot_metrics(epochs, train_losses, valid_losses, train_accuracies, valid_accuracies):
     """
@@ -390,13 +353,319 @@ def plot_metrics(epochs, train_losses, valid_losses, train_accuracies, valid_acc
 
     st.pyplot(fig)
 
-# Função principal que será usada pelo Streamlit para rodar a aplicação
-def main():
-    st.title("Classificação de Imagens com Modelo Treinado e Salvo em TFLite")
-    st.sidebar.title("Configurações de Treinamento")
+def compute_metrics(model, dataloader, classes):
+    """
+    Calcula métricas detalhadas e exibe matriz de confusão e relatório de classificação.
+    """
+    model.eval()
+    all_preds = []
+    all_labels = []
+    all_probs = []
 
-    # Configurações via interface do Streamlit
-    num_classes = st.sidebar.number_input("Número de Classes:", min_value=2, step=1)
+    with torch.no_grad():
+        for inputs, labels in dataloader:
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+
+            outputs = model(inputs)
+            probabilities = torch.nn.functional.softmax(outputs, dim=1)
+            _, preds = torch.max(outputs, 1)
+
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+            all_probs.extend(probabilities.cpu().numpy())
+
+    # Relatório de Classificação
+    report = classification_report(all_labels, all_preds, target_names=classes, output_dict=True)
+    st.text("Relatório de Classificação:")
+    st.write(pd.DataFrame(report).transpose())
+
+    # Matriz de Confusão Normalizada
+    cm = confusion_matrix(all_labels, all_preds, normalize='true')
+    fig, ax = plt.subplots()
+    sns.heatmap(cm, annot=True, fmt='.2f', cmap='Blues', xticklabels=classes, yticklabels=classes, ax=ax)
+    ax.set_xlabel('Predito')
+    ax.set_ylabel('Verdadeiro')
+    ax.set_title('Matriz de Confusão Normalizada')
+    st.pyplot(fig)
+
+    # Curva ROC
+    if len(classes) == 2:
+        fpr, tpr, thresholds = roc_curve(all_labels, [p[1] for p in all_probs])
+        roc_auc = roc_auc_score(all_labels, [p[1] for p in all_probs])
+        fig, ax = plt.subplots()
+        ax.plot(fpr, tpr, label='AUC = %0.2f' % roc_auc)
+        ax.plot([0, 1], [0, 1], 'k--')
+        ax.set_xlabel('Taxa de Falsos Positivos')
+        ax.set_ylabel('Taxa de Verdadeiros Positivos')
+        ax.set_title('Curva ROC')
+        ax.legend(loc='lower right')
+        st.pyplot(fig)
+    else:
+        # Multiclasse
+        binarized_labels = label_binarize(all_labels, classes=range(len(classes)))
+        roc_auc = roc_auc_score(binarized_labels, np.array(all_probs), average='weighted', multi_class='ovr')
+        st.write(f"AUC-ROC Média Ponderada: {roc_auc:.4f}")
+
+def error_analysis(model, dataloader, classes):
+    """
+    Realiza análise de erros mostrando algumas imagens mal classificadas.
+    """
+    model.eval()
+    misclassified_images = []
+    misclassified_labels = []
+    misclassified_preds = []
+
+    with torch.no_grad():
+        for inputs, labels in dataloader:
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+            outputs = model(inputs)
+            _, preds = torch.max(outputs, 1)
+
+            incorrect = preds != labels
+            if incorrect.any():
+                misclassified_images.extend(inputs[incorrect].cpu())
+                misclassified_labels.extend(labels[incorrect].cpu())
+                misclassified_preds.extend(preds[incorrect].cpu())
+                if len(misclassified_images) >= 5:
+                    break
+
+    if misclassified_images:
+        st.write("Algumas imagens mal classificadas:")
+        fig, axes = plt.subplots(1, min(5, len(misclassified_images)), figsize=(15, 3))
+        for i in range(min(5, len(misclassified_images))):
+            image = misclassified_images[i]
+            image = image.permute(1, 2, 0).numpy()
+            axes[i].imshow(image)
+            axes[i].set_title(f"V: {classes[misclassified_labels[i]]}\nP: {classes[misclassified_preds[i]]}")
+            axes[i].axis('off')
+        st.pyplot(fig)
+    else:
+        st.write("Nenhuma imagem mal classificada encontrada.")
+
+def extract_features(dataset, model, batch_size):
+    """
+    Extrai características de um conjunto de dados usando um modelo pré-treinado.
+    """
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, worker_init_fn=seed_worker)
+
+    features = []
+    labels = []
+
+    model.eval()
+    with torch.no_grad():
+        for inputs, lbls in dataloader:
+            inputs = inputs.to(device)
+            outputs = model(inputs)
+            outputs = outputs.view(outputs.size(0), -1)  # Flatten
+            features.append(outputs.cpu().numpy())
+            labels.extend(lbls.numpy())
+
+    features = np.concatenate(features, axis=0)
+    labels = np.array(labels)
+    return features, labels
+
+def perform_clustering(features, num_clusters):
+    """
+    Aplica algoritmos de clustering às características.
+    """
+    # Clustering Hierárquico
+    hierarchical = AgglomerativeClustering(n_clusters=num_clusters)
+    hierarchical_labels = hierarchical.fit_predict(features)
+
+    # K-Means
+    kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+    kmeans_labels = kmeans.fit_predict(features)
+
+    return hierarchical_labels, kmeans_labels
+
+def evaluate_clustering(true_labels, cluster_labels, method_name):
+    """
+    Avalia os resultados do clustering comparando com as classes reais.
+    """
+    ari = adjusted_rand_score(true_labels, cluster_labels)
+    nmi = normalized_mutual_info_score(true_labels, cluster_labels)
+    st.write(f"**Métricas para {method_name}:**")
+    st.write(f"Adjusted Rand Index: {ari:.4f}")
+    st.write(f"Normalized Mutual Information Score: {nmi:.4f}")
+
+def visualize_clusters(features, true_labels, hierarchical_labels, kmeans_labels, classes):
+    """
+    Visualiza os clusters usando redução de dimensionalidade e inclui as classes verdadeiras com nomes de rótulos.
+    """
+    # Redução de dimensionalidade com PCA para visualizar os clusters em 2D
+    pca = PCA(n_components=2)
+    reduced_features = pca.fit_transform(features)
+
+    # Mapear os rótulos verdadeiros para os nomes das classes
+    true_labels_named = [classes[label] for label in true_labels]
+    
+    # Usar as cores distintas e visíveis para garantir que os clusters sejam claramente separados
+    color_palette = sns.color_palette("tab10", len(set(true_labels)))
+
+    fig, axes = plt.subplots(1, 3, figsize=(21, 6))  # Agora temos 3 gráficos: Hierarchical, K-Means e classes verdadeiras
+
+    # Clustering Hierárquico
+    sns.scatterplot(x=reduced_features[:, 0], y=reduced_features[:, 1], hue=hierarchical_labels, palette="deep", ax=axes[0], legend='full')
+    axes[0].set_title('Clustering Hierárquico')
+    ari_hierarchical = adjusted_rand_score(true_labels, hierarchical_labels)
+    nmi_hierarchical = normalized_mutual_info_score(true_labels, hierarchical_labels)
+    axes[0].text(0.1, 0.9, f"ARI: {ari_hierarchical:.2f}\nNMI: {nmi_hierarchical:.2f}", horizontalalignment='center', verticalalignment='center', transform=axes[0].transAxes, bbox=dict(facecolor='white', alpha=0.5))
+
+    # K-Means Clustering
+    sns.scatterplot(x=reduced_features[:, 0], y=reduced_features[:, 1], hue=kmeans_labels, palette="deep", ax=axes[1], legend='full')
+    axes[1].set_title('K-Means Clustering')
+    ari_kmeans = adjusted_rand_score(true_labels, kmeans_labels)
+    nmi_kmeans = normalized_mutual_info_score(true_labels, kmeans_labels)
+    axes[1].text(0.1, 0.9, f"ARI: {ari_kmeans:.2f}\nNMI: {nmi_kmeans:.2f}", horizontalalignment='center', verticalalignment='center', transform=axes[1].transAxes, bbox=dict(facecolor='white', alpha=0.5))
+
+    # Classes verdadeiras
+    sns.scatterplot(x=reduced_features[:, 0], y=reduced_features[:, 1], hue=true_labels_named, palette=color_palette, ax=axes[2], legend='full')
+    axes[2].set_title('Classes Verdadeiras')
+
+    # Exibir os gráficos
+    st.pyplot(fig)
+
+def evaluate_image(model, image, classes):
+    """
+    Avalia uma única imagem e retorna a classe predita e a confiança.
+    """
+    model.eval()
+    image_tensor = test_transforms(image).unsqueeze(0).to(device)
+    with torch.no_grad():
+        output = model(image_tensor)
+        probabilities = torch.nn.functional.softmax(output, dim=1)
+        confidence, predicted = torch.max(probabilities, 1)
+        class_idx = predicted.item()
+        class_name = classes[class_idx]
+        return class_name, confidence.item()
+
+import cv2
+
+def visualize_activations_robust(model, image, class_names):
+    """
+    Visualiza as ativações na imagem usando Grad-CAM com uma visualização aprimorada e robusta.
+    Inclui ajustes dinâmicos de transparência, suavização e múltiplas técnicas de visualização.
+    """
+    model.eval()
+    # Preparar a imagem
+    input_tensor = test_transforms(image).unsqueeze(0).to(device)
+    
+    # Selecionar a camada alvo (última camada convolucional)
+    if isinstance(model, models.ResNet):
+        target_layer = model.layer4[-1]
+    elif isinstance(model, models.DenseNet):
+        target_layer = model.features[-1]
+    else:
+        st.error("Modelo não suportado para Grad-CAM.")
+        return
+
+    # Criar o método CAM
+    cam_extractor = SmoothGradCAMpp(model, target_layer=target_layer)
+
+    # Fazer uma previsão para obter o índice da classe predita
+    out = model(input_tensor)
+    _, pred = torch.max(out, 1)
+    pred_class = pred.item()
+
+    # Gerar o mapa de ativação
+    activation_map = cam_extractor(pred_class, out)
+
+    # Converter o mapa de ativação para uma imagem e garantir o formato correto
+    activation_map = activation_map[0].squeeze().cpu().numpy()
+
+    # Redimensionar o mapa de ativação para corresponder ao tamanho da imagem original
+    activation_map_resized = np.array(Image.fromarray(activation_map).resize(input_tensor.shape[-2:], resample=Image.BILINEAR))
+
+    # Normalizar o mapa de ativação para o intervalo [0, 1]
+    activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
+
+    # Aplicar suavização no mapa de ativação para melhorar a visualização
+    activation_map_smoothed = cv2.GaussianBlur(activation_map_resized, (5, 5), 0)
+
+    # Ajuste dinâmico de transparência (alpha) com base na intensidade do mapa de calor
+    alpha_map = np.clip(activation_map_smoothed * 2.0, 0.5, 1.0)
+
+    # Exibir a imagem original e o mapa de ativação sobreposto com ajuste dinâmico de transparência
+    fig, ax = plt.subplots(1, 2, figsize=(12, 6))
+
+    # Imagem original
+    ax[0].imshow(image)
+    ax[0].set_title('Imagem Original')
+    ax[0].axis('off')
+
+    # Mapa de ativação sobreposto à imagem original
+    ax[1].imshow(image)
+    ax[1].imshow(activation_map_smoothed, cmap='jet', alpha=alpha_map)  # Ajuste dinâmico de transparência
+    ax[1].set_title('Grad-CAM com Transparência Dinâmica e Suavização')
+    ax[1].axis('off')
+
+    st.pyplot(fig)
+
+    # Adicionar a visualização de camadas intermediárias
+    visualize_intermediate_layers(model, input_tensor, image)
+
+def visualize_intermediate_layers(model, input_tensor, original_image):
+    """
+    Gera visualizações de camadas intermediárias para entender a hierarquia das características aprendidas.
+    """
+    # Camadas intermediárias para visualização
+    intermediate_layers = [model.layer2[-1], model.layer3[-1]]  # Pode adicionar mais camadas conforme necessário
+
+    fig, ax = plt.subplots(1, len(intermediate_layers), figsize=(12, 4))
+    for i, layer in enumerate(intermediate_layers):
+        cam_extractor = SmoothGradCAMpp(model, target_layer=layer)
+        activation_map = cam_extractor(0, input_tensor)
+        activation_map_resized = np.array(Image.fromarray(activation_map[0].squeeze().cpu().numpy()).resize(input_tensor.shape[-2:], resample=Image.BILINEAR))
+        activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
+
+        ax[i].imshow(original_image)
+        ax[i].imshow(activation_map_resized, cmap='jet', alpha=0.6)  # Ajuste de transparência
+        ax[i].set_title(f'Ativações na Camada Intermediária {i+1}')
+        ax[i].axis('off')
+
+    st.pyplot(fig)
+
+
+
+
+def main():
+
+    # Definir o caminho do ícone
+    icon_path = "logo.png"  # Verifique se o arquivo logo.png está no diretório correto
+    
+    # Verificar se o arquivo de ícone existe antes de configurá-lo
+    if os.path.exists(icon_path):
+        st.set_page_config(page_title="Geomaker +IA", page_icon=icon_path, layout="wide")
+        logging.info(f"Ícone {icon_path} carregado com sucesso.")
+    else:
+        # Se o ícone não for encontrado, carrega sem favicon
+        st.set_page_config(page_title="Geomaker +IA", layout="wide")
+        logging.warning(f"Ícone {icon_path} não encontrado, carregando sem favicon.")
+    
+    # Layout da página
+    if os.path.exists('capa.png'):
+        st.image('capa.png', width=100, caption='Laboratório de Educação e Inteligência Artificial - Geomaker. "A melhor forma de prever o futuro é inventá-lo." - Alan Kay', use_column_width='always')
+    else:
+        st.warning("Imagem 'capa.png' não encontrada.")
+    
+    if os.path.exists("logo.png"):
+        st.sidebar.image("logo.png", width=200)
+    else:
+        st.sidebar.text("Imagem do logotipo não encontrada.")
+    
+    
+  #___________________________________________________________
+    st.title("Classificação e Clustering de Imagens com Aprendizado Profundo")
+    st.write("Este aplicativo permite treinar um modelo de classificação de imagens e aplicar algoritmos de clustering para análise comparativa.")
+
+    # Barra Lateral de Configurações
+    st.sidebar.title("Configurações do Treinamento")
+      # Imagem e Contatos___________________________
+    
+  
+    num_classes = st.sidebar.number_input("Número de Classes:", min_value=1, step=1)
     model_name = st.sidebar.selectbox("Modelo Pré-treinado:", options=['ResNet18', 'ResNet50', 'DenseNet121'])
     fine_tune = st.sidebar.checkbox("Fine-Tuning Completo", value=False)
     epochs = st.sidebar.slider("Número de Épocas:", min_value=1, max_value=50, value=5, step=1)
@@ -404,12 +673,94 @@ def main():
     batch_size = st.sidebar.selectbox("Tamanho de Lote:", options=[4, 8, 16, 32, 64], index=2)
     train_split = st.sidebar.slider("Percentual de Treinamento:", min_value=0.5, max_value=0.9, value=0.7, step=0.05)
     valid_split = st.sidebar.slider("Percentual de Validação:", min_value=0.05, max_value=0.4, value=0.15, step=0.05)
+    l2_lambda = st.sidebar.number_input("L2 Regularization (Weight Decay):", min_value=0.0, max_value=0.1, value=0.01, step=0.01)
     patience = st.sidebar.number_input("Paciência para Early Stopping:", min_value=1, max_value=10, value=3, step=1)
+    use_weighted_loss = st.sidebar.checkbox("Usar Perda Ponderada para Classes Desbalanceadas", value=False)
+    st.sidebar.image("eu.ico", width=80)
+   
+    st.sidebar.write("""
+    Projeto Geomaker + IA 
+    
+    https://doi.org/10.5281/zenodo.13910277
+    - Professor: Marcelo Claro.
+    Contatos: marceloclaro@gmail.com
+    Whatsapp: (88)981587145
+    Instagram: [marceloclaro.geomaker](https://www.instagram.com/marceloclaro.geomaker/)
+    
+    """)
+     # _____________________________________________
+    # Controle de Áudio
+    st.sidebar.title("Controle de Áudio")
+    
+    # Dicionário de arquivos de áudio, com nomes amigáveis mapeando para o caminho do arquivo
+    mp3_files = {
+        "Áudio explicativo para Leigos": "leigo.mp3",
+        "Áudio explicativo para Geografos": "geografo.mp3",
+        "Áudio explicativo para estudos na saúde": "saude.mp3",
+    }
+    
+    # Lista de arquivos MP3 para seleção
+    selected_mp3 = st.sidebar.radio("Escolha um áudio explicativo:", options=list(mp3_files.keys()))
+    
+    # Controle de opção de repetição
+    loop = st.sidebar.checkbox("Repetir áudio")
+    
+    # Botão de Play para iniciar o áudio
+    play_button = st.sidebar.button("Play")
+    
+    # Placeholder para o player de áudio
+    audio_placeholder = st.sidebar.empty()
+    
+    # Função para verificar se o arquivo existe
+    def check_file_exists(mp3_path):
+        if not os.path.exists(mp3_path):
+            st.sidebar.error(f"Arquivo {mp3_path} não encontrado.")
+            return False
+        return True
+    
+    # Se o botão Play for pressionado e um arquivo de áudio estiver selecionado
+    if play_button and selected_mp3:
+        mp3_path = mp3_files[selected_mp3]
+        
+        # Verificação da existência do arquivo
+        if check_file_exists(mp3_path):
+            try:
+                # Abrindo o arquivo de áudio no modo binário
+                with open(mp3_path, "rb") as audio_file:
+                    audio_bytes = audio_file.read()
+                    
+                    # Codificando o arquivo em base64 para embutir no HTML
+                    audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
+                    
+                    # Controle de loop (repetição)
+                    loop_attr = "loop" if loop else ""
+                    
+                    # Gerando o player de áudio em HTML
+                    audio_html = f"""
+                    <audio id="audio-player" controls autoplay {loop_attr}>
+                      <source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3">
+                      Seu navegador não suporta o elemento de áudio.
+                    </audio>
+                    """
+                    
+                    # Inserindo o player de áudio na interface
+                    audio_placeholder.markdown(audio_html, unsafe_allow_html=True)
+            
+            except FileNotFoundError:
+                st.sidebar.error(f"Arquivo {mp3_path} não encontrado.")
+            except Exception as e:
+                st.sidebar.error(f"Erro ao carregar o arquivo: {str(e)}")
+    #______________________________________________________________________________________-
 
-    # Upload do arquivo ZIP com as imagens
+
+    # Verificar se a soma dos splits é válida
+    if train_split + valid_split > 0.95:
+        st.sidebar.error("A soma dos splits de treinamento e validação deve ser menor ou igual a 0.95.")
+
+    # Upload do arquivo ZIP
     zip_file = st.file_uploader("Upload do arquivo ZIP com as imagens", type=["zip"])
 
-    if zip_file is not None:
+    if zip_file is not None and num_classes > 0 and train_split + valid_split <= 0.95:
         temp_dir = tempfile.mkdtemp()
         zip_path = os.path.join(temp_dir, "uploaded.zip")
         with open(zip_path, "wb") as f:
@@ -418,17 +769,68 @@ def main():
             zip_ref.extractall(temp_dir)
         data_dir = temp_dir
 
-        st.write("Iniciando o treinamento...")
-        model_data = train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss=False, l2_lambda=0.01, patience=patience)
+        st.write("Iniciando o treinamento supervisionado...")
+        model_data = train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience)
 
         if model_data is None:
-            st.error("Erro no treinamento.")
-        else:
-            model, classes, zip_file = model_data
-            st.success("Treinamento concluído!")
+            st.error("Erro no treinamento do modelo.")
+            shutil.rmtree(temp_dir)
+            return
 
-            # Link para download do modelo TFLite zipado
-            st.write(f"Baixar o modelo TFLite compactado: [Download {zip_file}]")
+        model, classes = model_data
+        st.success("Treinamento concluído!")
+
+        # Extrair características usando o modelo pré-treinado (sem a camada final)
+        st.write("Extraindo características para clustering...")
+        # Remover a última camada do modelo para obter embeddings
+        if model_name.startswith('ResNet'):
+            feature_extractor = nn.Sequential(*list(model.children())[:-1])
+        elif model_name.startswith('DenseNet'):
+            feature_extractor = nn.Sequential(*list(model.features))
+            feature_extractor.add_module('global_pool', nn.AdaptiveAvgPool2d((1,1)))
+        else:
+            st.error("Modelo não suportado para extração de características.")
+            return
+
+        feature_extractor = feature_extractor.to(device)
+        feature_extractor.eval()
+
+        # Carregar o dataset completo para extração de características
+        full_dataset = datasets.ImageFolder(root=data_dir, transform=test_transforms)
+        features, labels = extract_features(full_dataset, feature_extractor, batch_size)
+
+        # Aplicar algoritmos de clustering
+        st.write("Aplicando algoritmos de clustering...")
+        features_reshaped = features.reshape(len(features), -1)
+        hierarchical_labels, kmeans_labels = perform_clustering(features_reshaped, num_classes)
+
+        # Avaliar e exibir os resultados
+        st.write("Avaliando os resultados do clustering...")
+        evaluate_clustering(labels, hierarchical_labels, "Clustering Hierárquico")
+        evaluate_clustering(labels, kmeans_labels, "K-Means Clustering")
+
+        # Visualizar clusters
+        visualize_clusters(features_reshaped, labels, hierarchical_labels, kmeans_labels, classes)
+
+        # Avaliação de uma imagem individual
+        evaluate = st.radio("Deseja avaliar uma imagem?", ("Sim", "Não"))
+        if evaluate == "Sim":
+            eval_image_file = st.file_uploader("Faça upload da imagem para avaliação", type=["png", "jpg", "jpeg", "bmp", "gif"])
+            if eval_image_file is not None:
+                eval_image_file.seek(0)
+                try:
+                    eval_image = Image.open(eval_image_file).convert("RGB")
+                except Exception as e:
+                    st.error(f"Erro ao abrir a imagem: {e}")
+                    return
+
+                st.image(eval_image, caption='Imagem para avaliação', use_column_width=True)
+                class_name, confidence = evaluate_image(model, eval_image, classes)
+                st.write(f"**Classe Predita:** {class_name}")
+                st.write(f"**Confiança:** {confidence:.4f}")
+
+                # Visualizar ativações
+                visualize_activations(model, eval_image, classes)
 
         # Limpar o diretório temporário
         shutil.rmtree(temp_dir)
