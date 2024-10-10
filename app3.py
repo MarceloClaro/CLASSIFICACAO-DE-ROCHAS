@@ -20,6 +20,7 @@ from sklearn.preprocessing import label_binarize
 from sklearn.decomposition import PCA
 import streamlit as st
 import gc
+import cv2
 import logging
 import base64
 # Importações adicionais para Grad-CAM
