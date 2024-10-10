@@ -492,39 +492,21 @@ def evaluate_clustering(true_labels, cluster_labels, method_name):
 
 def visualize_clusters(features, true_labels, hierarchical_labels, kmeans_labels, classes):
     """
-    Visualiza os clusters usando redução de dimensionalidade e inclui as classes verdadeiras com nomes de rótulos.
+    Visualiza os clusters usando redução de dimensionalidade.
     """
-    # Redução de dimensionalidade com PCA para visualizar os clusters em 2D
     pca = PCA(n_components=2)
     reduced_features = pca.fit_transform(features)
 
-    # Mapear os rótulos verdadeiros para os nomes das classes
-    true_labels_named = [classes[label] for label in true_labels]
-    
-    # Usar as cores distintas e visíveis para garantir que os clusters sejam claramente separados
-    color_palette = sns.color_palette("tab10", len(set(true_labels)))
-
-    fig, axes = plt.subplots(1, 3, figsize=(21, 6))  # Agora temos 3 gráficos: Hierarchical, K-Means e classes verdadeiras
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
     # Clustering Hierárquico
-    sns.scatterplot(x=reduced_features[:, 0], y=reduced_features[:, 1], hue=hierarchical_labels, palette="deep", ax=axes[0], legend='full')
+    sns.scatterplot(x=reduced_features[:,0], y=reduced_features[:,1], hue=hierarchical_labels, palette="deep", ax=axes[0], legend='full')
     axes[0].set_title('Clustering Hierárquico')
-    ari_hierarchical = adjusted_rand_score(true_labels, hierarchical_labels)
-    nmi_hierarchical = normalized_mutual_info_score(true_labels, hierarchical_labels)
-    axes[0].text(0.1, 0.9, f"ARI: {ari_hierarchical:.2f}\nNMI: {nmi_hierarchical:.2f}", horizontalalignment='center', verticalalignment='center', transform=axes[0].transAxes, bbox=dict(facecolor='white', alpha=0.5))
 
-    # K-Means Clustering
-    sns.scatterplot(x=reduced_features[:, 0], y=reduced_features[:, 1], hue=kmeans_labels, palette="deep", ax=axes[1], legend='full')
+    # K-Means
+    sns.scatterplot(x=reduced_features[:,0], y=reduced_features[:,1], hue=kmeans_labels, palette="deep", ax=axes[1], legend='full')
     axes[1].set_title('K-Means Clustering')
-    ari_kmeans = adjusted_rand_score(true_labels, kmeans_labels)
-    nmi_kmeans = normalized_mutual_info_score(true_labels, kmeans_labels)
-    axes[1].text(0.1, 0.9, f"ARI: {ari_kmeans:.2f}\nNMI: {nmi_kmeans:.2f}", horizontalalignment='center', verticalalignment='center', transform=axes[1].transAxes, bbox=dict(facecolor='white', alpha=0.5))
 
-    # Classes verdadeiras
-    sns.scatterplot(x=reduced_features[:, 0], y=reduced_features[:, 1], hue=true_labels_named, palette=color_palette, ax=axes[2], legend='full')
-    axes[2].set_title('Classes Verdadeiras')
-
-    # Exibir os gráficos
     st.pyplot(fig)
 
 def evaluate_image(model, image, classes):
@@ -541,18 +523,15 @@ def evaluate_image(model, image, classes):
         class_name = classes[class_idx]
         return class_name, confidence.item()
 
-import cv2
-
-def visualize_activations_robust(model, image, class_names):
+def visualize_activations(model, image, class_names):
     """
-    Visualiza as ativações na imagem usando Grad-CAM com uma visualização aprimorada e robusta.
-    Inclui ajustes dinâmicos de transparência, suavização e múltiplas técnicas de visualização.
+    Visualiza as ativações na imagem usando Grad-CAM.
     """
     model.eval()
     # Preparar a imagem
     input_tensor = test_transforms(image).unsqueeze(0).to(device)
     
-    # Selecionar a camada alvo (última camada convolucional)
+    # Selecionar a camada alvo (por exemplo, a última camada convolucional)
     if isinstance(model, models.ResNet):
         target_layer = model.layer4[-1]
     elif isinstance(model, models.DenseNet):
@@ -573,72 +552,24 @@ def visualize_activations_robust(model, image, class_names):
     activation_map = cam_extractor(pred_class, out)
 
     # Converter o mapa de ativação para uma imagem e garantir o formato correto
-    activation_map = activation_map[0].squeeze().cpu().numpy()
-
+    activation_map = activation_map[0].squeeze().cpu().numpy()  # Garantir que é uma matriz numpy
+    
     # Redimensionar o mapa de ativação para corresponder ao tamanho da imagem original
     activation_map_resized = np.array(Image.fromarray(activation_map).resize(input_tensor.shape[-2:], resample=Image.BILINEAR))
 
-    # Normalizar o mapa de ativação para o intervalo [0, 1]
-    activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
-
-    # Aplicar suavização no mapa de ativação para melhorar a visualização
-    activation_map_smoothed = cv2.GaussianBlur(activation_map_resized, (5, 5), 0)
-
-    # Ajuste dinâmico de transparência (alpha) com base na intensidade do mapa de calor
-    alpha_map = np.clip(activation_map_smoothed * 2.0, 0.5, 1.0)
-
-    # Exibir a imagem original e o mapa de ativação sobreposto com ajuste dinâmico de transparência
-    fig, ax = plt.subplots(1, 2, figsize=(12, 6))
-
-    # Imagem original
+    # Exibir a imagem original e o mapa de ativação sobreposto
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
     ax[0].imshow(image)
     ax[0].set_title('Imagem Original')
     ax[0].axis('off')
 
-    # Mapa de ativação sobreposto à imagem original
     ax[1].imshow(image)
-    ax[1].imshow(activation_map_smoothed, cmap='jet', alpha=alpha_map)  # Ajuste dinâmico de transparência
-    ax[1].set_title('Grad-CAM com Transparência Dinâmica e Suavização')
+    ax[1].imshow(activation_map_resized, cmap='jet', alpha=0.5)
+    ax[1].set_title('Grad-CAM')
     ax[1].axis('off')
 
     st.pyplot(fig)
 
-    # Adicionar a visualização de camadas intermediárias
-    visualize_intermediate_layers(model, input_tensor, image)
-
-def visualize_intermediate_layers(model, input_tensor, original_image):
-    """
-    Gera visualizações de camadas intermediárias para entender a hierarquia das características aprendidas.
-    """
-    # Camadas intermediárias para visualização
-    intermediate_layers = [model.layer2[-1], model.layer3[-1]]  # Pode adicionar mais camadas conforme necessário
-
-    # Passe o input_tensor pelo modelo para gerar as ativações
-    with torch.no_grad():
-        _ = model(input_tensor)  # Executa o forward pass no modelo
-
-    fig, ax = plt.subplots(1, len(intermediate_layers), figsize=(12, 4))
-    for i, layer in enumerate(intermediate_layers):
-        cam_extractor = SmoothGradCAMpp(model, target_layer=layer)
-        
-        # Após o forward pass, agora podemos gerar o CAM
-        activation_map = cam_extractor(0, input_tensor)
-        
-        # Redimensiona o mapa de ativação
-        activation_map_resized = np.array(
-            Image.fromarray(activation_map[0].squeeze().cpu().numpy()).resize(input_tensor.shape[-2:], resample=Image.BILINEAR)
-        )
-        
-        # Normaliza o mapa de ativação
-        activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
-
-        # Mostra o mapa de ativação sobreposto à imagem original
-        ax[i].imshow(original_image)
-        ax[i].imshow(activation_map_resized, cmap='jet', alpha=0.6)  # Ajuste de transparência
-        ax[i].set_title(f'Ativações na Camada Intermediária {i+1}')
-        ax[i].axis('off')
-
-    st.pyplot(fig)
 
 def main():
 
@@ -840,7 +771,7 @@ def main():
                 st.write(f"**Confiança:** {confidence:.4f}")
 
                 # Visualizar ativações
-                visualize_activations_robust(model, eval_image, classes)
+                visualize_activations(model, eval_image, classes)
 
         # Limpar o diretório temporário
         shutil.rmtree(temp_dir)
