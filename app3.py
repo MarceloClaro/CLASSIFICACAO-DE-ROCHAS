@@ -543,7 +543,7 @@ def evaluate_image(model, image, classes):
 
 def visualize_activations(model, image, class_names):
     """
-    Visualiza as ativações na imagem usando Grad-CAM.
+    Visualiza as ativações na imagem usando Grad-CAM com uma visualização aprimorada.
     """
     model.eval()
     # Preparar a imagem
@@ -551,7 +551,7 @@ def visualize_activations(model, image, class_names):
     
     # Selecionar a camada alvo (por exemplo, a última camada convolucional)
     if isinstance(model, models.ResNet):
-        target_layer = model.layer4[-1]
+        target_layer = model.layer4[-1]  # Última camada convolucional
     elif isinstance(model, models.DenseNet):
         target_layer = model.features[-1]
     else:
@@ -575,18 +575,25 @@ def visualize_activations(model, image, class_names):
     # Redimensionar o mapa de ativação para corresponder ao tamanho da imagem original
     activation_map_resized = np.array(Image.fromarray(activation_map).resize(input_tensor.shape[-2:], resample=Image.BILINEAR))
 
+    # Normalizar o mapa de ativação para o intervalo [0, 1]
+    activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
+
     # Exibir a imagem original e o mapa de ativação sobreposto
-    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    fig, ax = plt.subplots(1, 2, figsize=(12, 6))
+
+    # Imagem original
     ax[0].imshow(image)
     ax[0].set_title('Imagem Original')
     ax[0].axis('off')
 
+    # Mapa de ativação sobreposto à imagem original
     ax[1].imshow(image)
-    ax[1].imshow(activation_map_resized, cmap='jet', alpha=0.5)
-    ax[1].set_title('Grad-CAM')
+    ax[1].imshow(activation_map_resized, cmap='jet', alpha=0.6)  # Ajuste de transparência para maior visibilidade
+    ax[1].set_title('Grad-CAM com Mapa de Calor')
     ax[1].axis('off')
 
     st.pyplot(fig)
+
 
 
 def main():
