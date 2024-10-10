@@ -492,21 +492,39 @@ def evaluate_clustering(true_labels, cluster_labels, method_name):
 
 def visualize_clusters(features, true_labels, hierarchical_labels, kmeans_labels, classes):
     """
-    Visualiza os clusters usando redução de dimensionalidade.
+    Visualiza os clusters usando redução de dimensionalidade e inclui as classes verdadeiras com nomes de rótulos.
     """
+    # Redução de dimensionalidade com PCA para visualizar os clusters em 2D
     pca = PCA(n_components=2)
     reduced_features = pca.fit_transform(features)
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    # Mapear os rótulos verdadeiros para os nomes das classes
+    true_labels_named = [classes[label] for label in true_labels]
+    
+    # Usar as cores distintas e visíveis para garantir que os clusters sejam claramente separados
+    color_palette = sns.color_palette("tab10", len(set(true_labels)))
+
+    fig, axes = plt.subplots(1, 3, figsize=(21, 6))  # Agora temos 3 gráficos: Hierarchical, K-Means e classes verdadeiras
 
     # Clustering Hierárquico
-    sns.scatterplot(x=reduced_features[:,0], y=reduced_features[:,1], hue=hierarchical_labels, palette="deep", ax=axes[0], legend='full')
+    sns.scatterplot(x=reduced_features[:, 0], y=reduced_features[:, 1], hue=hierarchical_labels, palette="deep", ax=axes[0], legend='full')
     axes[0].set_title('Clustering Hierárquico')
+    ari_hierarchical = adjusted_rand_score(true_labels, hierarchical_labels)
+    nmi_hierarchical = normalized_mutual_info_score(true_labels, hierarchical_labels)
+    axes[0].text(0.1, 0.9, f"ARI: {ari_hierarchical:.2f}\nNMI: {nmi_hierarchical:.2f}", horizontalalignment='center', verticalalignment='center', transform=axes[0].transAxes, bbox=dict(facecolor='white', alpha=0.5))
 
-    # K-Means
-    sns.scatterplot(x=reduced_features[:,0], y=reduced_features[:,1], hue=kmeans_labels, palette="deep", ax=axes[1], legend='full')
+    # K-Means Clustering
+    sns.scatterplot(x=reduced_features[:, 0], y=reduced_features[:, 1], hue=kmeans_labels, palette="deep", ax=axes[1], legend='full')
     axes[1].set_title('K-Means Clustering')
+    ari_kmeans = adjusted_rand_score(true_labels, kmeans_labels)
+    nmi_kmeans = normalized_mutual_info_score(true_labels, kmeans_labels)
+    axes[1].text(0.1, 0.9, f"ARI: {ari_kmeans:.2f}\nNMI: {nmi_kmeans:.2f}", horizontalalignment='center', verticalalignment='center', transform=axes[1].transAxes, bbox=dict(facecolor='white', alpha=0.5))
 
+    # Classes verdadeiras
+    sns.scatterplot(x=reduced_features[:, 0], y=reduced_features[:, 1], hue=true_labels_named, palette=color_palette, ax=axes[2], legend='full')
+    axes[2].set_title('Classes Verdadeiras')
+
+    # Exibir os gráficos
     st.pyplot(fig)
 
 def evaluate_image(model, image, classes):
