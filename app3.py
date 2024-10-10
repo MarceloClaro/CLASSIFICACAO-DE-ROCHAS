@@ -492,22 +492,29 @@ def evaluate_clustering(true_labels, cluster_labels, method_name):
 
 def visualize_clusters(features, true_labels, hierarchical_labels, kmeans_labels, classes):
     """
-    Visualiza os clusters usando redução de dimensionalidade.
+    Visualiza os clusters usando redução de dimensionalidade e inclui as classes verdadeiras.
     """
+    # Redução de dimensionalidade com PCA para visualizar os clusters em 2D
     pca = PCA(n_components=2)
     reduced_features = pca.fit_transform(features)
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    fig, axes = plt.subplots(1, 3, figsize=(21, 6))  # Agora temos 3 gráficos: Hierarchical, K-Means e classes verdadeiras
 
     # Clustering Hierárquico
-    sns.scatterplot(x=reduced_features[:,0], y=reduced_features[:,1], hue=hierarchical_labels, palette="deep", ax=axes[0], legend='full')
+    sns.scatterplot(x=reduced_features[:, 0], y=reduced_features[:, 1], hue=hierarchical_labels, palette="deep", ax=axes[0], legend='full')
     axes[0].set_title('Clustering Hierárquico')
 
-    # K-Means
-    sns.scatterplot(x=reduced_features[:,0], y=reduced_features[:,1], hue=kmeans_labels, palette="deep", ax=axes[1], legend='full')
+    # K-Means Clustering
+    sns.scatterplot(x=reduced_features[:, 0], y=reduced_features[:, 1], hue=kmeans_labels, palette="deep", ax=axes[1], legend='full')
     axes[1].set_title('K-Means Clustering')
 
+    # Classes verdadeiras
+    sns.scatterplot(x=reduced_features[:, 0], y=reduced_features[:, 1], hue=true_labels, palette="deep", ax=axes[2], legend='full')
+    axes[2].set_title('Classes Verdadeiras')
+
+    # Exibir os gráficos
     st.pyplot(fig)
+
 
 def evaluate_image(model, image, classes):
     """
