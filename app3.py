@@ -546,10 +546,8 @@ def visualize_activations(model, image, class_names):
     Visualiza as ativações na imagem usando Grad-CAM.
     """
     model.eval()
-    # Preparar a imagem
     input_tensor = test_transforms(image).unsqueeze(0).to(device)
     
-    # Selecionar a camada alvo (por exemplo, a última camada convolucional)
     if isinstance(model, models.ResNet):
         target_layer = model.layer4[-1]
     elif isinstance(model, models.DenseNet):
@@ -558,35 +556,40 @@ def visualize_activations(model, image, class_names):
         st.error("Modelo não suportado para Grad-CAM.")
         return
 
-    # Criar o método CAM
     cam_extractor = SmoothGradCAMpp(model, target_layer=target_layer)
 
-    # Fazer uma previsão para obter o índice da classe predita
-    out = model(input_tensor)
-    _, pred = torch.max(out, 1)
-    pred_class = pred.item()
+    # Habilitar gradientes explicitamente
+    with torch.set_grad_enabled(True):
+        out = model(input_tensor)
+        _, pred = torch.max(out, 1)
+        pred_class = pred.item()
 
-    # Gerar o mapa de ativação
-    activation_map = cam_extractor(pred_class, out)
+        # Gerar o mapa de ativação
+        activation_map = cam_extractor(pred_class, out)
 
-    # Converter o mapa de ativação para uma imagem e garantir o formato correto
-    activation_map = activation_map[0].squeeze().cpu().numpy()  # Garantir que é uma matriz numpy
+    activation_map = activation_map[0].squeeze().cpu().numpy()
     
-    # Redimensionar o mapa de ativação para corresponder ao tamanho da imagem original
-    activation_map_resized = np.array(Image.fromarray(activation_map).resize(input_tensor.shape[-2:], resample=Image.BILINEAR))
+    # Redimensionar o mapa de ativação para coincidir exatamente com a imagem original
+    activation_map_resized = cv2.resize(activation_map, (image.size[0], image.size[1]))
+
+    # Normalizar o mapa de ativação para o intervalo [0, 1]
+    activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
 
     # Exibir a imagem original e o mapa de ativação sobreposto
     fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    
     ax[0].imshow(image)
     ax[0].set_title('Imagem Original')
     ax[0].axis('off')
 
+    # Sobrepor o mapa de ativação redimensionado na imagem original
     ax[1].imshow(image)
     ax[1].imshow(activation_map_resized, cmap='jet', alpha=0.5)
     ax[1].set_title('Grad-CAM')
     ax[1].axis('off')
 
     st.pyplot(fig)
+
 
 
 def main():
