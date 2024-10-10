@@ -613,22 +613,32 @@ def visualize_intermediate_layers(model, input_tensor, original_image):
     # Camadas intermediárias para visualização
     intermediate_layers = [model.layer2[-1], model.layer3[-1]]  # Pode adicionar mais camadas conforme necessário
 
+    # Passe o input_tensor pelo modelo para gerar as ativações
+    with torch.no_grad():
+        _ = model(input_tensor)  # Executa o forward pass no modelo
+
     fig, ax = plt.subplots(1, len(intermediate_layers), figsize=(12, 4))
     for i, layer in enumerate(intermediate_layers):
         cam_extractor = SmoothGradCAMpp(model, target_layer=layer)
+        
+        # Após o forward pass, agora podemos gerar o CAM
         activation_map = cam_extractor(0, input_tensor)
-        activation_map_resized = np.array(Image.fromarray(activation_map[0].squeeze().cpu().numpy()).resize(input_tensor.shape[-2:], resample=Image.BILINEAR))
+        
+        # Redimensiona o mapa de ativação
+        activation_map_resized = np.array(
+            Image.fromarray(activation_map[0].squeeze().cpu().numpy()).resize(input_tensor.shape[-2:], resample=Image.BILINEAR)
+        )
+        
+        # Normaliza o mapa de ativação
         activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
 
+        # Mostra o mapa de ativação sobreposto à imagem original
         ax[i].imshow(original_image)
         ax[i].imshow(activation_map_resized, cmap='jet', alpha=0.6)  # Ajuste de transparência
         ax[i].set_title(f'Ativações na Camada Intermediária {i+1}')
         ax[i].axis('off')
 
     st.pyplot(fig)
-
-
-
 
 def main():
 
