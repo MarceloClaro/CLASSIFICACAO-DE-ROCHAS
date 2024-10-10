@@ -830,7 +830,7 @@ def main():
                 st.write(f"**Confiança:** {confidence:.4f}")
 
                 # Visualizar ativações
-                visualize_activations(model, eval_image, classes)
+                visualize_activations_robust(model, eval_image, classes)
 
         # Limpar o diretório temporário
         shutil.rmtree(temp_dir)
