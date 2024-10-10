@@ -8,4 +8,4 @@ matplotlib
 seaborn 
 scikit-learn
 torchcam
-cv2
+opencv-python
