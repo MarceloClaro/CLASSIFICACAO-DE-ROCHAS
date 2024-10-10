@@ -541,17 +541,20 @@ def evaluate_image(model, image, classes):
         class_name = classes[class_idx]
         return class_name, confidence.item()
 
-def visualize_activations(model, image, class_names):
+import cv2
+
+def visualize_activations_robust(model, image, class_names):
     """
-    Visualiza as ativações na imagem usando Grad-CAM com uma visualização aprimorada.
+    Visualiza as ativações na imagem usando Grad-CAM com uma visualização aprimorada e robusta.
+    Inclui ajustes dinâmicos de transparência, suavização e múltiplas técnicas de visualização.
     """
     model.eval()
     # Preparar a imagem
     input_tensor = test_transforms(image).unsqueeze(0).to(device)
     
-    # Selecionar a camada alvo (por exemplo, a última camada convolucional)
+    # Selecionar a camada alvo (última camada convolucional)
     if isinstance(model, models.ResNet):
-        target_layer = model.layer4[-1]  # Última camada convolucional
+        target_layer = model.layer4[-1]
     elif isinstance(model, models.DenseNet):
         target_layer = model.features[-1]
     else:
@@ -570,15 +573,21 @@ def visualize_activations(model, image, class_names):
     activation_map = cam_extractor(pred_class, out)
 
     # Converter o mapa de ativação para uma imagem e garantir o formato correto
-    activation_map = activation_map[0].squeeze().cpu().numpy()  # Garantir que é uma matriz numpy
-    
+    activation_map = activation_map[0].squeeze().cpu().numpy()
+
     # Redimensionar o mapa de ativação para corresponder ao tamanho da imagem original
     activation_map_resized = np.array(Image.fromarray(activation_map).resize(input_tensor.shape[-2:], resample=Image.BILINEAR))
 
     # Normalizar o mapa de ativação para o intervalo [0, 1]
     activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
 
-    # Exibir a imagem original e o mapa de ativação sobreposto
+    # Aplicar suavização no mapa de ativação para melhorar a visualização
+    activation_map_smoothed = cv2.GaussianBlur(activation_map_resized, (5, 5), 0)
+
+    # Ajuste dinâmico de transparência (alpha) com base na intensidade do mapa de calor
+    alpha_map = np.clip(activation_map_smoothed * 2.0, 0.5, 1.0)
+
+    # Exibir a imagem original e o mapa de ativação sobreposto com ajuste dinâmico de transparência
     fig, ax = plt.subplots(1, 2, figsize=(12, 6))
 
     # Imagem original
@@ -588,11 +597,36 @@ def visualize_activations(model, image, class_names):
 
     # Mapa de ativação sobreposto à imagem original
     ax[1].imshow(image)
-    ax[1].imshow(activation_map_resized, cmap='jet', alpha=0.6)  # Ajuste de transparência para maior visibilidade
-    ax[1].set_title('Grad-CAM com Mapa de Calor')
+    ax[1].imshow(activation_map_smoothed, cmap='jet', alpha=alpha_map)  # Ajuste dinâmico de transparência
+    ax[1].set_title('Grad-CAM com Transparência Dinâmica e Suavização')
     ax[1].axis('off')
 
     st.pyplot(fig)
+
+    # Adicionar a visualização de camadas intermediárias
+    visualize_intermediate_layers(model, input_tensor, image)
+
+def visualize_intermediate_layers(model, input_tensor, original_image):
+    """
+    Gera visualizações de camadas intermediárias para entender a hierarquia das características aprendidas.
+    """
+    # Camadas intermediárias para visualização
+    intermediate_layers = [model.layer2[-1], model.layer3[-1]]  # Pode adicionar mais camadas conforme necessário
+
+    fig, ax = plt.subplots(1, len(intermediate_layers), figsize=(12, 4))
+    for i, layer in enumerate(intermediate_layers):
+        cam_extractor = SmoothGradCAMpp(model, target_layer=layer)
+        activation_map = cam_extractor(0, input_tensor)
+        activation_map_resized = np.array(Image.fromarray(activation_map[0].squeeze().cpu().numpy()).resize(input_tensor.shape[-2:], resample=Image.BILINEAR))
+        activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
+
+        ax[i].imshow(original_image)
+        ax[i].imshow(activation_map_resized, cmap='jet', alpha=0.6)  # Ajuste de transparência
+        ax[i].set_title(f'Ativações na Camada Intermediária {i+1}')
+        ax[i].axis('off')
+
+    st.pyplot(fig)
+
 
 
 
