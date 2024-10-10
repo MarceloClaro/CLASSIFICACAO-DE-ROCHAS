@@ -582,7 +582,7 @@ def visualize_activations(model, image, class_names):
     ax[0].axis('off')
 
     ax[1].imshow(image)
-    ax[1].imshow(activation_map_resized, cmap='jet', alpha=0.7)
+    ax[1].imshow(activation_map_resized, cmap='jet', alpha=0.5)
     ax[1].set_title('Grad-CAM')
     ax[1].axis('off')
 
