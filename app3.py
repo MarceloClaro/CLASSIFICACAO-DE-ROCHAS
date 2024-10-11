@@ -546,9 +546,10 @@ def visualize_activations(model, image, class_names):
     """
     Visualiza as ativações na imagem usando Grad-CAM.
     """
-    model.eval()
+    model.eval()  # Coloca o modelo em modo de avaliação
     input_tensor = test_transforms(image).unsqueeze(0).to(device)
     
+    # Verificar se o modelo é suportado
     if isinstance(model, models.ResNet):
         target_layer = model.layer4[-1]
     elif isinstance(model, models.DenseNet):
@@ -557,17 +558,19 @@ def visualize_activations(model, image, class_names):
         st.error("Modelo não suportado para Grad-CAM.")
         return
 
+    # Criar extrator CAM com a camada alvo
     cam_extractor = SmoothGradCAMpp(model, target_layer=target_layer)
 
     # Habilitar gradientes explicitamente
     with torch.set_grad_enabled(True):
-        out = model(input_tensor)
-        _, pred = torch.max(out, 1)
+        out = model(input_tensor)  # Faz a previsão
+        _, pred = torch.max(out, 1)  # Pega a classe predita
         pred_class = pred.item()
 
         # Gerar o mapa de ativação
         activation_map = cam_extractor(pred_class, out)
 
+    # Converter o mapa de ativação em numpy e garantir que está no formato correto
     activation_map = activation_map[0].squeeze().cpu().numpy()
     
     # Redimensionar o mapa de ativação para coincidir exatamente com a imagem original
@@ -579,6 +582,7 @@ def visualize_activations(model, image, class_names):
     # Exibir a imagem original e o mapa de ativação sobreposto
     fig, ax = plt.subplots(1, 2, figsize=(10, 5))
     
+    # Imagem original
     ax[0].imshow(image)
     ax[0].set_title('Imagem Original')
     ax[0].axis('off')
@@ -589,6 +593,7 @@ def visualize_activations(model, image, class_names):
     ax[1].set_title('Grad-CAM')
     ax[1].axis('off')
 
+    # Exibir as imagens com o Streamlit
     st.pyplot(fig)
 
 
