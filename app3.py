@@ -677,8 +677,8 @@ def main():
             \text{Se } L_{\text{val}}(t) \geq L_{\text{val}}(t-1) \text{ por } p \text{ épocas consecutivas, então interrompa o treinamento.}
             ''')
             st.write("""
-            Aqui, \(L_{\text{val}}(t)\) representa o valor da **função de perda** no conjunto de validação na época \(t\), e \(p\) é o **parâmetro de paciência**. 
-            A paciência (\(p\)) define quanto tempo o treinamento deve continuar mesmo que não haja melhorias imediatas. Se a perda não melhorar por \(p\) épocas consecutivas, 
+            Aqui, \[L_{\text{val}}(t)\] representa o valor da **função de perda** no conjunto de validação na época \(t\), e \(p\) é o **parâmetro de paciência**. 
+            A paciência (\[p\]) define quanto tempo o treinamento deve continuar mesmo que não haja melhorias imediatas. Se a perda não melhorar por \(p\) épocas consecutivas, 
             o treinamento é interrompido.
             """)
     
