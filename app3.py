@@ -658,9 +658,9 @@ def main():
     #________________________________________________________________________________________
     # Sidebar com o conteúdo explicativo e fórmula LaTeX
     with st.sidebar:
-        with st.expander("Implementação da Técnica de Parada Precoce"):
+        with st.expander("Implementação da Técnica de Parada Precoce - Early Stopping:"):
             st.write("""
-            ### Implementação da Técnica de Parada Precoce no Treinamento de Redes Neurais Profundas: Uma Abordagem para Evitar Overfitting
+            ### Implementação da Técnica de Parada Precoce (Early Stopping) no Treinamento de Redes Neurais Profundas: Uma Abordagem para Evitar Overfitting
     
             #### Introdução
             A implementação da técnica de parada precoce (*early stopping*) no treinamento de redes neurais profundas é uma estratégia importante para mitigar o problema do *overfitting*. 
