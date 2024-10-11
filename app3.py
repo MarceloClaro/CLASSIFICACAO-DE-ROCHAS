@@ -657,97 +657,86 @@ def main():
     
     #________________________________________________________________________________________
     # Sidebar com o conteúdo explicativo e fórmula LaTeX
+   
     with st.sidebar:
         with st.expander("Implementação da Técnica de Parada Precoce - Early Stopping:"):
             st.write("""
-            ### Implementação da Técnica de Parada Precoce (Early Stopping) no Treinamento de Redes Neurais Profundas: Uma Abordagem para Evitar Overfitting
+            ### Implementação e Interpretação de Early Stopping no Treinamento de Redes Neurais Profundas
     
             #### Introdução
-            A implementação da técnica de parada precoce (*early stopping*) no treinamento de redes neurais profundas é uma estratégia importante para mitigar o problema do *overfitting*. 
-            O *overfitting* ocorre quando um modelo se ajusta aos dados de treinamento, comprometendo sua capacidade de generalização para novos dados. A parada precoce interrompe o treinamento 
-            de um modelo quando seu desempenho em um conjunto de validação não apresenta melhorias significativas após um número predefinido de épocas. 
-            Essa abordagem baseia-se na observação de que, após um certo ponto, a melhoria no desempenho do modelo em dados de treinamento não resulta em melhorias em dados desconhecidos, 
-            prejudicando a capacidade preditiva do modelo (Piotrowski & Napiorkowski, 2013; Al‐Rimy et al., 2023).
+            A técnica de **parada precoce** (ou *early stopping*) é amplamente utilizada para mitigar o **overfitting** no treinamento de redes neurais profundas. 
+            O overfitting ocorre quando o modelo se ajusta tão bem aos dados de treinamento que sua capacidade de generalização para novos dados é prejudicada. 
+            O princípio da parada precoce é interromper o treinamento quando o desempenho do modelo em um conjunto de validação não apresenta melhorias significativas 
+            após um número predefinido de épocas. Essa abordagem baseia-se na observação de que, após certo ponto, melhorias no desempenho do modelo em dados de treinamento 
+            não resultam em melhorias em dados que o modelo ainda não viu (Piotrowski & Napiorkowski, 2013; Al‐Rimy et al., 2023).
             """)
     
             st.write("Matematicamente, a parada precoce pode ser descrita pela seguinte condição de interrupção:")
             # Fórmulas matemáticas
             st.latex(r'''
-            \text{Se } L_{\text{val}}(t) \geq L_{\text{val}}(t-1)
-            ''')
-            st.latex(r'''
-            \text{ para } p \text{ épocas consecutivas,}
-            ''')
-            st.latex(r'''
-            \text{ então interrompa o treinamento.}
+            \text{Se } L_{\text{val}}(t) \geq L_{\text{val}}(t-1) \text{ por } p \text{ épocas consecutivas, então interrompa o treinamento.}
             ''')
             st.write("""
-            Onde
-            """)
-            st.latex(r'''
-            L_{\text{val}}(t) \text{ é a função de perda no tempo } t 
-            ''')
-            st.write("""
-            e
-            """)
-            st.latex(r'''
-            p \text{ é o parâmetro de paciência.}
-            ''')
-            st.write("""
-            Essa técnica economiza recursos computacionais e evita a complexidade excessiva do modelo,
-            resultando em um melhor desempenho em dados não vistos (Sakizadeh et al., 2015; Liao et al., 2018).
-            """)
-            st.write("""
-            Onde \( L_{\text{val}}(t) \) é a função de perda no tempo \( t \) e \( p \) é o parâmetro de paciência. Essa técnica economiza recursos computacionais e evita a complexidade excessiva do modelo,
-            resultando em um melhor desempenho em dados não vistos (Sakizadeh et al., 2015; Liao et al., 2018).
+            Aqui, \(L_{\text{val}}(t)\) representa o valor da **função de perda** no conjunto de validação na época \(t\), e \(p\) é o **parâmetro de paciência**. 
+            A paciência (\(p\)) define quanto tempo o treinamento deve continuar mesmo que não haja melhorias imediatas. Se a perda não melhorar por \(p\) épocas consecutivas, 
+            o treinamento é interrompido.
             """)
     
             st.write("""
-            #### Paciência: Conceito e Aplicação
-            O parâmetro chave do *early stopping* é a **paciência**, que define o número de épocas consecutivas que o modelo pode continuar a ser treinado sem apresentar melhorias na métrica monitorada.
-            Um valor baixo de paciência pode levar à interrupção prematura do treinamento, enquanto um valor elevado pode permitir que o modelo se ajuste excessivamente aos dados de treinamento, resultando em *overfitting*.
+            #### A Importância da Paciência
+            O parâmetro de **paciência** define o número de épocas consecutivas sem melhoria na métrica de validação que o modelo pode suportar antes de o treinamento ser interrompido. 
+            A escolha do valor de paciência tem impacto direto no equilíbrio entre **evitar o overfitting** e **permitir que o modelo continue aprendendo**. 
             """)
     
             st.write("##### Paciência = 0")
             st.write("""
-            Um valor de paciência igual a zero implica que o treinamento será interrompido imediatamente após a primeira ocorrência de estagnação na métrica de validação. Isso pode ser útil em cenários onde se deseja evitar qualquer risco de *overfitting*.
+            Um valor de paciência igual a zero implica que o treinamento será interrompido imediatamente após a primeira ocorrência de estagnação na métrica de validação. 
+            Isso pode ser útil em cenários onde se deseja evitar qualquer risco de *overfitting*.
             """)
     
             st.write("##### Paciência ≥ 1")
             st.write("""
-            Uma paciência maior (como 1 ou 2) permite que o modelo continue sendo treinado mesmo após pequenas flutuações no desempenho, o que pode ser benéfico em conjuntos de dados ruidosos (Sakizadeh et al., 2015).
+            Uma paciência maior (como 1 ou 2) permite que o modelo continue sendo treinado mesmo após pequenas flutuações no desempenho, 
+            o que pode ser benéfico em conjuntos de dados ruidosos (Sakizadeh et al., 2015).
             """)
     
             st.write("""
             #### Impacto do *Early Stopping* e da Paciência
-            A escolha da paciência é uma troca entre eficiência computacional e a capacidade de generalização. Modelos com paciência baixa tendem a interromper o treinamento rapidamente, 
-            evitando o *overfitting*, enquanto paciências maiores permitem ao modelo uma exploração mais profunda do espaço de parâmetros.
+            A configuração do parâmetro de paciência influencia diretamente a eficiência do treinamento. Com uma paciência muito baixa, o treinamento pode ser interrompido de forma prematura, 
+            mesmo que o modelo ainda tenha potencial de melhoria. Por outro lado, uma paciência muito alta pode permitir que o modelo se ajuste excessivamente aos dados de treinamento, 
+            levando ao *overfitting* (Sakizadeh et al., 2015).
             """)
     
             st.write("""
-            Em experimentos práticos, como na detecção de melanoma, a parada precoce pode ser aplicada para interromper o treinamento se a acurácia no conjunto de validação não melhorar após um número específico de épocas.
+            #### Exemplos de Aplicação
+            Um exemplo prático de uso da parada precoce é em tarefas de **classificação de imagens**. Durante o treinamento de um modelo para detecção de melanoma, se a acurácia no conjunto de validação 
+            não melhorar após um determinado número de épocas, o early stopping é acionado.
             """)
     
             st.write("""
-            #### Aplicações Combinadas de Parada Precoce e Outras Técnicas de Regularização
-            A implementação da parada precoce pode ser combinada com outras técnicas de regularização, como a injeção de ruído e a regularização L1/L2, para melhorar a robustez do modelo e sua capacidade de generalização.
+            #### Integração com Outras Técnicas de Regularização
+            A parada precoce pode ser usada em conjunto com outras técnicas de regularização, como a **injeção de ruído** e a regularização **L1/L2**, 
+            para melhorar a robustez do modelo e sua capacidade de generalização (Friedrich et al., 2022; Rezaeezade & Batina, 2022). 
+            A combinação dessas técnicas ajuda a evitar que o modelo se ajuste excessivamente aos dados de treinamento, principalmente em cenários com volumes limitados de dados.
             """)
     
             st.write("""
             #### Conclusão
-            A técnica de parada precoce é uma ferramenta poderosa no treinamento de redes neurais profundas, ajudando a evitar o *overfitting* e economizando recursos computacionais. A escolha adequada do parâmetro de paciência é essencial para equilibrar
-            a eficiência computacional com a capacidade de aprendizado do modelo.
+            A **parada precoce** é uma técnica eficaz para evitar o *overfitting* no treinamento de redes neurais profundas. O valor da paciência desempenha um papel crítico, 
+            permitindo o equilíbrio entre **eficiência computacional** e **capacidade de aprendizado**. Além disso, a combinação da parada precoce com outras técnicas de regularização 
+            pode melhorar ainda mais o desempenho do modelo.
             """)
     
             st.write("""
             #### Referências
-            - AL‐RIMY, B.; SAEED, F.; AL-SAREM, M.; ALBARRAK, A.; QASEM, S. An adaptive early stopping technique for densenet169-based knee osteoarthritis detection model. *Diagnostics*, 13(11), 1903, 2023.
-            - FRIEDRICH, S. et al. Regularization approaches in clinical biostatistics: a review of methods and their applications. *Statistical Methods in Medical Research*, 32(2), 425-440, 2022.
-            - LIAO, R. et al. The Rayleigh fading channel prediction via deep learning. *Wireless Communications and Mobile Computing*, 2018.
-            - PIOTROWSKI, A.; NAPIORKOWSKI, J. A comparison of methods to avoid overfitting in neural networks training. *Journal of Hydrology*, 476, 97-111, 2013.
-            - REZAEEZADE, A.; BATINA, L. Regularizers to the rescue: fighting overfitting in deeplearning-based side-channel analysis. *arXiv preprint*, 2022.
-            - SAKIZADEH, M.; MALIAN, A.; AHMADPOUR, E. Groundwater quality modeling with a small data set. *Ground Water*, 54(1), 115-120, 2015.
+            - PIOTROWSKI, A.; NAPIORKOWSKI, J. A comparison of methods to avoid overfitting in neural networks training in the case of catchment runoff modelling. *Journal of Hydrology*, v. 476, p. 97-111, 2013. https://doi.org/10.1016/j.jhydrol.2012.10.019.
+            - AL‐RIMY, B. et al. An adaptive early stopping technique for densenet169-based knee osteoarthritis detection model. *Diagnostics*, v. 13, n. 11, p. 1903, 2023. https://doi.org/10.3390/diagnostics13111903.
+            - SAKIZADEH, M.; MALIAN, A.; AHMADPOUR, E. Groundwater quality modeling with a small data set. *Ground Water*, v. 54, n. 1, p. 115-120, 2015. https://doi.org/10.1111/gwat.12317.
+            - LIAO, R. et al. The Rayleigh fading channel prediction via deep learning. *Wireless Communications and Mobile Computing*, v. 2018, p. 6497340, 2018. https://doi.org/10.1155/2018/6497340.
+            - FRIEDRICH, S. et al. Regularization approaches in clinical biostatistics: a review of methods and their applications. *Statistical Methods in Medical Research*, v. 32, n. 2, p. 425-440, 2022. https://doi.org/10.1177/09622802221133557.
+            - REZAEEZADE, A.; BATINA, L. Regularizers to the rescue: fighting overfitting in deep learning-based side-channel analysis. *arXiv preprint*, 2022. https://doi.org/10.21203/rs.3.rs-2386625/v1.
             """)
+
     #________________________________________________________________________________________
     patience = st.sidebar.number_input("Paciência para Early Stopping:", min_value=1, max_value=10, value=3, step=1)
     use_weighted_loss = st.sidebar.checkbox("Usar Perda Ponderada para Classes Desbalanceadas", value=False)
