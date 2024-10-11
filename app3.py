@@ -685,8 +685,8 @@ def main():
             st.latex(r'''
             L_{\text{val}}(t) \text{ é a função de perda no tempo } t 
             ''')
-           st.write("""
-           e
+            st.write("""
+            e
             """)
             st.latex(r'''
             p \text{ é o parâmetro de paciência.}
