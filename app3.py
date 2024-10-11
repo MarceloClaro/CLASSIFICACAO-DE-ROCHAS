@@ -671,11 +671,30 @@ def main():
             """)
     
             st.write("Matematicamente, a parada precoce pode ser descrita pela seguinte condição de interrupção:")
-            
+            # Fórmulas matemáticas
             st.latex(r'''
-            \text{Se } L_{\text{val}}(t) \geq L_{\text{val}}(t-1) \text{ para } p \text{ épocas consecutivas, então interrompa o treinamento.}
+            \text{Se } L_{\text{val}}(t) \geq L_{\text{val}}(t-1)
             ''')
             
+            st.latex(r'''
+            \text{ para } p \text{ épocas consecutivas, então interrompa o treinamento.}
+            ''')
+            st.write("""
+            Onde
+            """)
+            st.latex(r'''
+            L_{\text{val}}(t) \text{ é a função de perda no tempo } t 
+            ''')
+           st.write("""
+           e
+            """)
+            st.latex(r'''
+            p \text{ é o parâmetro de paciência.}
+            ''')
+            st.write("""
+            Essa técnica economiza recursos computacionais e evita a complexidade excessiva do modelo,
+            resultando em um melhor desempenho em dados não vistos (Sakizadeh et al., 2015; Liao et al., 2018).
+            """)
             st.write("""
             Onde \( L_{\text{val}}(t) \) é a função de perda no tempo \( t \) e \( p \) é o parâmetro de paciência. Essa técnica economiza recursos computacionais e evita a complexidade excessiva do modelo,
             resultando em um melhor desempenho em dados não vistos (Sakizadeh et al., 2015; Liao et al., 2018).
