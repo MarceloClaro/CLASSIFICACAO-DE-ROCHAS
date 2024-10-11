@@ -23,6 +23,9 @@ import gc
 import cv2
 import logging
 import base64
+import torch.nn as nn
+import torchvision.models as models
+
 # Importações adicionais para Grad-CAM
 from torchcam.methods import SmoothGradCAMpp
 from torchvision.transforms.functional import normalize, resize, to_pil_image
@@ -542,6 +545,17 @@ def evaluate_image(model, image, classes):
         class_name = classes[class_idx]
         return class_name, confidence.item()
 
+#________________________________________________
+
+
+# Função para capturar ativações da camada de interesse
+activations = {}
+
+def get_activation(name):
+    def hook(model, input, output):
+        activations[name] = output.detach()
+    return hook
+
 def visualize_activations(model, image, class_names):
     """
     Visualiza as ativações na imagem usando Grad-CAM.
@@ -557,9 +571,9 @@ def visualize_activations(model, image, class_names):
     else:
         st.error("Modelo não suportado para Grad-CAM.")
         return
-
-    # Criar extrator CAM com a camada alvo
-    cam_extractor = SmoothGradCAMpp(model, target_layer=target_layer)
+    
+    # Registrar hook para capturar a saída da camada de interesse
+    target_layer.register_forward_hook(get_activation('target_layer'))
 
     # Habilitar gradientes explicitamente
     with torch.set_grad_enabled(True):
@@ -568,36 +582,27 @@ def visualize_activations(model, image, class_names):
         pred_class = pred.item()
 
         # Gerar o mapa de ativação
-        activation_map = cam_extractor(pred_class, out)
+        activation_map = activations['target_layer'].squeeze().cpu().numpy()
 
-    # Converter o mapa de ativação em numpy e garantir que está no formato correto
-    activation_map = activation_map[0].squeeze().cpu().numpy()
-    
     # Redimensionar o mapa de ativação para coincidir exatamente com a imagem original
-    activation_map_resized = cv2.resize(activation_map, (image.size[0], image.size[1]))
+    activation_map_resized = cv2.resize(activation_map[0], (image.size[0], image.size[1]))
 
     # Normalizar o mapa de ativação para o intervalo [0, 1]
     activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
 
     # Exibir a imagem original e o mapa de ativação sobreposto
-    fig, ax = plt.subplots(1, 3, figsize=(15, 5))
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
     
     # Imagem original
     ax[0].imshow(image)
     ax[0].set_title('Imagem Original')
     ax[0].axis('off')
 
-    # Exibir a camada intermediária que está sendo usada para gerar o Grad-CAM
-    intermediate_output = target_layer(input_tensor).detach().cpu().numpy()[0]
-    ax[1].imshow(intermediate_output[0], cmap='gray')
-    ax[1].set_title('Imagem Intermediária (Camada Neural)')
-    ax[1].axis('off')
-
     # Sobrepor o mapa de ativação redimensionado na imagem original
-    ax[2].imshow(image)
-    ax[2].imshow(activation_map_resized, cmap='jet', alpha=0.5)
-    ax[2].set_title('Grad-CAM')
-    ax[2].axis('off')
+    ax[1].imshow(image)
+    ax[1].imshow(activation_map_resized, cmap='jet', alpha=0.5)
+    ax[1].set_title('Grad-CAM')
+    ax[1].axis('off')
 
     # Exibir as imagens com o Streamlit
     st.pyplot(fig)
