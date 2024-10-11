@@ -580,21 +580,28 @@ def visualize_activations(model, image, class_names):
     activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
 
     # Exibir a imagem original e o mapa de ativação sobreposto
-    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    fig, ax = plt.subplots(1, 3, figsize=(15, 5))
     
     # Imagem original
     ax[0].imshow(image)
     ax[0].set_title('Imagem Original')
     ax[0].axis('off')
 
-    # Sobrepor o mapa de ativação redimensionado na imagem original
-    ax[1].imshow(image)
-    ax[1].imshow(activation_map_resized, cmap='jet', alpha=0.5)
-    ax[1].set_title('Grad-CAM')
+    # Exibir a camada intermediária que está sendo usada para gerar o Grad-CAM
+    intermediate_output = target_layer(input_tensor).detach().cpu().numpy()[0]
+    ax[1].imshow(intermediate_output[0], cmap='gray')
+    ax[1].set_title('Imagem Intermediária (Camada Neural)')
     ax[1].axis('off')
+
+    # Sobrepor o mapa de ativação redimensionado na imagem original
+    ax[2].imshow(image)
+    ax[2].imshow(activation_map_resized, cmap='jet', alpha=0.5)
+    ax[2].set_title('Grad-CAM')
+    ax[2].axis('off')
 
     # Exibir as imagens com o Streamlit
     st.pyplot(fig)
+
 
 
 
