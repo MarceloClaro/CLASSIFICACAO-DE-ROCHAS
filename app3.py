@@ -675,9 +675,11 @@ def main():
             st.latex(r'''
             \text{Se } L_{\text{val}}(t) \geq L_{\text{val}}(t-1)
             ''')
-            
             st.latex(r'''
-            \text{ para } p \text{ épocas consecutivas, então interrompa o treinamento.}
+            \text{ para } p \text{ épocas consecutivas,}
+            ''')
+            st.latex(r'''
+            \text{ então interrompa o treinamento.}
             ''')
             st.write("""
             Onde
