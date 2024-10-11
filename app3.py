@@ -672,12 +672,13 @@ def main():
             """)
     
             st.write("Matematicamente, a parada precoce pode ser descrita pela seguinte condição de interrupção:")
-            # Fórmulas matemáticas
+           # Fórmulas matemáticas
             st.latex(r'''
-            \text{Se } L_{\text{val}}(t) \geq L_{\text{val}}(t-1) }
+            \text{Se } L_{\text{val}}(t) \geq L_{\text{val}}(t-1) \text{ por } p \text{ épocas }
             ''')
+
             st.latex(r'''
-            \text{ por } p \text{ épocas consecutivas, então interrompa o treinamento.}
+            \text{ consecutivas, então interrompa o treinamento.}
             ''')
             st.write("""
             Aqui, \[L_{\text{val}}(t)\] representa o valor da **função de perda** no conjunto de validação na época \(t\), e \(p\) é o **parâmetro de paciência**. 
