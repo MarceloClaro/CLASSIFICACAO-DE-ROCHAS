@@ -679,14 +679,14 @@ def main():
             st.write("""
             Onde:
             """) 
-            st.write("- ")
+            
             st.latex(r'''
             L_{\text{total}}
             ''')
             st.write("""
             é a perda total que o modelo busca minimizar;
             """)
-            st.write("- ")
+            
             st.latex(r'''
             L_{\text{original}}
             ''')
