@@ -957,6 +957,7 @@ def main():
     valid_split = st.sidebar.slider("Percentual de Validação:", min_value=0.05, max_value=0.4, value=0.15, step=0.05)
     #________________________________________________________________________________________
     # Sidebar com o conteúdo explicativo e fórmula LaTeX
+    # Sidebar com o conteúdo explicativo e fórmula LaTeX
     with st.sidebar:
         with st.expander("Implementação da Técnica de Regularização L2 (Weight Decay):"):
             st.write("""
@@ -966,7 +967,7 @@ def main():
             aos padrões dos dados de treinamento, mas também ao ruído presente, o que compromete sua capacidade de generalização para novos dados 
             (Piotrowski & Napiorkowski, 2013). A regularização L2 adiciona um termo de penalização à função de perda do modelo, o que resulta em uma 
             redução dos valores absolutos dos pesos, promovendo, assim, modelos mais simples e generalizáveis (Friedrich et al., 2022).
-    
+      
             Esta revisão visa fornecer uma visão clara e técnica da aplicação da regularização L2, discutindo seus efeitos, a interpretação do coeficiente de regularização 
             """)
             st.latex(r'''
@@ -1025,7 +1026,7 @@ def main():
             st.write("""        
             A escolha do valor de λ
             """)
-  
+      
             st.write("""
             influencia diretamente o comportamento do modelo:
             """)
@@ -1065,9 +1066,9 @@ def main():
             - AL‐RIMY, B.; SAEED, F.; AL-SAREM, M.; ALBARRAK, A.; QASEM, S. An adaptive early stopping technique for densenet169-based knee osteoarthritis detection model. *Diagnostics*, 13(11), 1903, 2023. https://doi.org/10.3390/diagnostics13111903
             - FRIEDRICH, S. et al. Regularization approaches in clinical biostatistics: a review of methods and their applications. *Statistical Methods in Medical Research*, 32(2), 425-440, 2022. https://doi.org/10.1177/09622802221133557
             - PIOTROWSKI, A.; NAPIORKOWSKI, J. A comparison of methods to avoid overfitting in neural networks training in the case of catchment runoff modelling. *Journal of Hydrology*, 476, 97-111, 2013. https://doi.org/10.1016/j.jhydrol.2012.10.019
-            - REZAEEZADE, A.; BATINA, L. Regularizers to the rescue: fighting overfitting in deep learning-based side-channel analysis. 2022. https://doi.org/10.21203/rs.3.rs-2386625/v1
             - SAKIZADEH, M.; MALIAN, A.; AHMADPOUR, E. Groundwater quality modeling with a small data set. *Ground Water*, 54(1), 115-120, 2015. https://doi.org/10.1111/gwat.12317
             """)
+    
 
   
     l2_lambda = st.sidebar.number_input("L2 Regularization (Weight Decay):", min_value=0.0, max_value=0.1, value=0.01, step=0.01)
@@ -1084,7 +1085,7 @@ def main():
             após um número predefinido de épocas. Essa abordagem baseia-se na observação de que, após certo ponto, melhorias no desempenho do modelo em dados de treinamento 
             não resultam em melhorias em dados que o modelo ainda não viu (Piotrowski & Napiorkowski, 2013; Al‐Rimy et al., 2023).
             """)
-    
+      
             st.write("Matematicamente, a parada precoce pode ser descrita pela seguinte condição de interrupção:")
             # Fórmulas matemáticas
             st.latex(r'''
@@ -1096,67 +1097,66 @@ def main():
             st.latex(r'''
             L_{\text{val}}(t)
             ''')
-
+    
             st.write("""
             representa o valor da **função de perda** no conjunto de validação na época (t), e (p) é o **parâmetro de paciência**. 
             A paciência (p) define quanto tempo o treinamento deve continuar mesmo que não haja melhorias imediatas. Se a perda não melhorar por \(p\) épocas consecutivas, 
             o treinamento é interrompido.
             """)
-    
+      
             st.write("""
             #### A Importância da Paciência
             O parâmetro de **paciência** define o número de épocas consecutivas sem melhoria na métrica de validação que o modelo pode suportar antes de o treinamento ser interrompido. 
             A escolha do valor de paciência tem impacto direto no equilíbrio entre **evitar o overfitting** e **permitir que o modelo continue aprendendo**. 
             """)
-    
+      
             st.write("##### Paciência = 0")
             st.write("""
             Um valor de paciência igual a zero implica que o treinamento será interrompido imediatamente após a primeira ocorrência de estagnação na métrica de validação. 
             Isso pode ser útil em cenários onde se deseja evitar qualquer risco de *overfitting*.
             """)
-    
+      
             st.write("##### Paciência ≥ 1")
             st.write("""
             Uma paciência maior (como 1 ou 2) permite que o modelo continue sendo treinado mesmo após pequenas flutuações no desempenho, 
             o que pode ser benéfico em conjuntos de dados ruidosos (Sakizadeh et al., 2015).
             """)
-    
+      
             st.write("""
             #### Impacto do *Early Stopping* e da Paciência
             A configuração do parâmetro de paciência influencia diretamente a eficiência do treinamento. Com uma paciência muito baixa, o treinamento pode ser interrompido de forma prematura, 
             mesmo que o modelo ainda tenha potencial de melhoria. Por outro lado, uma paciência muito alta pode permitir que o modelo se ajuste excessivamente aos dados de treinamento, 
             levando ao *overfitting* (Sakizadeh et al., 2015).
             """)
-    
+      
             st.write("""
             #### Exemplos de Aplicação
             Um exemplo prático de uso da parada precoce é em tarefas de **classificação de imagens**. Durante o treinamento de um modelo para detecção de melanoma, se a acurácia no conjunto de validação 
             não melhorar após um determinado número de épocas, o early stopping é acionado.
             """)
-    
+      
             st.write("""
             #### Integração com Outras Técnicas de Regularização
             A parada precoce pode ser usada em conjunto com outras técnicas de regularização, como a **injeção de ruído** e a regularização **L1/L2**, 
-            para melhorar a robustez do modelo e sua capacidade de generalização (Friedrich et al., 2022; Rezaeezade & Batina, 2022). 
+            para melhorar a robustez do modelo e sua capacidade de generalização (Friedrich et al., 2022). 
             A combinação dessas técnicas ajuda a evitar que o modelo se ajuste excessivamente aos dados de treinamento, principalmente em cenários com volumes limitados de dados.
             """)
-    
+      
             st.write("""
             #### Conclusão
             A **parada precoce** é uma técnica eficaz para evitar o *overfitting* no treinamento de redes neurais profundas. O valor da paciência desempenha um papel crítico, 
             permitindo o equilíbrio entre **eficiência computacional** e **capacidade de aprendizado**. Além disso, a combinação da parada precoce com outras técnicas de regularização 
             pode melhorar ainda mais o desempenho do modelo.
             """)
-    
+      
             st.write("""
             #### Referências
             - PIOTROWSKI, A.; NAPIORKOWSKI, J. A comparison of methods to avoid overfitting in neural networks training in the case of catchment runoff modelling. *Journal of Hydrology*, v. 476, p. 97-111, 2013. https://doi.org/10.1016/j.jhydrol.2012.10.019.
             - AL‐RIMY, B. et al. An adaptive early stopping technique for densenet169-based knee osteoarthritis detection model. *Diagnostics*, v. 13, n. 11, p. 1903, 2023. https://doi.org/10.3390/diagnostics13111903.
             - SAKIZADEH, M.; MALIAN, A.; AHMADPOUR, E. Groundwater quality modeling with a small data set. *Ground Water*, v. 54, n. 1, p. 115-120, 2015. https://doi.org/10.1111/gwat.12317.
-            - LIAO, R. et al. The Rayleigh fading channel prediction via deep learning. *Wireless Communications and Mobile Computing*, v. 2018, p. 6497340, 2018. https://doi.org/10.1155/2018/6497340.
             - FRIEDRICH, S. et al. Regularization approaches in clinical biostatistics: a review of methods and their applications. *Statistical Methods in Medical Research*, v. 32, n. 2, p. 425-440, 2022. https://doi.org/10.1177/09622802221133557.
-            - REZAEEZADE, A.; BATINA, L. Regularizers to the rescue: fighting overfitting in deep learning-based side-channel analysis. *arXiv preprint*, 2022. https://doi.org/10.21203/rs.3.rs-2386625/v1.
             """)
+
 
     #________________________________________________________________________________________
     patience = st.sidebar.number_input("Paciência para Early Stopping:", min_value=1, max_value=10, value=3, step=1)
