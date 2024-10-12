@@ -665,7 +665,7 @@ def main():
             (Piotrowski & Napiorkowski, 2013). A regularização L2 adiciona um termo de penalização à função de perda do modelo, o que resulta em uma 
             redução dos valores absolutos dos pesos, promovendo, assim, modelos mais simples e generalizáveis (Friedrich et al., 2022).
     
-            Este manual visa fornecer uma visão clara e técnica da aplicação da regularização L2, discutindo seus efeitos, a interpretação do coeficiente de regularização 
+            Esta revisão visa fornecer uma visão clara e técnica da aplicação da regularização L2, discutindo seus efeitos, a interpretação do coeficiente de regularização 
             """)
             st.latex(r'''
             \lambda
@@ -730,7 +730,14 @@ def main():
             ''')
           
             st.write("""        
-            A escolha do valor de \( \lambda \) influencia diretamente o comportamento do modelo:
+            A escolha do valor de  
+            """)
+  
+            st.latex(r''' 
+            \lambda  
+            ''')
+            st.write("""
+            influencia diretamente o comportamento do modelo:
             """)
     
             st.write("#### \( \lambda = 0 \)")
