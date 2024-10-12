@@ -653,6 +653,117 @@ def main():
     batch_size = st.sidebar.selectbox("Tamanho de Lote:", options=[4, 8, 16, 32, 64], index=2)
     train_split = st.sidebar.slider("Percentual de Treinamento:", min_value=0.5, max_value=0.9, value=0.7, step=0.05)
     valid_split = st.sidebar.slider("Percentual de Validação:", min_value=0.05, max_value=0.4, value=0.15, step=0.05)
+    #________________________________________________________________________________________
+    # Sidebar com o conteúdo explicativo e fórmula LaTeX
+    with st.sidebar:
+        with st.expander("Manual de Aplicação: Regularização L2 (Weight Decay) em Redes Neurais Profundas"):
+            st.write("""
+            ### Introdução
+            A regularização L2, frequentemente referida como *weight decay*, é uma técnica amplamente utilizada para mitigar o **overfitting** 
+            em modelos de aprendizado de máquina, especialmente em redes neurais profundas. O *overfitting* ocorre quando o modelo se ajusta não apenas 
+            aos padrões dos dados de treinamento, mas também ao ruído presente, o que compromete sua capacidade de generalização para novos dados 
+            (Piotrowski & Napiorkowski, 2013). A regularização L2 adiciona um termo de penalização à função de perda do modelo, o que resulta em uma 
+            redução dos valores absolutos dos pesos, promovendo, assim, modelos mais simples e generalizáveis (Friedrich et al., 2022).
+    
+            Este manual visa fornecer uma visão clara e técnica da aplicação da regularização L2, discutindo seus efeitos, a interpretação do coeficiente de regularização 
+            """)
+            st.latex(r'''
+            \lambda
+            ''')
+            st.write("""
+            e as implicações da escolha desse parâmetro.
+            """)
+            st.latex(r'''
+            L_{\text{total}} = L_{\text{original}} + \lambda \sum_{i} w_i^2
+            ''')
+    
+            st.write("""
+            Onde:
+            """)
+            st.latex(r'''
+            - \( L_{\text{total}} \)
+            ''')
+            st.write("""
+            é a perda total que o modelo busca minimizar;
+            """)
+            st.latex(r'''
+            - \( L_{\text{original}} \)
+            ''')
+            st.write("""
+            é a função de perda original (como a perda de entropia cruzada);
+            """)
+            st.latex(r'''
+            - \( \lambda \)
+            ''')
+            st.write("""
+            é o coeficiente de regularização, que controla a penalidade aplicada aos pesos;
+            """)
+            st.latex(r'''
+            - \( w_i \)
+            ''')
+            st.write(""" 
+            são os pesos individuais do modelo (Al‐Rimy et al., 2023).
+            """)
+            st.write("""
+            Este termo adicional penaliza pesos grandes, forçando o modelo a priorizar soluções que utilizam pesos menores, o que é crucial para evitar 
+            que o modelo memorize os dados de treinamento, promovendo maior capacidade de generalização (Sakizadeh et al., 2015).
+            """)
+    
+            st.write("""
+            ### Fundamentação Teórica
+            A regularização L2 tem uma base teórica sólida, sendo amplamente aplicada para controlar a complexidade do modelo. Ao adicionar o termo de penalização, 
+            a regularização L2 ajuda a evitar o overfitting e melhora a estabilidade numérica do modelo (Friedrich et al., 2022). Isso é particularmente importante 
+            em redes neurais profundas, onde o número de parâmetros pode ser grande e a complexidade do modelo alta.
+            """)
+    
+            st.write("""
+            ### Efeitos da Regularização L2
+            A regularização L2 controla a complexidade do modelo ao penalizar pesos grandes, o que é particularmente útil em cenários com muitos parâmetros 
+            ou dados ruidosos (Piotrowski & Napiorkowski, 2013). Além de reduzir o overfitting, a L2 promove a estabilidade no treinamento, melhorando a consistência do desempenho 
+            em dados de teste (Friedrich et al., 2022).
+            """)
+    
+            st.write("""
+            ### Interpretação e Efeitos Práticos de \( \lambda \)
+            A escolha do valor de \( \lambda \) influencia diretamente o comportamento do modelo:
+            """)
+    
+            st.write("#### \( \lambda = 0 \)")
+            st.write("""
+            Quando \( \lambda = 0 \), a regularização L2 está desativada. Isso permite que o modelo ajuste-se livremente aos dados de treinamento, 
+            aumentando o risco de overfitting, especialmente em conjuntos de dados pequenos ou ruidosos (Friedrich et al., 2022).
+            """)
+    
+            st.write("#### \( \lambda = 0,01 \)")
+            st.write("""
+            Este é um valor moderado, que penaliza de forma equilibrada os pesos do modelo. Essa configuração ajuda a evitar o overfitting sem comprometer a capacidade do modelo de 
+            aprender padrões relevantes (Al‐Rimy et al., 2023).
+            """)
+    
+            st.write("#### \( \lambda = 0,02 \) ou \( \lambda = 0,03 \)")
+            st.write("""
+            Esses valores aumentam a intensidade da penalização, sendo úteis em cenários com dados ruidosos ou em que o número de parâmetros é alto em relação à quantidade de dados 
+            disponíveis (Piotrowski & Napiorkowski, 2013). Contudo, deve-se monitorar o desempenho do modelo, pois valores elevados de \( \lambda \) podem resultar em **underfitting**, 
+            comprometendo a capacidade do modelo de capturar padrões complexos (Friedrich et al., 2022).
+            """)
+    
+            st.write("""
+            ### Conclusão
+            A regularização L2 é uma técnica poderosa no treinamento de redes neurais profundas, ajudando a mitigar o overfitting e a melhorar a capacidade de generalização do modelo. 
+            Ao penalizar pesos grandes, a L2 incentiva soluções mais simples e robustas. No entanto, a escolha do valor de \( \lambda \) é crucial para garantir que o modelo consiga capturar 
+            padrões complexos sem se ajustar excessivamente aos dados de treinamento.
+            """)
+    
+            st.write("""
+            ### Referências
+            - AL‐RIMY, B.; SAEED, F.; AL-SAREM, M.; ALBARRAK, A.; QASEM, S. An adaptive early stopping technique for densenet169-based knee osteoarthritis detection model. *Diagnostics*, 13(11), 1903, 2023. https://doi.org/10.3390/diagnostics13111903
+            - FRIEDRICH, S. et al. Regularization approaches in clinical biostatistics: a review of methods and their applications. *Statistical Methods in Medical Research*, 32(2), 425-440, 2022. https://doi.org/10.1177/09622802221133557
+            - PIOTROWSKI, A.; NAPIORKOWSKI, J. A comparison of methods to avoid overfitting in neural networks training in the case of catchment runoff modelling. *Journal of Hydrology*, 476, 97-111, 2013. https://doi.org/10.1016/j.jhydrol.2012.10.019
+            - REZAEEZADE, A.; BATINA, L. Regularizers to the rescue: fighting overfitting in deep learning-based side-channel analysis. 2022. https://doi.org/10.21203/rs.3.rs-2386625/v1
+            - SAKIZADEH, M.; MALIAN, A.; AHMADPOUR, E. Groundwater quality modeling with a small data set. *Ground Water*, 54(1), 115-120, 2015. https://doi.org/10.1111/gwat.12317
+            """)
+
+  
     l2_lambda = st.sidebar.number_input("L2 Regularization (Weight Decay):", min_value=0.0, max_value=0.1, value=0.01, step=0.01)
     
     #________________________________________________________________________________________
