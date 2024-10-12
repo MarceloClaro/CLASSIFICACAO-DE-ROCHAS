@@ -680,26 +680,31 @@ def main():
             st.write("""
             Onde:
             """)
+          
+            st.write("- ")
             st.latex(r'''
-            - \( L_{\text{total}} \)
+            L_{\text{total}}
             ''')
+
             st.write("""
             é a perda total que o modelo busca minimizar;
             """)
+            st.write("- ")
             st.latex(r'''
-            - \( L_{\text{original}} \)
+            L_{\text{original}}
             ''')
+
             st.write("""
             é a função de perda original (como a perda de entropia cruzada);
             """)
             st.latex(r'''
-            - \( \lambda \)
+            \lambda
             ''')
             st.write("""
             é o coeficiente de regularização, que controla a penalidade aplicada aos pesos;
             """)
             st.latex(r'''
-            - \( w_i \)
+            \w_i
             ''')
             st.write(""" 
             são os pesos individuais do modelo (Al‐Rimy et al., 2023).
