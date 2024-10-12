@@ -747,14 +747,14 @@ def main():
             st.write("""
             #### λ = 0,02 ou λ = 0,03
             Esses valores aumentam a intensidade da penalização, sendo úteis em cenários com dados ruidosos ou em que o número de parâmetros é alto em relação à quantidade de dados 
-            disponíveis (Piotrowski & Napiorkowski, 2013). Contudo, deve-se monitorar o desempenho do modelo, pois valores elevados de \( \lambda \) podem resultar em **underfitting**, 
+            disponíveis (Piotrowski & Napiorkowski, 2013). Contudo, deve-se monitorar o desempenho do modelo, pois valores elevados de λ podem resultar em **underfitting**, 
             comprometendo a capacidade do modelo de capturar padrões complexos (Friedrich et al., 2022).
             """)
     
             st.write("""
             ### Conclusão
             A regularização L2 é uma técnica poderosa no treinamento de redes neurais profundas, ajudando a mitigar o overfitting e a melhorar a capacidade de generalização do modelo. 
-            Ao penalizar pesos grandes, a L2 incentiva soluções mais simples e robustas. No entanto, a escolha do valor de \( \lambda \) é crucial para garantir que o modelo consiga capturar 
+            Ao penalizar pesos grandes, a L2 incentiva soluções mais simples e robustas. No entanto, a escolha do valor de λ é crucial para garantir que o modelo consiga capturar 
             padrões complexos sem se ajustar excessivamente aos dados de treinamento.
             """)
     
