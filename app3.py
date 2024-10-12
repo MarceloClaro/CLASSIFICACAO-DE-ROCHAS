@@ -1163,7 +1163,7 @@ def main():
 
     #____________________________________________________________________________________________
     with st.sidebar:
-        with st.expander("Perda Ponderada para Classes Desbalanceadas"):
+        with st.expander("Perda Ponderada para Classes Desbalanceadas:"):
             st.write("""
             ### Perda Ponderada para Classes Desbalanceadas
         
