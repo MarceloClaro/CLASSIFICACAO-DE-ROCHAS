@@ -704,8 +704,9 @@ def main():
             é o coeficiente de regularização, que controla a penalidade aplicada aos pesos;
             """)
             st.latex(r'''
-            \w_i
+            w_i
             ''')
+
             st.write(""" 
             são os pesos individuais do modelo (Al‐Rimy et al., 2023).
             """)
