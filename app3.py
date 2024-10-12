@@ -730,7 +730,7 @@ def main():
             ''')
           
             st.write("""        
-            A escolha do valor de  
+            A escolha do valor de λ
             """)
   
             st.latex(r''' 
@@ -740,19 +740,19 @@ def main():
             influencia diretamente o comportamento do modelo:
             """)
     
-            st.write("#### \( \lambda = 0 \)")
+            st.write("#### λ = 0")
             st.write("""
-            Quando \( \lambda = 0 \), a regularização L2 está desativada. Isso permite que o modelo ajuste-se livremente aos dados de treinamento, 
+            Quando λ = 0 ), a regularização L2 está desativada. Isso permite que o modelo ajuste-se livremente aos dados de treinamento, 
             aumentando o risco de overfitting, especialmente em conjuntos de dados pequenos ou ruidosos (Friedrich et al., 2022).
             """)
     
-            st.write("#### \( \lambda = 0,01 \)")
+            st.write("#### λ = 0,01")
             st.write("""
             Este é um valor moderado, que penaliza de forma equilibrada os pesos do modelo. Essa configuração ajuda a evitar o overfitting sem comprometer a capacidade do modelo de 
             aprender padrões relevantes (Al‐Rimy et al., 2023).
             """)
     
-            st.write("#### \( \lambda = 0,02 \) ou \( \lambda = 0,03 \)")
+            st.write("#### λ = 0,02 ou λ = 0,03")
             st.write("""
             Esses valores aumentam a intensidade da penalização, sendo úteis em cenários com dados ruidosos ou em que o número de parâmetros é alto em relação à quantidade de dados 
             disponíveis (Piotrowski & Napiorkowski, 2013). Contudo, deve-se monitorar o desempenho do modelo, pois valores elevados de \( \lambda \) podem resultar em **underfitting**, 
