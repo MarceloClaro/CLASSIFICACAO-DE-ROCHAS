@@ -691,13 +691,7 @@ def main():
             L_{\text{original}}
             ''')
             st.write("""
-            é a função de perda original (como a perda de entropia cruzada);
-            """)
-            st.latex(r'''
-            \lambda
-            ''')
-            st.write("""
-            é o coeficiente de regularização, que controla a penalidade aplicada aos pesos;
+            é a função de perda original (como a perda de entropia cruzada); λ é o coeficiente de regularização, que controla a penalidade aplicada aos pesos;
             """)
             st.latex(r'''
             w_i
@@ -723,19 +717,12 @@ def main():
             """)
     
             st.write("""
-            ### Interpretação e Efeitos Práticos de 
-            """)  
-            st.latex(r''' 
-            \lambda  
-            ''')
+            ### Interpretação e Efeitos Práticos de λ
           
             st.write("""        
             A escolha do valor de λ
             """)
   
-            st.latex(r''' 
-            \lambda  
-            ''')
             st.write("""
             influencia diretamente o comportamento do modelo:
             """)
