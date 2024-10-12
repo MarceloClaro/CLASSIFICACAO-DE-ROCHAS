@@ -651,7 +651,7 @@ def main():
     #________________________________________________________________________________________
     # Fine-Tuning Completo em Redes Neurais Profundas
     with st.sidebar:
-        with st.expander("Fine-Tuning Completo em Redes Neurais Profundas"):
+        with st.expander("Fine-Tuning Completo em Redes Neurais Profundas:"):
             st.write("""
             ### Introdução
         
