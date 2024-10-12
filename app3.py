@@ -1074,11 +1074,9 @@ def main():
     
     #________________________________________________________________________________________
     # Sidebar com o conteúdo explicativo e fórmula LaTeX
-   
     with st.sidebar:
         with st.expander("Implementação da Técnica de Parada Precoce - Early Stopping:"):
             st.write("""
-               
             #### Introdução
             A técnica de **parada precoce** (ou *early stopping*) é amplamente utilizada para mitigar o **overfitting** no treinamento de redes neurais profundas. 
             O overfitting ocorre quando o modelo se ajusta tão bem aos dados de treinamento que sua capacidade de generalização para novos dados é prejudicada. 
