@@ -1202,13 +1202,6 @@ def main():
             ### Referências
         
             - Buda, M., Maki, A., & Mazurowski, M. (2018). A systematic study of the class imbalance problem in convolutional neural networks. *Neural Networks*, 106, 249-259. https://doi.org/10.1016/j.neunet.2018.07.011
-            - Huang, G., Liu, Z., Maaten, L., & Weinberger, K. (2017). Densely connected convolutional networks. https://doi.org/10.1109/cvpr.2017.243
-            - Li, S. (2023). Clouddensenet: lightweight ground-based cloud classification method for large-scale datasets based on reconstructed densenet. *Sensors*, 23(18), 7957. https://doi.org/10.3390/s23187957
-            - Li, T., Jiao, W., Wang, L., & Zhong, G. (2020). Automatic densenet sparsification. *IEEE Access*, 8, 62561-62571. https://doi.org/10.1109/access.2020.2984130
-            - Nguyễn, H., Yu, G., Shin, N., Kwon, G., Kwak, W., & Kim, J. (2021). Defective product classification system for smart factory based on deep learning. *Electronics*, 10(7), 826. https://doi.org/10.3390/electronics10070826
-            - Shorten, C. & Khoshgoftaar, T. M. (2019). A survey on image data augmentation for deep learning. *Journal of Big Data*, 6(1). https://doi.org/10.1186/s40537-019-0197-0
-            - Tariq, T., Suhail, Z., & Nawaz, Z. (2023). Knee osteoarthritis detection and classification using x-rays. *IEEE Access*, 11, 48292-48303. https://doi.org/10.1109/access.2023.3276810
-            - Zhuang, D., & Ibrahim, A. (2021). Deep learning for drug discovery: a study of identifying high efficacy drug compounds using a cascade transfer learning approach. *Applied Sciences*, 11(17), 7772. https://doi.org/10.3390/app11177772
             """)
 
     use_weighted_loss = st.sidebar.checkbox("Usar Perda Ponderada para Classes Desbalanceadas", value=False)
