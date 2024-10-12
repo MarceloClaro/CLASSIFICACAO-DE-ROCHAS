@@ -874,24 +874,31 @@ def main():
             st.write("""
             Onde:
             """)
+          
             st.latex(r'''
             L_{\text{fine-tuning}}
             ''')
+          
             st.write("""
             é a função de perda durante o fine-tuning;
             """)
+          
             st.latex(r'''
             L_{\text{original}}
             ''')
+          
             st.write("""
             representa a função de perda original do modelo pré-treinado;
             """)
+          
             st.latex(r'''
             \lambda
             ''')
+          
             st.write("""
             é o coeficiente de regularização (no caso de utilizar a regularização L2);
             """)
+          
             st.latex(r'''
             w_i
             ''')
@@ -971,18 +978,21 @@ def main():
             aos padrões dos dados de treinamento, mas também ao ruído presente, o que compromete sua capacidade de generalização para novos dados 
             (Piotrowski & Napiorkowski, 2013). A regularização L2 adiciona um termo de penalização à função de perda do modelo, o que resulta em uma 
             redução dos valores absolutos dos pesos, promovendo, assim, modelos mais simples e generalizáveis (Friedrich et al., 2022).
-      
             Esta revisão visa fornecer uma visão clara e técnica da aplicação da regularização L2, discutindo seus efeitos, a interpretação do coeficiente de regularização 
             """)
+          
             st.latex(r'''
             \lambda
             ''')
+          
             st.write("""
             e as implicações da escolha desse parâmetro.
             """)
+          
             st.latex(r'''
             L_{\text{total}} = L_{\text{original}} + \lambda \sum_{i} w_i^2
             ''')
+          
             st.write("""
             Onde:
             """) 
@@ -990,6 +1000,7 @@ def main():
             st.latex(r'''
             L_{\text{total}}
             ''')
+          
             st.write("""
             é a perda total que o modelo busca minimizar;
             """)
@@ -997,25 +1008,31 @@ def main():
             st.latex(r'''
             L_{\text{original}}
             ''')
+          
             st.write("""
             é a função de perda original (como a perda de entropia cruzada); λ é o coeficiente de regularização, que controla a penalidade aplicada aos pesos;
             """)
+          
             st.latex(r'''
             w_i
             ''')
+          
             st.write(""" 
             são os pesos individuais do modelo (Al‐Rimy et al., 2023).
             """)
+          
             st.write("""
             Este termo adicional penaliza pesos grandes, forçando o modelo a priorizar soluções que utilizam pesos menores, o que é crucial para evitar 
             que o modelo memorize os dados de treinamento, promovendo maior capacidade de generalização (Sakizadeh et al., 2015).
             """)
+          
             st.write("""
             ### Fundamentação Teórica
             A regularização L2 tem uma base teórica sólida, sendo amplamente aplicada para controlar a complexidade do modelo. Ao adicionar o termo de penalização, 
             a regularização L2 ajuda a evitar o overfitting e melhora a estabilidade numérica do modelo (Friedrich et al., 2022). Isso é particularmente importante 
             em redes neurais profundas, onde o número de parâmetros pode ser grande e a complexidade do modelo alta.
             """)
+          
             st.write("""
             ### Efeitos da Regularização L2
             A regularização L2 controla a complexidade do modelo ao penalizar pesos grandes, o que é particularmente útil em cenários com muitos parâmetros 
