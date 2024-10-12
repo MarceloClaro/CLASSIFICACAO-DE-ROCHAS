@@ -706,7 +706,7 @@ def main():
             é a saída da l-ésima camada e 
             """)
             st.latex(r'''
-            \H_l
+             \mathbf{H}_l
             ''')
             st.write("""
             é a função aplicada. Essa configuração otimiza o uso de gradientes e representações, resultando em um desempenho superior em tarefas de classificação 
