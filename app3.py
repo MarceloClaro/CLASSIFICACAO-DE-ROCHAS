@@ -674,13 +674,11 @@ def main():
             st.write("Matematicamente, a parada precoce pode ser descrita pela seguinte condição de interrupção:")
             # Fórmulas matemáticas
             st.latex(r'''
-            \text{Se } L_{\text{val}}(t) \geq L_{\text{val}}(t-1) \text{ por } p \text{ épocas consecutivas, então interrompa o treinamento.}
+            \text{Se } L_{\text{val}}(t) \geq L_{\text{val}}(t-1)
             ''')
-            
             st.write("""
-            Aqui,
+            por (p) épocas consecutivas, então interrompa o treinamento. Aqui,
             """)
-            
             st.latex(r'''
             L_{\text{val}}(t)
             ''')
