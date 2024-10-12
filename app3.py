@@ -655,7 +655,7 @@ def main():
     valid_split = st.sidebar.slider("Percentual de Validação:", min_value=0.05, max_value=0.4, value=0.15, step=0.05)
     #________________________________________________________________________________________
     # Sidebar com o conteúdo explicativo e fórmula LaTeX
-    
+    with st.sidebar:
         with st.expander("Manual de Aplicação: Regularização L2 (Weight Decay) em Redes Neurais Profundas"):
             st.write("""
             ### Introdução
