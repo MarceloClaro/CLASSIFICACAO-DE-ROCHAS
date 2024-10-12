@@ -718,6 +718,7 @@ def main():
     
             st.write("""
             ### Interpretação e Efeitos Práticos de λ
+            """)
           
             st.write("""        
             A escolha do valor de λ
@@ -728,14 +729,16 @@ def main():
             """)
     
             st.write("""
-            #### λ = 0")
+            #### λ = 0
+            """)
             st.write("""
-            Quando λ = 0 ), a regularização L2 está desativada. Isso permite que o modelo ajuste-se livremente aos dados de treinamento, 
+            Quando λ = 0, a regularização L2 está desativada. Isso permite que o modelo ajuste-se livremente aos dados de treinamento, 
             aumentando o risco de overfitting, especialmente em conjuntos de dados pequenos ou ruidosos (Friedrich et al., 2022).
             """)
     
             st.write("""
-            #### λ = 0,01")
+            #### λ = 0,01
+            """)
             st.write("""
             Este é um valor moderado, que penaliza de forma equilibrada os pesos do modelo. Essa configuração ajuda a evitar o overfitting sem comprometer a capacidade do modelo de 
             aprender padrões relevantes (Al‐Rimy et al., 2023).
