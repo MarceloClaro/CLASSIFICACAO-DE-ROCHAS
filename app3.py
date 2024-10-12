@@ -723,7 +723,12 @@ def main():
             """)
     
             st.write("""
-            ### Interpretação e Efeitos Práticos de """)  st.latex(r''' \lambda  ''')
+            ### Interpretação e Efeitos Práticos de 
+            """)  
+            st.latex(r''' 
+            \lambda  
+            ''')
+          
             st.write("""        
             A escolha do valor de \( \lambda \) influencia diretamente o comportamento do modelo:
             """)
