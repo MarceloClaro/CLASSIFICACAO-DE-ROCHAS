@@ -674,10 +674,30 @@ def main():
         
             st.write("""
             Onde:
-            - \(L_{\text{fine-tuning}}\) é a função de perda durante o fine-tuning;
-            - \(L_{\text{original}}\) representa a função de perda original do modelo pré-treinado;
-            - \(\lambda\) é o coeficiente de regularização (no caso de utilizar a regularização L2);
-            - \(w_i\) são os pesos individuais que serão atualizados durante o processo de fine-tuning (Friedrich et al., 2022; Al‐rimy et al., 2023).
+            """)
+            st.latex(r'''
+            L_{\text{fine-tuning}}
+            ''')
+            st.write("""
+            é a função de perda durante o fine-tuning;
+            """)
+            st.latex(r'''
+            L_{\text{original}}
+            ''')
+            st.write("""
+            representa a função de perda original do modelo pré-treinado;
+            """)
+            st.latex(r'''
+            \lambda
+            ''')
+            st.write("""
+            é o coeficiente de regularização (no caso de utilizar a regularização L2);
+            """)
+            st.latex(r'''
+            w_i
+            ''')
+            st.write("""
+            são os pesos individuais que serão atualizados durante o processo de fine-tuning (Friedrich et al., 2022; Al‐rimy et al., 2023).
             """)
         
             st.write("""
