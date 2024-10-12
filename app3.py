@@ -676,16 +676,13 @@ def main():
             st.latex(r'''
             L_{\text{total}} = L_{\text{original}} + \lambda \sum_{i} w_i^2
             ''')
-    
             st.write("""
             Onde:
-            """)
-          
+            """) 
             st.write("- ")
             st.latex(r'''
             L_{\text{total}}
             ''')
-
             st.write("""
             é a perda total que o modelo busca minimizar;
             """)
@@ -693,7 +690,6 @@ def main():
             st.latex(r'''
             L_{\text{original}}
             ''')
-
             st.write("""
             é a função de perda original (como a perda de entropia cruzada);
             """)
@@ -706,7 +702,6 @@ def main():
             st.latex(r'''
             w_i
             ''')
-
             st.write(""" 
             são os pesos individuais do modelo (Al‐Rimy et al., 2023).
             """)
@@ -714,14 +709,12 @@ def main():
             Este termo adicional penaliza pesos grandes, forçando o modelo a priorizar soluções que utilizam pesos menores, o que é crucial para evitar 
             que o modelo memorize os dados de treinamento, promovendo maior capacidade de generalização (Sakizadeh et al., 2015).
             """)
-    
             st.write("""
             ### Fundamentação Teórica
             A regularização L2 tem uma base teórica sólida, sendo amplamente aplicada para controlar a complexidade do modelo. Ao adicionar o termo de penalização, 
             a regularização L2 ajuda a evitar o overfitting e melhora a estabilidade numérica do modelo (Friedrich et al., 2022). Isso é particularmente importante 
             em redes neurais profundas, onde o número de parâmetros pode ser grande e a complexidade do modelo alta.
             """)
-    
             st.write("""
             ### Efeitos da Regularização L2
             A regularização L2 controla a complexidade do modelo ao penalizar pesos grandes, o que é particularmente útil em cenários com muitos parâmetros 
