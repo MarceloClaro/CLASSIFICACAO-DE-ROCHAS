@@ -1179,9 +1179,7 @@ def main():
         
             """)
             
-            st.latex(r'''
-            \text{criterion} = \text{nn.CrossEntropyLoss(weight=class\_weights)}
-            ''')
+            st.write("**criterion = nn.CrossEntropyLoss(weight=class_weights)**")
             
             st.write("""
             No trecho de código acima, o vetor `targets` coleta os rótulos das amostras no conjunto de treino e a função `np.bincount(targets)` conta quantas vezes cada classe aparece, resultando em um vetor `class_counts`, onde cada índice corresponde à quantidade de amostras de uma classe específica (Buda et al., 2018).
