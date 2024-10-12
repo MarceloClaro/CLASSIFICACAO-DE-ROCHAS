@@ -703,10 +703,10 @@ def main():
             \mathbf{x}_l 
             ''')
             st.write("""
-            é a saída da
+            é a saída da l-ésima camada e 
             """)
             st.latex(r'''
-            \l-ésima camada e H_l\
+            \H_l
             ''')
             st.write("""
             é a função aplicada. Essa configuração otimiza o uso de gradientes e representações, resultando em um desempenho superior em tarefas de classificação 
