@@ -762,8 +762,9 @@ def main():
             st.latex(r'''
             \mathcal{F}(x, \{W_i\}) + x
             ''')
+          
             st.write("""
-            representa a função aprendida e \(x\) é a entrada. O termo \(x\) é adicionado à saída, o que simplifica o processo de treinamento e permite que redes mais profundas sejam treinadas com maior eficácia 
+            representa a função aprendida e x é a entrada. O termo x é adicionado à saída, o que simplifica o processo de treinamento e permite que redes mais profundas sejam treinadas com maior eficácia 
             ("A Framework for Flood Extent Mapping using CNN Transfer Learning", 2022; Petrovska et al., 2020).
             """)
         
@@ -787,15 +788,19 @@ def main():
             st.write("""
             onde
             """)
+          
             st.latex(r'''
             \mathbf{x}_l 
             ''')
+          
             st.write("""
             é a saída da l-ésima camada e 
             """)
+          
             st.latex(r'''
              \mathbf{H}_l
             ''')
+          
             st.write("""
             é a função aplicada. Essa configuração otimiza o uso de gradientes e representações, resultando em um desempenho superior em tarefas de classificação 
             (Benegui & Ionescu, 2020; Varshni et al., 2019; Hamdaoui et al., 2021).
@@ -956,7 +961,6 @@ def main():
     train_split = st.sidebar.slider("Percentual de Treinamento:", min_value=0.5, max_value=0.9, value=0.7, step=0.05)
     valid_split = st.sidebar.slider("Percentual de Validação:", min_value=0.05, max_value=0.4, value=0.15, step=0.05)
     #________________________________________________________________________________________
-    # Sidebar com o conteúdo explicativo e fórmula LaTeX
     # Sidebar com o conteúdo explicativo e fórmula LaTeX
     with st.sidebar:
         with st.expander("Implementação da Técnica de Regularização L2 (Weight Decay):"):
