@@ -745,8 +745,7 @@ def main():
             """)
     
             st.write("""
-            #### λ = 0,02 ou λ = 0,03")
-            
+            #### λ = 0,02 ou λ = 0,03
             Esses valores aumentam a intensidade da penalização, sendo úteis em cenários com dados ruidosos ou em que o número de parâmetros é alto em relação à quantidade de dados 
             disponíveis (Piotrowski & Napiorkowski, 2013). Contudo, deve-se monitorar o desempenho do modelo, pois valores elevados de \( \lambda \) podem resultar em **underfitting**, 
             comprometendo a capacidade do modelo de capturar padrões complexos (Friedrich et al., 2022).
