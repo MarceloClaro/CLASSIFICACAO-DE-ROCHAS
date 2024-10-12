@@ -735,6 +735,7 @@ def main():
   
     num_classes = st.sidebar.number_input("Número de Classes:", min_value=1, step=1)
     #_______________________________________________________________________________________
+    # Sidebar com o conteúdo explicativo e fórmula LaTeX
     with st.sidebar:
         with st.expander("Modelos Pré-Treinados: ResNet18, ResNet50 e DenseNet121:"):
             st.write("""
