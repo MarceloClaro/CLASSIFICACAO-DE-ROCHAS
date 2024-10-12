@@ -656,7 +656,7 @@ def main():
     #________________________________________________________________________________________
     # Sidebar com o conteúdo explicativo e fórmula LaTeX
     with st.sidebar:
-        with st.expander("Manual de Aplicação: Regularização L2 (Weight Decay) em Redes Neurais Profundas"):
+        with st.expander("Implementação da Técnica de Regularização L2 (Weight Decay)."):
             st.write("""
             ### Introdução
             A regularização L2, frequentemente referida como *weight decay*, é uma técnica amplamente utilizada para mitigar o **overfitting** 
