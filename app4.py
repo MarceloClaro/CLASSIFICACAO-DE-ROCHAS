@@ -551,6 +551,10 @@ def evaluate_image(model, image, classes):
 # Função para carregar o modelo de segmentação em PyTorch
 @st.cache(allow_output_mutation=True)
 def carregar_modelo_segmentacao():
+    # Verificar se o arquivo existe
+    if not os.path.exists('modelo_segmentacao.pth'):
+        st.error("O arquivo 'modelo_segmentacao.pth' não foi encontrado. Certifique-se de que o modelo de segmentação foi treinado e o arquivo está no diretório correto.")
+        return None
     # Substitua 'resnet18' pelo encoder que você usou durante o treinamento
     model = smp.Unet(
         encoder_name="resnet18",        # Escolha o encoder que você usou
@@ -566,6 +570,8 @@ def carregar_modelo_segmentacao():
 
 # Carregar o modelo de segmentação
 modelo_segmentacao = carregar_modelo_segmentacao()
+if modelo_segmentacao is None:
+    st.stop()  # Interrompe a execução se o modelo não foi carregado
 
 # Função para aplicar a máscara na imagem
 def aplicar_mascara(image):
@@ -692,10 +698,9 @@ def main():
         st.sidebar.image("logo.png", width=200)
     else:
         st.sidebar.text("Imagem do logotipo não encontrada.")
-
-    # (O restante do código da função main permanece inalterado)
-
-    # Aqui, coloque o restante do código da função main que você já possui,
+    
+    # O restante do código da função main permanece inalterado
+    # Aqui você deve incluir o restante do código da função main que você já possui,
     # incluindo as configurações da barra lateral, uploads de arquivos, etc.
 
     # Verificar se a soma dos splits é válida
