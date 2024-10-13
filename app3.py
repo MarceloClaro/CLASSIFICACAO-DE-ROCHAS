@@ -590,6 +590,12 @@ def visualize_activations(model, image, class_names):
     # Verificar forma e tipo
     st.write(f"Forma do activation_map_resized: {activation_map_resized.shape}")
     st.write(f"Tipo de dados do activation_map_resized: {activation_map_resized.dtype}")
+    st.write(f"Valores mínimo e máximo do activation_map_resized: min={activation_map_resized.min()}, max={activation_map_resized.max()}")
+    
+    # Garantir que seja 2D
+    if activation_map_resized.ndim > 2:
+        activation_map_resized = activation_map_resized.squeeze()
+        st.write(f"Forma após squeeze: {activation_map_resized.shape}")
     
     # Converter a imagem para array NumPy
     image_np = np.array(image.convert('RGB'))
@@ -597,10 +603,14 @@ def visualize_activations(model, image, class_names):
     # Converter a imagem para BGR
     image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
     
+    # Verificar tamanho da imagem
+    st.write(f"Forma da imagem original (image_np): {image_np.shape}")
+    
     # Aplicar o mapa de cores
     heatmap = cv2.applyColorMap(activation_map_resized, cv2.COLORMAP_JET)
     
     # Verificar se a imagem e o heatmap têm o mesmo tamanho
+    st.write(f"Forma do heatmap: {heatmap.shape}")
     if image_np.shape[:2] != heatmap.shape[:2]:
         st.error("A imagem e o mapa de ativação têm tamanhos diferentes.")
         return
