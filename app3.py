@@ -25,11 +25,11 @@ import logging
 import base64
 import torch.nn as nn
 import torchvision.models as models
-import torchcam
+
 # Importações adicionais para Grad-CAM
 from torchcam.methods import SmoothGradCAMpp
 from torchvision.transforms.functional import normalize, resize, to_pil_image
-from torchvision import models
+
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -547,6 +547,15 @@ def evaluate_image(model, image, classes):
 
 #________________________________________________
 
+
+# Função para capturar ativações da camada de interesse
+activations = {}
+
+def get_activation(name):
+    def hook(model, input, output):
+        activations[name] = output.detach()
+    return hook
+
 def visualize_activations(model, image, class_names):
     """
     Visualiza as ativações na imagem usando Grad-CAM.
@@ -558,58 +567,46 @@ def visualize_activations(model, image, class_names):
     if isinstance(model, models.ResNet):
         target_layer = model.layer4[-1]
     elif isinstance(model, models.DenseNet):
-        target_layer = model.features.denseblock4.denselayer16
+        target_layer = model.features[-1]
     else:
         st.error("Modelo não suportado para Grad-CAM.")
         return
     
-    # Criar o objeto CAM usando torchcam
-    cam_extractor = SmoothGradCAMpp(model, target_layer=target_layer)
-    
+    # Registrar hook para capturar a saída da camada de interesse
+    target_layer.register_forward_hook(get_activation('target_layer'))
+
     # Habilitar gradientes explicitamente
     with torch.set_grad_enabled(True):
         out = model(input_tensor)  # Faz a previsão
-        _, pred = torch.max(out, 1)  # Obtém a classe predita
+        _, pred = torch.max(out, 1)  # Pega a classe predita
         pred_class = pred.item()
-    
-    # Gerar o mapa de ativação
-    activation_map = cam_extractor(pred_class, out)
-    
-    # Obter o mapa de ativação da primeira imagem no lote
-    activation_map = activation_map[0].cpu().numpy()
-    
-    # Redimensionar o mapa de ativação para coincidir com o tamanho da imagem original
-    activation_map_resized = cv2.resize(activation_map, (image.width, image.height))
-    
+
+        # Gerar o mapa de ativação
+        activation_map = activations['target_layer'].squeeze().cpu().numpy()
+
+    # Redimensionar o mapa de ativação para coincidir exatamente com a imagem original
+    activation_map_resized = cv2.resize(activation_map[0], (image.size[0], image.size[1]))
+
     # Normalizar o mapa de ativação para o intervalo [0, 1]
     activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
-    
-    # Converter a imagem para array NumPy
-    image_np = np.array(image)
-    
-    # Converter o mapa de ativação em uma imagem RGB
-    heatmap = cv2.applyColorMap(np.uint8(255 * activation_map_resized), cv2.COLORMAP_JET)
-    heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
-    
-    # Sobrepor o mapa de ativação na imagem original
-    superimposed_img = heatmap * 0.4 + image_np * 0.6
-    superimposed_img = np.uint8(superimposed_img)
-    
+
     # Exibir a imagem original e o mapa de ativação sobreposto
     fig, ax = plt.subplots(1, 2, figsize=(10, 5))
     
     # Imagem original
-    ax[0].imshow(image_np)
+    ax[0].imshow(image)
     ax[0].set_title('Imagem Original')
     ax[0].axis('off')
-    
-    # Imagem com Grad-CAM
-    ax[1].imshow(superimposed_img)
+
+    # Sobrepor o mapa de ativação redimensionado na imagem original
+    ax[1].imshow(image)
+    ax[1].imshow(activation_map_resized, cmap='jet', alpha=0.5)
     ax[1].set_title('Grad-CAM')
     ax[1].axis('off')
-    
+
     # Exibir as imagens com o Streamlit
     st.pyplot(fig)
+
 
 
 
@@ -772,19 +769,16 @@ def main():
             """)
     
             st.write("### Efeitos do Número de Classes no Desempenho")
-          
             st.write("""
             O número de classes influencia diretamente a complexidade do modelo e o tempo de treinamento. Conforme o número de classes aumenta, a tarefa de classificação se torna mais difícil, exigindo mais parâmetros e tempo de computação. Além disso, um maior número de classes aumenta o risco de **sobreajuste** (overfitting), especialmente em conjuntos de dados pequenos (Cheng, 2023; Suhana, 2022).
             """)
     
             st.write("### Conclusão")
-          
             st.write("""
             O número de classes é um fator determinante na definição da arquitetura de redes neurais para tarefas de classificação. Seja em problemas binários, multiclasse ou multirrótulo, a escolha adequada desse parâmetro garante que a rede neural seja capaz de aprender as características relevantes de cada categoria. Em problemas com muitas classes, estratégias como a **regularização** e o **data augmentation** podem ser utilizadas para melhorar o desempenho do modelo, evitando o sobreajuste (Cheng, 2023; Sardeshmukh, 2023).
             """)
     
             st.write("### Referências")
-          
             st.write("""
             1. Cheng, R. (2023). Expansion of the CT-scans image set based on the pretrained DCGAN for improving the performance of the CNN. *Journal of Physics Conference Series*, 2646(1), 012015. https://doi.org/10.1088/1742-6596/2646/1/012015
             2. Petrovska, B., Atanasova-Pacemska, T., Corizzo, R., Mignone, P., Lameski, P., & Zdravevski, E. (2020). Aerial Scene Classification through Fine-Tuning with Adaptive Learning Rates and Label Smoothing. *Applied Sciences*, 10(17), 5792. https://doi.org/10.3390/app10175792
