@@ -25,6 +25,7 @@ import logging
 import base64
 import torch.nn as nn
 import torchvision.models as models
+from tensorflow.keras.models import load_model
 
 # Importações adicionais para Grad-CAM
 from torchcam.methods import SmoothGradCAMpp
@@ -547,9 +548,34 @@ def evaluate_image(model, image, classes):
 
 #________________________________________________
 
+
+# Carregar o modelo de segmentação
+@st.cache(allow_output_mutation=True)
+def carregar_modelo_segmentacao():
+    return load_model('ResU_net.h5')
+
+modelo_segmentacao = carregar_modelo_segmentacao()
+
+# Função para melhorar a imagem (gerar a máscara de segmentação)
+def melhorar_imagem(img):
+    img = img.reshape((1, 256, 256, 3)).astype(float) / 255.
+    sub = modelo_segmentacao.predict(img).flatten()
+    sub = np.where(sub > 0.5, 1, 0)
+    return sub
+
+# Função para aplicar a máscara na imagem
+def aplicar_mascara(img):
+    img_resized = cv2.resize(img, (256, 256))
+    img_normalized = img_resized.astype(np.float32) / 255.
+    mask = melhorar_imagem(img_normalized).reshape(256, 256)
+    mask = np.array(mask, dtype=np.uint8)
+    res = cv2.bitwise_and(img_resized, img_resized, mask=mask)
+    return res
+
+# Função para visualizar as ativações e exibir a imagem segmentada
 def visualize_activations(model, image, class_names):
     """
-    Visualiza as ativações na imagem usando Grad-CAM.
+    Visualiza as ativações na imagem usando Grad-CAM e exibe a imagem segmentada.
     """
     model.eval()  # Coloca o modelo em modo de avaliação
     input_tensor = test_transforms(image).unsqueeze(0).to(device)
@@ -595,8 +621,11 @@ def visualize_activations(model, image, class_names):
     superimposed_img = heatmap * 0.4 + image_np * 0.6
     superimposed_img = np.uint8(superimposed_img)
     
-    # Exibir a imagem original e o mapa de ativação sobreposto
-    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    # Aplicar a segmentação à imagem
+    segmented_img = aplicar_mascara(image_np)
+    
+    # Exibir a imagem original, o Grad-CAM e a imagem segmentada
+    fig, ax = plt.subplots(1, 3, figsize=(18, 6))
     
     # Imagem original
     ax[0].imshow(image_np)
@@ -608,9 +637,13 @@ def visualize_activations(model, image, class_names):
     ax[1].set_title('Grad-CAM')
     ax[1].axis('off')
     
+    # Imagem segmentada
+    ax[2].imshow(segmented_img)
+    ax[2].set_title('Imagem Segmentada')
+    ax[2].axis('off')
+    
     # Exibir as imagens com o Streamlit
     st.pyplot(fig)
-
 
 
 def main():
