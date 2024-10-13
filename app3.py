@@ -25,7 +25,7 @@ import logging
 import base64
 import torch.nn as nn
 import torchvision.models as models
-
+import torchcam
 # Importações adicionais para Grad-CAM
 from torchcam.methods import SmoothGradCAMpp
 from torchvision.transforms.functional import normalize, resize, to_pil_image
