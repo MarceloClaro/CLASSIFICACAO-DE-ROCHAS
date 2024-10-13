@@ -144,11 +144,11 @@ def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
     Retorna o modelo pré-treinado selecionado.
     """
     if model_name == 'ResNet18':
-        model = models.resnet18(pretrained=True)
+        model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
     elif model_name == 'ResNet50':
-        model = models.resnet50(pretrained=True)
+        model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
     elif model_name == 'DenseNet121':
-        model = models.densenet121(pretrained=True)
+        model = models.densenet121(weights=models.DenseNet121_Weights.DEFAULT)
     else:
         st.error("Modelo não suportado.")
         return None
@@ -549,29 +549,29 @@ def evaluate_image(model, image, classes):
         return class_name, confidence.item()
 
 # Função para carregar o modelo de segmentação em PyTorch
-@st.cache(allow_output_mutation=True)
+@st.cache_resource
 def carregar_modelo_segmentacao():
-    # Verificar se o arquivo existe
     if not os.path.exists('modelo_segmentacao.pth'):
-        st.error("O arquivo 'modelo_segmentacao.pth' não foi encontrado. Certifique-se de que o modelo de segmentação foi treinado e o arquivo está no diretório correto.")
-        return None
-    # Substitua 'resnet18' pelo encoder que você usou durante o treinamento
-    model = smp.Unet(
+        st.warning("O arquivo 'modelo_segmentacao.pth' não foi encontrado. Por favor, faça upload do modelo de segmentação.")
+        uploaded_file = st.sidebar.file_uploader("Faça upload do arquivo 'modelo_segmentacao.pth'", type=["pth"])
+        if uploaded_file is not None:
+            with open('modelo_segmentacao.pth', 'wb') as f:
+                f.write(uploaded_file.getbuffer())
+            st.success("Arquivo 'modelo_segmentacao.pth' carregado com sucesso.")
+        else:
+            st.stop()
+    # Carregar o modelo
+    modelo_segmentacao = smp.Unet(
         encoder_name="resnet18",        # Escolha o encoder que você usou
         encoder_weights=None,           # Pesos pré-treinados não são necessários, pois o modelo já foi treinado
         in_channels=3,                  # Número de canais da imagem de entrada (RGB)
         classes=1,                      # Número de classes para segmentação (1 para segmentação binária)
     )
     # Carregar os pesos do modelo treinado
-    model.load_state_dict(torch.load('modelo_segmentacao.pth', map_location=device))
-    model.to(device)
-    model.eval()
-    return model
-
-# Carregar o modelo de segmentação
-modelo_segmentacao = carregar_modelo_segmentacao()
-if modelo_segmentacao is None:
-    st.stop()  # Interrompe a execução se o modelo não foi carregado
+    modelo_segmentacao.load_state_dict(torch.load('modelo_segmentacao.pth', map_location=device))
+    modelo_segmentacao.to(device)
+    modelo_segmentacao.eval()
+    return modelo_segmentacao
 
 # Função para aplicar a máscara na imagem
 def aplicar_mascara(image):
@@ -675,7 +675,6 @@ def visualize_activations(model, image, class_names):
     st.pyplot(fig)
 
 def main():
-
     # Definir o caminho do ícone
     icon_path = "logo.png"  # Verifique se o arquivo logo.png está no diretório correto
     
@@ -699,9 +698,23 @@ def main():
     else:
         st.sidebar.text("Imagem do logotipo não encontrada.")
     
-    # O restante do código da função main permanece inalterado
     # Aqui você deve incluir o restante do código da função main que você já possui,
     # incluindo as configurações da barra lateral, uploads de arquivos, etc.
+
+    # Exemplo de configurações na barra lateral
+    st.sidebar.title("Parâmetros do Modelo")
+
+    num_classes = st.sidebar.number_input("Número de Classes:", min_value=2, max_value=100, value=2, step=1)
+    model_name = st.sidebar.selectbox("Modelo Pré-treinado:", options=['ResNet18', 'ResNet50', 'DenseNet121'])
+    fine_tune = st.sidebar.checkbox("Fine-Tuning Completo", value=False)
+    epochs = st.sidebar.slider("Número de Épocas:", min_value=1, max_value=500, value=5, step=1)
+    learning_rate = st.sidebar.select_slider("Taxa de Aprendizagem:", options=[0.1, 0.01, 0.001, 0.0001], value=0.0001)
+    batch_size = st.sidebar.selectbox("Tamanho de Lote:", options=[4, 8, 16, 32, 64], index=2)
+    train_split = st.sidebar.slider("Percentual de Treinamento:", min_value=0.5, max_value=0.9, value=0.7, step=0.05)
+    valid_split = st.sidebar.slider("Percentual de Validação:", min_value=0.05, max_value=0.4, value=0.15, step=0.05)
+    l2_lambda = st.sidebar.number_input("L2 Regularization (Weight Decay):", min_value=0.0, max_value=0.1, value=0.01, step=0.01)
+    patience = st.sidebar.number_input("Paciência para Early Stopping:", min_value=1, max_value=10, value=3, step=1)
+    use_weighted_loss = st.sidebar.checkbox("Usar Perda Ponderada para Classes Desbalanceadas", value=False)
 
     # Verificar se a soma dos splits é válida
     if train_split + valid_split > 0.95:
@@ -780,6 +793,18 @@ def main():
                 st.write(f"**Confiança:** {confidence:.4f}")
 
                 # Visualizar ativações
+                # Carregar o modelo de segmentação
+                modelo_segmentacao = carregar_modelo_segmentacao()
+
+                # Botão na sidebar para fazer backup do modelo de segmentação
+                if os.path.exists('modelo_segmentacao.pth'):
+                    if st.sidebar.button("Fazer backup do modelo de segmentação"):
+                        with open('modelo_segmentacao.pth', 'rb') as f:
+                            model_bytes = f.read()
+                        b64 = base64.b64encode(model_bytes).decode()
+                        href = f'<a href="data:file/output_model;base64,{b64}" download="modelo_segmentacao.pth">Clique aqui para baixar o modelo de segmentação treinado</a>'
+                        st.sidebar.markdown(href, unsafe_allow_html=True)
+
                 visualize_activations(model, eval_image, classes)
 
         # Limpar o diretório temporário
