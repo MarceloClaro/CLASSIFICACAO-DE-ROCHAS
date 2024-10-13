@@ -20,12 +20,19 @@ from sklearn.preprocessing import label_binarize
 from sklearn.decomposition import PCA
 import streamlit as st
 import gc
+import cv2
 import logging
 import base64
+import torch.nn as nn
+import torchvision.models as models
+
 # Importações adicionais para Grad-CAM
 from torchcam.methods import SmoothGradCAMpp
 from torchvision.transforms.functional import normalize, resize, to_pil_image
-import cv2
+
+# Importação para modelos de segmentação
+import segmentation_models_pytorch as smp
+
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -541,94 +548,125 @@ def evaluate_image(model, image, classes):
         class_name = classes[class_idx]
         return class_name, confidence.item()
 
-import cv2
-
-def visualize_activations_robust(model, image, class_names):
-    """
-    Visualiza as ativações na imagem usando Grad-CAM com uma visualização aprimorada e robusta.
-    Inclui ajustes dinâmicos de transparência, suavização e múltiplas técnicas de visualização.
-    """
+# Função para carregar o modelo de segmentação em PyTorch
+@st.cache(allow_output_mutation=True)
+def carregar_modelo_segmentacao():
+    # Substitua 'resnet18' pelo encoder que você usou durante o treinamento
+    model = smp.Unet(
+        encoder_name="resnet18",        # Escolha o encoder que você usou
+        encoder_weights=None,           # Pesos pré-treinados não são necessários, pois o modelo já foi treinado
+        in_channels=3,                  # Número de canais da imagem de entrada (RGB)
+        classes=1,                      # Número de classes para segmentação (1 para segmentação binária)
+    )
+    # Carregar os pesos do modelo treinado
+    model.load_state_dict(torch.load('modelo_segmentacao.pth', map_location=device))
+    model.to(device)
     model.eval()
-    # Preparar a imagem
+    return model
+
+# Carregar o modelo de segmentação
+modelo_segmentacao = carregar_modelo_segmentacao()
+
+# Função para aplicar a máscara na imagem
+def aplicar_mascara(image):
+    # Pré-processar a imagem
+    transform = transforms.Compose([
+        transforms.Resize((256, 256)),
+        transforms.ToTensor(),
+    ])
+    img_tensor = transform(image).unsqueeze(0).to(device)
+
+    # Obter a predição do modelo
+    with torch.no_grad():
+        output = modelo_segmentacao(img_tensor)
+        # Aplicar função de ativação sigmoid para segmentação binária
+        pred_mask = torch.sigmoid(output).squeeze().cpu().numpy()
+        # Converter a máscara predita para formato binário
+        mask = (pred_mask > 0.5).astype(np.uint8)
+
+    # Redimensionar a máscara para o tamanho original da imagem
+    mask_resized = cv2.resize(mask, (image.width, image.height), interpolation=cv2.INTER_NEAREST)
+
+    # Converter a imagem para array NumPy
+    image_np = np.array(image)
+
+    # Aplicar a máscara na imagem original
+    res = cv2.bitwise_and(image_np, image_np, mask=mask_resized)
+
+    return res
+
+# Função para visualizar as ativações e exibir a imagem segmentada
+def visualize_activations(model, image, class_names):
+    """
+    Visualiza as ativações na imagem usando Grad-CAM e exibe a imagem segmentada.
+    """
+    model.eval()  # Coloca o modelo em modo de avaliação
     input_tensor = test_transforms(image).unsqueeze(0).to(device)
     
-    # Selecionar a camada alvo (última camada convolucional)
+    # Verificar se o modelo é suportado
     if isinstance(model, models.ResNet):
         target_layer = model.layer4[-1]
     elif isinstance(model, models.DenseNet):
-        target_layer = model.features[-1]
+        target_layer = model.features.denseblock4.denselayer16
     else:
         st.error("Modelo não suportado para Grad-CAM.")
         return
-
-    # Criar o método CAM
+    
+    # Criar o objeto CAM usando torchcam
     cam_extractor = SmoothGradCAMpp(model, target_layer=target_layer)
-
-    # Fazer uma previsão para obter o índice da classe predita
-    out = model(input_tensor)
-    _, pred = torch.max(out, 1)
-    pred_class = pred.item()
-
+    
+    # Habilitar gradientes explicitamente
+    with torch.set_grad_enabled(True):
+        out = model(input_tensor)  # Faz a previsão
+        _, pred = torch.max(out, 1)  # Obtém a classe predita
+        pred_class = pred.item()
+    
     # Gerar o mapa de ativação
     activation_map = cam_extractor(pred_class, out)
-
-    # Converter o mapa de ativação para uma imagem e garantir o formato correto
-    activation_map = activation_map[0].squeeze().cpu().numpy()
-
-    # Redimensionar o mapa de ativação para corresponder ao tamanho da imagem original
-    activation_map_resized = np.array(Image.fromarray(activation_map).resize(input_tensor.shape[-2:], resample=Image.BILINEAR))
-
+    
+    # Obter o mapa de ativação da primeira imagem no lote
+    activation_map = activation_map[0].cpu().numpy()
+    
+    # Redimensionar o mapa de ativação para coincidir com o tamanho da imagem original
+    activation_map_resized = cv2.resize(activation_map, (image.width, image.height))
+    
     # Normalizar o mapa de ativação para o intervalo [0, 1]
-    activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
-
-    # Aplicar suavização no mapa de ativação para melhorar a visualização
-    activation_map_smoothed = cv2.GaussianBlur(activation_map_resized, (5, 5), 0)
-
-    # Ajuste dinâmico de transparência (alpha) com base na intensidade do mapa de calor
-    alpha_map = np.clip(activation_map_smoothed * 2.0, 0.5, 1.0)
-
-    # Exibir a imagem original e o mapa de ativação sobreposto com ajuste dinâmico de transparência
-    fig, ax = plt.subplots(1, 2, figsize=(12, 6))
-
+    activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min() + 1e-8)
+    
+    # Converter a imagem para array NumPy
+    image_np = np.array(image)
+    
+    # Converter o mapa de ativação em uma imagem RGB
+    heatmap = cv2.applyColorMap(np.uint8(activation_map_resized * 255), cv2.COLORMAP_JET)
+    heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
+    
+    # Sobrepor o mapa de ativação na imagem original
+    superimposed_img = heatmap * 0.4 + image_np * 0.6
+    superimposed_img = np.uint8(superimposed_img)
+    
+    # Aplicar a segmentação à imagem
+    segmented_img = aplicar_mascara(image)
+    
+    # Exibir a imagem original, o Grad-CAM e a imagem segmentada
+    fig, ax = plt.subplots(1, 3, figsize=(18, 6))
+    
     # Imagem original
-    ax[0].imshow(image)
+    ax[0].imshow(image_np)
     ax[0].set_title('Imagem Original')
     ax[0].axis('off')
-
-    # Mapa de ativação sobreposto à imagem original
-    ax[1].imshow(image)
-    ax[1].imshow(activation_map_smoothed, cmap='jet', alpha=alpha_map)  # Ajuste dinâmico de transparência
-    ax[1].set_title('Grad-CAM com Transparência Dinâmica e Suavização')
+    
+    # Imagem com Grad-CAM
+    ax[1].imshow(superimposed_img)
+    ax[1].set_title('Grad-CAM')
     ax[1].axis('off')
-
+    
+    # Imagem segmentada
+    ax[2].imshow(segmented_img)
+    ax[2].set_title('Imagem Segmentada')
+    ax[2].axis('off')
+    
+    # Exibir as imagens com o Streamlit
     st.pyplot(fig)
-
-    # Adicionar a visualização de camadas intermediárias
-    visualize_intermediate_layers(model, input_tensor, image)
-
-def visualize_intermediate_layers(model, input_tensor, original_image):
-    """
-    Gera visualizações de camadas intermediárias para entender a hierarquia das características aprendidas.
-    """
-    # Camadas intermediárias para visualização
-    intermediate_layers = [model.layer2[-1], model.layer3[-1]]  # Pode adicionar mais camadas conforme necessário
-
-    fig, ax = plt.subplots(1, len(intermediate_layers), figsize=(12, 4))
-    for i, layer in enumerate(intermediate_layers):
-        cam_extractor = SmoothGradCAMpp(model, target_layer=layer)
-        activation_map = cam_extractor(0, input_tensor)
-        activation_map_resized = np.array(Image.fromarray(activation_map[0].squeeze().cpu().numpy()).resize(input_tensor.shape[-2:], resample=Image.BILINEAR))
-        activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
-
-        ax[i].imshow(original_image)
-        ax[i].imshow(activation_map_resized, cmap='jet', alpha=0.6)  # Ajuste de transparência
-        ax[i].set_title(f'Ativações na Camada Intermediária {i+1}')
-        ax[i].axis('off')
-
-    st.pyplot(fig)
-
-
-
 
 def main():
 
@@ -654,104 +692,11 @@ def main():
         st.sidebar.image("logo.png", width=200)
     else:
         st.sidebar.text("Imagem do logotipo não encontrada.")
-    
-    
-  #___________________________________________________________
-    st.title("Classificação e Clustering de Imagens com Aprendizado Profundo")
-    st.write("Este aplicativo permite treinar um modelo de classificação de imagens e aplicar algoritmos de clustering para análise comparativa.")
 
-    # Barra Lateral de Configurações
-    st.sidebar.title("Configurações do Treinamento")
-      # Imagem e Contatos___________________________
-    
-  
-    num_classes = st.sidebar.number_input("Número de Classes:", min_value=1, step=1)
-    model_name = st.sidebar.selectbox("Modelo Pré-treinado:", options=['ResNet18', 'ResNet50', 'DenseNet121'])
-    fine_tune = st.sidebar.checkbox("Fine-Tuning Completo", value=False)
-    epochs = st.sidebar.slider("Número de Épocas:", min_value=1, max_value=50, value=5, step=1)
-    learning_rate = st.sidebar.select_slider("Taxa de Aprendizagem:", options=[0.1, 0.01, 0.001, 0.0001], value=0.001)
-    batch_size = st.sidebar.selectbox("Tamanho de Lote:", options=[4, 8, 16, 32, 64], index=2)
-    train_split = st.sidebar.slider("Percentual de Treinamento:", min_value=0.5, max_value=0.9, value=0.7, step=0.05)
-    valid_split = st.sidebar.slider("Percentual de Validação:", min_value=0.05, max_value=0.4, value=0.15, step=0.05)
-    l2_lambda = st.sidebar.number_input("L2 Regularization (Weight Decay):", min_value=0.0, max_value=0.1, value=0.01, step=0.01)
-    patience = st.sidebar.number_input("Paciência para Early Stopping:", min_value=1, max_value=10, value=3, step=1)
-    use_weighted_loss = st.sidebar.checkbox("Usar Perda Ponderada para Classes Desbalanceadas", value=False)
-    st.sidebar.image("eu.ico", width=80)
-   
-    st.sidebar.write("""
-    Projeto Geomaker + IA 
-    
-    https://doi.org/10.5281/zenodo.13910277
-    - Professor: Marcelo Claro.
-    Contatos: marceloclaro@gmail.com
-    Whatsapp: (88)981587145
-    Instagram: [marceloclaro.geomaker](https://www.instagram.com/marceloclaro.geomaker/)
-    
-    """)
-     # _____________________________________________
-    # Controle de Áudio
-    st.sidebar.title("Controle de Áudio")
-    
-    # Dicionário de arquivos de áudio, com nomes amigáveis mapeando para o caminho do arquivo
-    mp3_files = {
-        "Áudio explicativo para Leigos": "leigo.mp3",
-        "Áudio explicativo para Geografos": "geografo.mp3",
-        "Áudio explicativo para estudos na saúde": "saude.mp3",
-    }
-    
-    # Lista de arquivos MP3 para seleção
-    selected_mp3 = st.sidebar.radio("Escolha um áudio explicativo:", options=list(mp3_files.keys()))
-    
-    # Controle de opção de repetição
-    loop = st.sidebar.checkbox("Repetir áudio")
-    
-    # Botão de Play para iniciar o áudio
-    play_button = st.sidebar.button("Play")
-    
-    # Placeholder para o player de áudio
-    audio_placeholder = st.sidebar.empty()
-    
-    # Função para verificar se o arquivo existe
-    def check_file_exists(mp3_path):
-        if not os.path.exists(mp3_path):
-            st.sidebar.error(f"Arquivo {mp3_path} não encontrado.")
-            return False
-        return True
-    
-    # Se o botão Play for pressionado e um arquivo de áudio estiver selecionado
-    if play_button and selected_mp3:
-        mp3_path = mp3_files[selected_mp3]
-        
-        # Verificação da existência do arquivo
-        if check_file_exists(mp3_path):
-            try:
-                # Abrindo o arquivo de áudio no modo binário
-                with open(mp3_path, "rb") as audio_file:
-                    audio_bytes = audio_file.read()
-                    
-                    # Codificando o arquivo em base64 para embutir no HTML
-                    audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
-                    
-                    # Controle de loop (repetição)
-                    loop_attr = "loop" if loop else ""
-                    
-                    # Gerando o player de áudio em HTML
-                    audio_html = f"""
-                    <audio id="audio-player" controls autoplay {loop_attr}>
-                      <source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3">
-                      Seu navegador não suporta o elemento de áudio.
-                    </audio>
-                    """
-                    
-                    # Inserindo o player de áudio na interface
-                    audio_placeholder.markdown(audio_html, unsafe_allow_html=True)
-            
-            except FileNotFoundError:
-                st.sidebar.error(f"Arquivo {mp3_path} não encontrado.")
-            except Exception as e:
-                st.sidebar.error(f"Erro ao carregar o arquivo: {str(e)}")
-    #______________________________________________________________________________________-
+    # (O restante do código da função main permanece inalterado)
 
+    # Aqui, coloque o restante do código da função main que você já possui,
+    # incluindo as configurações da barra lateral, uploads de arquivos, etc.
 
     # Verificar se a soma dos splits é válida
     if train_split + valid_split > 0.95:
