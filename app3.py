@@ -20,16 +20,12 @@ from sklearn.preprocessing import label_binarize
 from sklearn.decomposition import PCA
 import streamlit as st
 import gc
-import cv2
 import logging
 import base64
-import torch.nn as nn
-import torchvision.models as models
-
 # Importações adicionais para Grad-CAM
 from torchcam.methods import SmoothGradCAMpp
 from torchvision.transforms.functional import normalize, resize, to_pil_image
-
+import cv2
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -551,14 +547,14 @@ def visualize_activations(model, image, class_names):
     """
     Visualiza as ativações na imagem usando Grad-CAM.
     """
-    model.eval()
+    model.eval()  # Coloca o modelo em modo de avaliação
     input_tensor = test_transforms(image).unsqueeze(0).to(device)
     
-    # Verificar se o modelo é suportado e definir a camada alvo como string
+    # Verificar se o modelo é suportado
     if isinstance(model, models.ResNet):
-        target_layer = 'layer4'
+        target_layer = model.layer4[-1]
     elif isinstance(model, models.DenseNet):
-        target_layer = 'features.denseblock4.denselayer16'
+        target_layer = model.features.denseblock4.denselayer16
     else:
         st.error("Modelo não suportado para Grad-CAM.")
         return
@@ -568,69 +564,49 @@ def visualize_activations(model, image, class_names):
     
     # Habilitar gradientes explicitamente
     with torch.set_grad_enabled(True):
-        out = model(input_tensor)
-        _, pred = torch.max(out, 1)
+        out = model(input_tensor)  # Faz a previsão
+        _, pred = torch.max(out, 1)  # Obtém a classe predita
         pred_class = pred.item()
-        activation_map_dict = cam_extractor(pred_class, out)
     
-    # Obter o mapa de ativação da camada alvo
-    activation_map = activation_map_dict[target_layer][0].cpu().numpy()
+    # Gerar o mapa de ativação
+    activation_map = cam_extractor(pred_class, out)
     
-    # Redimensionar o mapa de ativação
+    # Obter o mapa de ativação da primeira imagem no lote
+    activation_map = activation_map[0].cpu().numpy()
+    
+    # Redimensionar o mapa de ativação para coincidir com o tamanho da imagem original
     activation_map_resized = cv2.resize(activation_map, (image.size[0], image.size[1]))
     
-    # Verificar por NaN ou Inf
-    if np.isnan(activation_map_resized).any() or np.isinf(activation_map_resized).any():
-        activation_map_resized = np.nan_to_num(activation_map_resized, nan=0.0, posinf=255, neginf=0)
-    
-    # Normalizar e converter para uint8
-    activation_map_resized = cv2.normalize(activation_map_resized, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
-    activation_map_resized = activation_map_resized.astype(np.uint8)
-    
-    # Verificar forma e tipo
-    st.write(f"Forma do activation_map_resized: {activation_map_resized.shape}")
-    st.write(f"Tipo de dados do activation_map_resized: {activation_map_resized.dtype}")
-    st.write(f"Valores mínimo e máximo do activation_map_resized: min={activation_map_resized.min()}, max={activation_map_resized.max()}")
-    
-    # Garantir que seja 2D
-    if activation_map_resized.ndim > 2:
-        activation_map_resized = activation_map_resized.squeeze()
-        st.write(f"Forma após squeeze: {activation_map_resized.shape}")
+    # Normalizar o mapa de ativação para o intervalo [0, 1]
+    activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
     
     # Converter a imagem para array NumPy
-    image_np = np.array(image.convert('RGB'))
+    image_np = np.array(image)
     
-    # Converter a imagem para BGR
-    image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
-    
-    # Verificar tamanho da imagem
-    st.write(f"Forma da imagem original (image_np): {image_np.shape}")
-    
-    # Aplicar o mapa de cores
-    heatmap = cv2.applyColorMap(activation_map_resized, cv2.COLORMAP_JET)
-    
-    # Verificar se a imagem e o heatmap têm o mesmo tamanho
-    st.write(f"Forma do heatmap: {heatmap.shape}")
-    if image_np.shape[:2] != heatmap.shape[:2]:
-        st.error("A imagem e o mapa de ativação têm tamanhos diferentes.")
-        return
+    # Converter o mapa de ativação em uma imagem RGB
+    heatmap = cv2.applyColorMap(np.uint8(255 * activation_map_resized), cv2.COLORMAP_JET)
+    heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
     
     # Sobrepor o mapa de ativação na imagem original
-    superimposed_img = cv2.addWeighted(image_np, 0.6, heatmap, 0.4, 0)
+    superimposed_img = heatmap * 0.4 + image_np * 0.6
+    superimposed_img = np.uint8(superimposed_img)
     
-    # Converter de volta para RGB
-    image_np = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
-    superimposed_img = cv2.cvtColor(superimposed_img, cv2.COLOR_BGR2RGB)
-    
-    # Exibir as imagens
+    # Exibir a imagem original e o mapa de ativação sobreposto
     fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    
+    # Imagem original
     ax[0].imshow(image_np)
     ax[0].set_title('Imagem Original')
     ax[0].axis('off')
+    
+    # Imagem com Grad-CAM
     ax[1].imshow(superimposed_img)
     ax[1].set_title('Grad-CAM')
     ax[1].axis('off')
+    
+    # Exibir as imagens com o Streamlit
     st.pyplot(fig)
+
 
 
 def main():
@@ -640,11 +616,11 @@ def main():
     
     # Verificar se o arquivo de ícone existe antes de configurá-lo
     if os.path.exists(icon_path):
-        st.set_page_config(page_title="Geomaker +IA", page_icon=icon_path, layout="wide")
+        st.set_page_config(page_title="OdontoIA", page_icon=icon_path, layout="wide")
         logging.info(f"Ícone {icon_path} carregado com sucesso.")
     else:
         # Se o ícone não for encontrado, carrega sem favicon
-        st.set_page_config(page_title="Geomaker +IA", layout="wide")
+        st.set_page_config(page_title="OdontoIA", layout="wide")
         logging.warning(f"Ícone {icon_path} não encontrado, carregando sem favicon.")
     
     # Layout da página
@@ -660,7 +636,7 @@ def main():
     
     
   #___________________________________________________________
-    st.title("Classificação e Clustering de Imagens com Aprendizado Profundo")
+    st.title("Detecção de lesões por Imagens com Aprendizado Profundo")
     st.write("Este aplicativo permite treinar um modelo de classificação de imagens e aplicar algoritmos de clustering para análise comparativa.")
     with st.expander("Transformações de Dados e Aumento de Dados no Treinamento de Redes Neurais"):
         st.write("""
@@ -776,7 +752,7 @@ def main():
             onde **W** e **b** são os pesos e o bias, respectivamente, que conectam a camada anterior às classes de saída. O resultado é passado pela função **softmax**, que converte os valores em probabilidades associadas a cada classe (Petrovska et al., 2020).
             """)
     
-            st.write("### Classificação Binária")
+                       
             st.write("""
             Em tarefas de classificação binária, o modelo tem apenas duas classes possíveis, como **detecção de fraude** ou **diagnóstico de doenças** (positivo ou negativo). Nesse caso, a função de ativação final é geralmente a **sigmoide**, que retorna uma probabilidade entre 0 e 1 para cada entrada. Um limiar é então aplicado para decidir a classe final predita pelo modelo (Cheng, 2023).
             """)
@@ -802,6 +778,7 @@ def main():
             """)
     
             st.write("### Referências")
+          
             st.write("""
             1. Cheng, R. (2023). Expansion of the CT-scans image set based on the pretrained DCGAN for improving the performance of the CNN. *Journal of Physics Conference Series*, 2646(1), 012015. https://doi.org/10.1088/1742-6596/2646/1/012015
             2. Petrovska, B., Atanasova-Pacemska, T., Corizzo, R., Mignone, P., Lameski, P., & Zdravevski, E. (2020). Aerial Scene Classification through Fine-Tuning with Adaptive Learning Rates and Label Smoothing. *Applied Sciences*, 10(17), 5792. https://doi.org/10.3390/app10175792
@@ -810,7 +787,7 @@ def main():
             """)
 
   
-    num_classes = st.sidebar.number_input("Número de Classes:", min_value=2, step=1)
+    num_classes = st.sidebar.number_input("Número de Classes:", min_value=1, step=1)
     #_______________________________________________________________________________________
     # Sidebar com o conteúdo explicativo e fórmula LaTeX
     with st.sidebar:
@@ -1040,7 +1017,7 @@ def main():
             """)
 
     fine_tune = st.sidebar.checkbox("Fine-Tuning Completo", value=False)
-    epochs = st.sidebar.slider("Número de Épocas:", min_value=1, max_value=500, value=100, step=1)
+    epochs = st.sidebar.slider("Número de Épocas:", min_value=1, max_value=500, value=200, step=1)
     learning_rate = st.sidebar.select_slider("Taxa de Aprendizagem:", options=[0.1, 0.01, 0.001, 0.0001], value=0.0001)
     batch_size = st.sidebar.selectbox("Tamanho de Lote:", options=[4, 8, 16, 32, 64], index=2)
     train_split = st.sidebar.slider("Percentual de Treinamento:", min_value=0.5, max_value=0.9, value=0.7, step=0.05)
@@ -1307,12 +1284,18 @@ def main():
     st.sidebar.image("eu.ico", width=80)
    
     st.sidebar.write("""
+    Produzido pelo:
+    
     Projeto Geomaker + IA 
     
-    https://doi.org/10.5281/zenodo.13910277
+    https://doi.org/10.5281/zenodo.13925454
+    
     - Professor: Marcelo Claro.
+    
     Contatos: marceloclaro@gmail.com
+    
     Whatsapp: (88)981587145
+    
     Instagram: [marceloclaro.geomaker](https://www.instagram.com/marceloclaro.geomaker/)
     
     """)
@@ -1323,8 +1306,7 @@ def main():
     # Dicionário de arquivos de áudio, com nomes amigáveis mapeando para o caminho do arquivo
     mp3_files = {
         "Áudio explicativo para Leigos": "leigo.mp3",
-        "Áudio explicativo para Geografos": "geografo.mp3",
-        "Áudio explicativo para estudos na saúde": "saude.mp3",
+        "Áudio explicativo para treinamentos de poucos dados": "bucal.mp3",
     }
     
     # Lista de arquivos MP3 para seleção
