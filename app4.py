@@ -10,7 +10,7 @@ import seaborn as sns
 from PIL import Image
 import torch
 from torch import nn, optim
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 from torchvision import transforms, models, datasets
 from sklearn.cluster import AgglomerativeClustering, KMeans
 from sklearn.metrics import (adjusted_rand_score, normalized_mutual_info_score,
@@ -23,12 +23,15 @@ import gc
 import cv2
 import logging
 import base64
+import torch.nn as nn
+import torchvision.models as models
 
 # Importações adicionais para Grad-CAM
 from torchcam.methods import SmoothGradCAMpp
+from torchvision.transforms.functional import normalize, resize, to_pil_image
 
-# Importação para modelos de segmentação
-import segmentation_models_pytorch as smp
+# Importação adicional para salvar as classes em JSON
+import json
 
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -121,11 +124,9 @@ def plot_class_distribution(dataset, classes):
     
     # Plotar o gráfico com as contagens
     fig, ax = plt.subplots(figsize=(10, 6))
-    sns.countplot(x=labels, hue=labels, ax=ax, palette="Set2", dodge=False)
-    ax.legend_.remove()  # Remover a legenda
+    sns.countplot(x=labels, ax=ax, palette="Set2")
     
-    # Definir os ticks e os tick labels
-    ax.set_xticks(range(len(classes)))
+    # Adicionar os nomes das classes no eixo X
     ax.set_xticklabels(classes, rotation=45)
     
     # Adicionar as contagens acima das barras
@@ -143,11 +144,11 @@ def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
     Retorna o modelo pré-treinado selecionado.
     """
     if model_name == 'ResNet18':
-        model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+        model = models.resnet18(pretrained=True)
     elif model_name == 'ResNet50':
-        model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+        model = models.resnet50(pretrained=True)
     elif model_name == 'DenseNet121':
-        model = models.densenet121(weights=models.DenseNet121_Weights.DEFAULT)
+        model = models.densenet121(pretrained=True)
     else:
         st.error("Modelo não suportado.")
         return None
@@ -175,7 +176,7 @@ def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
     model = model.to(device)
     return model
 
-def train_model(data_dir, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience):
+def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience, temp_dir):
     """
     Função principal para treinamento do modelo.
     """
@@ -183,9 +184,6 @@ def train_model(data_dir, model_name, fine_tune, epochs, learning_rate, batch_si
 
     # Carregar o dataset original sem transformações
     full_dataset = datasets.ImageFolder(root=data_dir)
-    
-    # Determinar o número de classes
-    num_classes = len(full_dataset.classes)
 
     # Exibir algumas imagens do dataset
     visualize_data(full_dataset, full_dataset.classes)
@@ -247,6 +245,7 @@ def train_model(data_dir, model_name, fine_tune, epochs, learning_rate, batch_si
     # Early Stopping
     best_valid_loss = float('inf')
     epochs_no_improve = 0
+    best_model_wts = model.state_dict()  # Inicializar com os pesos atuais
 
     # Treinamento
     for epoch in range(epochs):
@@ -309,7 +308,7 @@ def train_model(data_dir, model_name, fine_tune, epochs, learning_rate, batch_si
         if valid_epoch_loss < best_valid_loss:
             best_valid_loss = valid_epoch_loss
             epochs_no_improve = 0
-            best_model_wts = model.state_dict()
+            best_model_wts = model.state_dict().copy()
         else:
             epochs_no_improve += 1
             if epochs_no_improve >= patience:
@@ -319,6 +318,15 @@ def train_model(data_dir, model_name, fine_tune, epochs, learning_rate, batch_si
 
     # Carregar os melhores pesos do modelo
     model.load_state_dict(best_model_wts)
+
+    # Salvar o modelo em um arquivo temporário
+    model_save_path = os.path.join(temp_dir, 'best_model.pth')
+    torch.save(model.state_dict(), model_save_path)
+
+    # Salvar as classes em um arquivo JSON
+    classes_save_path = os.path.join(temp_dir, 'classes.json')
+    with open(classes_save_path, 'w') as f:
+        json.dump(full_dataset.classes, f)
 
     # Gráficos de Perda e Acurácia
     plot_metrics(epochs, train_losses, valid_losses, train_accuracies, valid_accuracies)
@@ -335,12 +343,290 @@ def train_model(data_dir, model_name, fine_tune, epochs, learning_rate, batch_si
     del train_loader, valid_loader
     gc.collect()
 
-    return model, full_dataset.classes
+    # Retornar o modelo, as classes e os caminhos dos arquivos salvos
+    return model, full_dataset.classes, model_save_path, classes_save_path
 
-# As outras funções permanecem inalteradas
-# ...
+def plot_metrics(epochs, train_losses, valid_losses, train_accuracies, valid_accuracies):
+    """
+    Plota os gráficos de perda e acurácia.
+    """
+    epochs_range = range(1, len(train_losses)+1)
+    fig, ax = plt.subplots(1, 2, figsize=(14, 5))
+
+    # Gráfico de Perda
+    ax[0].plot(epochs_range, train_losses, label='Treino')
+    ax[0].plot(epochs_range, valid_losses, label='Validação')
+    ax[0].set_title('Perda por Época')
+    ax[0].set_xlabel('Épocas')
+    ax[0].set_ylabel('Perda')
+    ax[0].legend()
+
+    # Gráfico de Acurácia
+    ax[1].plot(epochs_range, train_accuracies, label='Treino')
+    ax[1].plot(epochs_range, valid_accuracies, label='Validação')
+    ax[1].set_title('Acurácia por Época')
+    ax[1].set_xlabel('Épocas')
+    ax[1].set_ylabel('Acurácia')
+    ax[1].legend()
+
+    st.pyplot(fig)
+
+def compute_metrics(model, dataloader, classes):
+    """
+    Calcula métricas detalhadas e exibe matriz de confusão e relatório de classificação.
+    """
+    model.eval()
+    all_preds = []
+    all_labels = []
+    all_probs = []
+
+    with torch.no_grad():
+        for inputs, labels in dataloader:
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+
+            outputs = model(inputs)
+            probabilities = torch.nn.functional.softmax(outputs, dim=1)
+            _, preds = torch.max(outputs, 1)
+
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+            all_probs.extend(probabilities.cpu().numpy())
+
+    # Relatório de Classificação
+    report = classification_report(all_labels, all_preds, target_names=classes, output_dict=True)
+    st.text("Relatório de Classificação:")
+    st.write(pd.DataFrame(report).transpose())
+
+    # Matriz de Confusão Normalizada
+    cm = confusion_matrix(all_labels, all_preds, normalize='true')
+    fig, ax = plt.subplots()
+    sns.heatmap(cm, annot=True, fmt='.2f', cmap='Blues', xticklabels=classes, yticklabels=classes, ax=ax)
+    ax.set_xlabel('Predito')
+    ax.set_ylabel('Verdadeiro')
+    ax.set_title('Matriz de Confusão Normalizada')
+    st.pyplot(fig)
+
+    # Curva ROC
+    if len(classes) == 2:
+        fpr, tpr, thresholds = roc_curve(all_labels, [p[1] for p in all_probs])
+        roc_auc = roc_auc_score(all_labels, [p[1] for p in all_probs])
+        fig, ax = plt.subplots()
+        ax.plot(fpr, tpr, label='AUC = %0.2f' % roc_auc)
+        ax.plot([0, 1], [0, 1], 'k--')
+        ax.set_xlabel('Taxa de Falsos Positivos')
+        ax.set_ylabel('Taxa de Verdadeiros Positivos')
+        ax.set_title('Curva ROC')
+        ax.legend(loc='lower right')
+        st.pyplot(fig)
+    else:
+        # Multiclasse
+        binarized_labels = label_binarize(all_labels, classes=range(len(classes)))
+        roc_auc = roc_auc_score(binarized_labels, np.array(all_probs), average='weighted', multi_class='ovr')
+        st.write(f"AUC-ROC Média Ponderada: {roc_auc:.4f}")
+
+def error_analysis(model, dataloader, classes):
+    """
+    Realiza análise de erros mostrando algumas imagens mal classificadas.
+    """
+    model.eval()
+    misclassified_images = []
+    misclassified_labels = []
+    misclassified_preds = []
+
+    with torch.no_grad():
+        for inputs, labels in dataloader:
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+            outputs = model(inputs)
+            _, preds = torch.max(outputs, 1)
+
+            incorrect = preds != labels
+            if incorrect.any():
+                misclassified_images.extend(inputs[incorrect].cpu())
+                misclassified_labels.extend(labels[incorrect].cpu())
+                misclassified_preds.extend(preds[incorrect].cpu())
+                if len(misclassified_images) >= 5:
+                    break
+
+    if misclassified_images:
+        st.write("Algumas imagens mal classificadas:")
+        fig, axes = plt.subplots(1, min(5, len(misclassified_images)), figsize=(15, 3))
+        for i in range(min(5, len(misclassified_images))):
+            image = misclassified_images[i]
+            image = image.permute(1, 2, 0).numpy()
+            axes[i].imshow(image)
+            axes[i].set_title(f"V: {classes[misclassified_labels[i]]}\nP: {classes[misclassified_preds[i]]}")
+            axes[i].axis('off')
+        st.pyplot(fig)
+    else:
+        st.write("Nenhuma imagem mal classificada encontrada.")
+
+def extract_features(dataset, model, batch_size):
+    """
+    Extrai características de um conjunto de dados usando um modelo pré-treinado.
+    """
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, worker_init_fn=seed_worker)
+
+    features = []
+    labels = []
+
+    model.eval()
+    with torch.no_grad():
+        for inputs, lbls in dataloader:
+            inputs = inputs.to(device)
+            outputs = model(inputs)
+            outputs = outputs.view(outputs.size(0), -1)  # Flatten
+            features.append(outputs.cpu().numpy())
+            labels.extend(lbls.numpy())
+
+    features = np.concatenate(features, axis=0)
+    labels = np.array(labels)
+    return features, labels
+
+def perform_clustering(features, num_clusters):
+    """
+    Aplica algoritmos de clustering às características.
+    """
+    # Clustering Hierárquico
+    hierarchical = AgglomerativeClustering(n_clusters=num_clusters)
+    hierarchical_labels = hierarchical.fit_predict(features)
+
+    # K-Means
+    kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+    kmeans_labels = kmeans.fit_predict(features)
+
+    return hierarchical_labels, kmeans_labels
+
+def evaluate_clustering(true_labels, cluster_labels, method_name):
+    """
+    Avalia os resultados do clustering comparando com as classes reais.
+    """
+    ari = adjusted_rand_score(true_labels, cluster_labels)
+    nmi = normalized_mutual_info_score(true_labels, cluster_labels)
+    st.write(f"**Métricas para {method_name}:**")
+    st.write(f"Adjusted Rand Index: {ari:.4f}")
+    st.write(f"Normalized Mutual Information Score: {nmi:.4f}")
+
+def visualize_clusters(features, true_labels, hierarchical_labels, kmeans_labels, classes):
+    """
+    Visualiza os clusters usando redução de dimensionalidade e inclui as classes verdadeiras com nomes de rótulos.
+    """
+    # Redução de dimensionalidade com PCA para visualizar os clusters em 2D
+    pca = PCA(n_components=2)
+    reduced_features = pca.fit_transform(features)
+
+    # Mapear os rótulos verdadeiros para os nomes das classes
+    true_labels_named = [classes[label] for label in true_labels]
+    
+    # Usar as cores distintas e visíveis para garantir que os clusters sejam claramente separados
+    color_palette = sns.color_palette("tab10", len(set(true_labels)))
+
+    fig, axes = plt.subplots(1, 3, figsize=(21, 6))  # Agora temos 3 gráficos: Hierarchical, K-Means e classes verdadeiras
+
+    # Clustering Hierárquico
+    sns.scatterplot(x=reduced_features[:, 0], y=reduced_features[:, 1], hue=hierarchical_labels, palette="deep", ax=axes[0], legend='full')
+    axes[0].set_title('Clustering Hierárquico')
+    ari_hierarchical = adjusted_rand_score(true_labels, hierarchical_labels)
+    nmi_hierarchical = normalized_mutual_info_score(true_labels, hierarchical_labels)
+    axes[0].text(0.1, 0.9, f"ARI: {ari_hierarchical:.2f}\nNMI: {nmi_hierarchical:.2f}", horizontalalignment='center', verticalalignment='center', transform=axes[0].transAxes, bbox=dict(facecolor='white', alpha=0.5))
+
+    # K-Means Clustering
+    sns.scatterplot(x=reduced_features[:, 0], y=reduced_features[:, 1], hue=kmeans_labels, palette="deep", ax=axes[1], legend='full')
+    axes[1].set_title('K-Means Clustering')
+    ari_kmeans = adjusted_rand_score(true_labels, kmeans_labels)
+    nmi_kmeans = normalized_mutual_info_score(true_labels, kmeans_labels)
+    axes[1].text(0.1, 0.9, f"ARI: {ari_kmeans:.2f}\nNMI: {nmi_kmeans:.2f}", horizontalalignment='center', verticalalignment='center', transform=axes[1].transAxes, bbox=dict(facecolor='white', alpha=0.5))
+
+    # Classes verdadeiras
+    sns.scatterplot(x=reduced_features[:, 0], y=reduced_features[:, 1], hue=true_labels_named, palette=color_palette, ax=axes[2], legend='full')
+    axes[2].set_title('Classes Verdadeiras')
+
+    # Exibir os gráficos
+    st.pyplot(fig)
+
+def evaluate_image(model, image, classes):
+    """
+    Avalia uma única imagem e retorna a classe predita e a confiança.
+    """
+    model.eval()
+    image_tensor = test_transforms(image).unsqueeze(0).to(device)
+    with torch.no_grad():
+        output = model(image_tensor)
+        probabilities = torch.nn.functional.softmax(output, dim=1)
+        confidence, predicted = torch.max(probabilities, 1)
+        class_idx = predicted.item()
+        class_name = classes[class_idx]
+        return class_name, confidence.item()
+
+#________________________________________________
+
+def visualize_activations(model, image, class_names):
+    """
+    Visualiza as ativações na imagem usando Grad-CAM.
+    """
+    model.eval()  # Coloca o modelo em modo de avaliação
+    input_tensor = test_transforms(image).unsqueeze(0).to(device)
+    
+    # Verificar se o modelo é suportado
+    if isinstance(model, models.ResNet):
+        target_layer = model.layer4[-1]
+    elif isinstance(model, models.DenseNet):
+        target_layer = model.features.denseblock4.denselayer16
+    else:
+        st.error("Modelo não suportado para Grad-CAM.")
+        return
+    
+    # Criar o objeto CAM usando torchcam
+    cam_extractor = SmoothGradCAMpp(model, target_layer=target_layer)
+    
+    # Habilitar gradientes explicitamente
+    with torch.set_grad_enabled(True):
+        out = model(input_tensor)  # Faz a previsão
+        _, pred = torch.max(out, 1)  # Obtém a classe predita
+        pred_class = pred.item()
+    
+    # Gerar o mapa de ativação
+    activation_map = cam_extractor(pred_class, out)
+    
+    # Obter o mapa de ativação da primeira imagem no lote
+    activation_map = activation_map[0].cpu().numpy()
+    
+    # Redimensionar o mapa de ativação para coincidir com o tamanho da imagem original
+    activation_map_resized = cv2.resize(activation_map, (image.size[0], image.size[1]))
+    
+    # Normalizar o mapa de ativação para o intervalo [0, 1]
+    activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
+    
+    # Converter a imagem para array NumPy
+    image_np = np.array(image)
+    
+    # Converter o mapa de ativação em uma imagem RGB
+    heatmap = cv2.applyColorMap(np.uint8(255 * activation_map_resized), cv2.COLORMAP_JET)
+    heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
+    
+    # Sobrepor o mapa de ativação na imagem original
+    superimposed_img = heatmap * 0.4 + image_np * 0.6
+    superimposed_img = np.uint8(superimposed_img)
+    
+    # Exibir a imagem original e o mapa de ativação sobreposto
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    
+    # Imagem original
+    ax[0].imshow(image_np)
+    ax[0].set_title('Imagem Original')
+    ax[0].axis('off')
+    
+    # Imagem com Grad-CAM
+    ax[1].imshow(superimposed_img)
+    ax[1].set_title('Grad-CAM')
+    ax[1].axis('off')
+    
+    # Exibir as imagens com o Streamlit
+    st.pyplot(fig)
 
 def main():
+
     # Definir o caminho do ícone
     icon_path = "logo.png"  # Verifique se o arquivo logo.png está no diretório correto
     
@@ -364,26 +650,17 @@ def main():
     else:
         st.sidebar.text("Imagem do logotipo não encontrada.")
     
-    # Aqui você deve incluir o restante do código da função main que você já possui,
-    # incluindo as configurações da barra lateral, uploads de arquivos, etc.
-
-    # Exemplo de configurações na barra lateral
-    st.sidebar.title("Parâmetros do Modelo")
-
-    # Remover a entrada de num_classes da barra lateral
-    # num_classes = st.sidebar.number_input("Número de Classes:", min_value=2, max_value=100, value=2, step=1)
-
-    model_name = st.sidebar.selectbox("Modelo Pré-treinado:", options=['ResNet18', 'ResNet50', 'DenseNet121'])
-    fine_tune = st.sidebar.checkbox("Fine-Tuning Completo", value=False)
-    epochs = st.sidebar.slider("Número de Épocas:", min_value=1, max_value=500, value=5, step=1)
-    learning_rate = st.sidebar.select_slider("Taxa de Aprendizagem:", options=[0.1, 0.01, 0.001, 0.0001], value=0.0001)
-    batch_size = st.sidebar.selectbox("Tamanho de Lote:", options=[4, 8, 16, 32, 64], index=2)
-    train_split = st.sidebar.slider("Percentual de Treinamento:", min_value=0.5, max_value=0.9, value=0.7, step=0.05)
-    valid_split = st.sidebar.slider("Percentual de Validação:", min_value=0.05, max_value=0.4, value=0.15, step=0.05)
-    l2_lambda = st.sidebar.number_input("L2 Regularization (Weight Decay):", min_value=0.0, max_value=0.1, value=0.01, step=0.01)
-    patience = st.sidebar.number_input("Paciência para Early Stopping:", min_value=1, max_value=10, value=3, step=1)
-    use_weighted_loss = st.sidebar.checkbox("Usar Perda Ponderada para Classes Desbalanceadas", value=False)
-
+    #___________________________________________________________
+    st.title("Classificação e Clustering de Imagens com Aprendizado Profundo")
+    st.write("Este aplicativo permite treinar um modelo de classificação de imagens e aplicar algoritmos de clustering para análise comparativa.")
+    
+    # ... (Mantenha o restante do texto explicativo)
+    
+    # Barra Lateral de Configurações
+    st.sidebar.title("Configurações do Treinamento")
+    
+    # ... (Mantenha o restante dos widgets da barra lateral)
+    
     # Verificar se a soma dos splits é válida
     if train_split + valid_split > 0.95:
         st.sidebar.error("A soma dos splits de treinamento e validação deve ser menor ou igual a 0.95.")
@@ -391,7 +668,7 @@ def main():
     # Upload do arquivo ZIP
     zip_file = st.file_uploader("Upload do arquivo ZIP com as imagens", type=["zip"])
 
-    if zip_file is not None and train_split + valid_split <= 0.95:
+    if zip_file is not None and num_classes > 0 and train_split + valid_split <= 0.95:
         temp_dir = tempfile.mkdtemp()
         zip_path = os.path.join(temp_dir, "uploaded.zip")
         with open(zip_path, "wb") as f:
@@ -401,18 +678,89 @@ def main():
         data_dir = temp_dir
 
         st.write("Iniciando o treinamento supervisionado...")
-        model_data = train_model(data_dir, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience)
+        model_data = train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience, temp_dir)
 
         if model_data is None:
             st.error("Erro no treinamento do modelo.")
             shutil.rmtree(temp_dir)
             return
 
-        model, classes = model_data
+        model, classes, model_save_path, classes_save_path = model_data
         st.success("Treinamento concluído!")
 
-        # O restante do código permanece o mesmo
-        # ...
+        # Fornecer o botão para baixar o modelo treinado
+        with open(model_save_path, 'rb') as f:
+            model_bytes = f.read()
 
+        st.download_button(label='Baixar o modelo treinado',
+                           data=model_bytes,
+                           file_name='best_model.pth',
+                           mime='application/octet-stream')
+
+        # Fornecer o botão para baixar as classes
+        with open(classes_save_path, 'rb') as f:
+            classes_bytes = f.read()
+
+        st.download_button(label='Baixar as classes',
+                           data=classes_bytes,
+                           file_name='classes.json',
+                           mime='application/json')
+
+        # Extrair características usando o modelo pré-treinado (sem a camada final)
+        st.write("Extraindo características para clustering...")
+        # Remover a última camada do modelo para obter embeddings
+        if model_name.startswith('ResNet'):
+            feature_extractor = nn.Sequential(*list(model.children())[:-1])
+        elif model_name.startswith('DenseNet'):
+            feature_extractor = nn.Sequential(*list(model.features))
+            feature_extractor.add_module('global_pool', nn.AdaptiveAvgPool2d((1,1)))
+        else:
+            st.error("Modelo não suportado para extração de características.")
+            return
+
+        feature_extractor = feature_extractor.to(device)
+        feature_extractor.eval()
+
+        # Carregar o dataset completo para extração de características
+        full_dataset = datasets.ImageFolder(root=data_dir, transform=test_transforms)
+        features, labels = extract_features(full_dataset, feature_extractor, batch_size)
+
+        # Aplicar algoritmos de clustering
+        st.write("Aplicando algoritmos de clustering...")
+        features_reshaped = features.reshape(len(features), -1)
+        hierarchical_labels, kmeans_labels = perform_clustering(features_reshaped, num_classes)
+
+        # Avaliar e exibir os resultados
+        st.write("Avaliando os resultados do clustering...")
+        evaluate_clustering(labels, hierarchical_labels, "Clustering Hierárquico")
+        evaluate_clustering(labels, kmeans_labels, "K-Means Clustering")
+
+        # Visualizar clusters
+        visualize_clusters(features_reshaped, labels, hierarchical_labels, kmeans_labels, classes)
+
+        # Avaliação de uma imagem individual
+        evaluate = st.radio("Deseja avaliar uma imagem?", ("Sim", "Não"))
+        if evaluate == "Sim":
+            eval_image_file = st.file_uploader("Faça upload da imagem para avaliação", type=["png", "jpg", "jpeg", "bmp", "gif"])
+            if eval_image_file is not None:
+                eval_image_file.seek(0)
+                try:
+                    eval_image = Image.open(eval_image_file).convert("RGB")
+                except Exception as e:
+                    st.error(f"Erro ao abrir a imagem: {e}")
+                    return
+
+                st.image(eval_image, caption='Imagem para avaliação', use_column_width=True)
+                class_name, confidence = evaluate_image(model, eval_image, classes)
+                st.write(f"**Classe Predita:** {class_name}")
+                st.write(f"**Confiança:** {confidence:.4f}")
+
+                # Visualizar ativações
+                visualize_activations(model, eval_image, classes)
+
+        # Limpar o diretório temporário
+        shutil.rmtree(temp_dir)
+
+# Chamar a função principal
 if __name__ == "__main__":
     main()
