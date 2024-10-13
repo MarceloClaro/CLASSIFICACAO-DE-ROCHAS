@@ -561,6 +561,8 @@ def evaluate_image(model, image, classes):
 
 #________________________________________________
 
+
+
 def visualize_activations(model, image, class_names):
     """
     Visualiza as ativações na imagem usando Grad-CAM.
@@ -568,11 +570,11 @@ def visualize_activations(model, image, class_names):
     model.eval()  # Coloca o modelo em modo de avaliação
     input_tensor = test_transforms(image).unsqueeze(0).to(device)
     
-    # Verificar se o modelo é suportado
+    # Verificar se o modelo é suportado e definir a camada alvo como string
     if isinstance(model, models.ResNet):
-        target_layer = model.layer4[-1]
+        target_layer = 'layer4'  # Nome da camada alvo para ResNet
     elif isinstance(model, models.DenseNet):
-        target_layer = model.features.denseblock4.denselayer16
+        target_layer = 'features.denseblock4.denselayer16'  # Nome da camada alvo para DenseNet
     else:
         st.error("Modelo não suportado para Grad-CAM.")
         return
@@ -585,29 +587,43 @@ def visualize_activations(model, image, class_names):
         out = model(input_tensor)  # Faz a previsão
         _, pred = torch.max(out, 1)  # Obtém a classe predita
         pred_class = pred.item()
+        
+        # Gerar o mapa de ativação
+        activation_map_dict = cam_extractor(pred_class, out)
     
-    # Gerar o mapa de ativação
-    activation_map = cam_extractor(pred_class, out)
-    
-    # Obter o mapa de ativação da primeira imagem no lote
-    activation_map = activation_map[0].cpu().numpy()
+    # Obter o mapa de ativação da camada alvo
+    activation_map = activation_map_dict[target_layer][0].cpu().numpy()
     
     # Redimensionar o mapa de ativação para coincidir com o tamanho da imagem original
     activation_map_resized = cv2.resize(activation_map, (image.size[0], image.size[1]))
     
-    # Normalizar o mapa de ativação para o intervalo [0, 1]
+    # Normalizar o mapa de ativação para o intervalo [0, 255]
     activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
+    activation_map_resized = np.uint8(255 * activation_map_resized)
+    
+    # Se o mapa de ativação tiver uma dimensão extra, remova-a
+    if activation_map_resized.ndim == 3 and activation_map_resized.shape[2] == 1:
+        activation_map_resized = activation_map_resized[:, :, 0]
     
     # Converter a imagem para array NumPy
     image_np = np.array(image)
     
+    # Converter a imagem para BGR (OpenCV usa BGR)
+    image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+    
     # Converter o mapa de ativação em uma imagem RGB
-    heatmap = cv2.applyColorMap(np.uint8(255 * activation_map_resized), cv2.COLORMAP_JET)
-    heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
+    heatmap = cv2.applyColorMap(activation_map_resized, cv2.COLORMAP_JET)
+    
+    # Certifique-se de que a imagem e o heatmap têm o mesmo número de canais
+    if image_np.shape[2] == 4:  # Se a imagem tiver um canal alfa
+        image_np = cv2.cvtColor(image_np, cv2.COLOR_RGBA2RGB)
     
     # Sobrepor o mapa de ativação na imagem original
-    superimposed_img = heatmap * 0.4 + image_np * 0.6
-    superimposed_img = np.uint8(superimposed_img)
+    superimposed_img = cv2.addWeighted(image_np, 0.6, heatmap, 0.4, 0)
+    
+    # Converter de volta para RGB para exibir corretamente com matplotlib
+    image_np = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
+    superimposed_img = cv2.cvtColor(superimposed_img, cv2.COLOR_BGR2RGB)
     
     # Exibir a imagem original e o mapa de ativação sobreposto
     fig, ax = plt.subplots(1, 2, figsize=(10, 5))
@@ -624,6 +640,8 @@ def visualize_activations(model, image, class_names):
     
     # Exibir as imagens com o Streamlit
     st.pyplot(fig)
+
+
 
 def main():
 
