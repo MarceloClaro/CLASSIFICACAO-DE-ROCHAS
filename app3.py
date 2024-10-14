@@ -616,11 +616,11 @@ def main():
     
     # Verificar se o arquivo de ícone existe antes de configurá-lo
     if os.path.exists(icon_path):
-        st.set_page_config(page_title="OdontoIA", page_icon=icon_path, layout="wide")
+        st.set_page_config(page_title="Geomaker", page_icon=icon_path, layout="wide")
         logging.info(f"Ícone {icon_path} carregado com sucesso.")
     else:
         # Se o ícone não for encontrado, carrega sem favicon
-        st.set_page_config(page_title="OdontoIA", layout="wide")
+        st.set_page_config(page_title="Geomaker", layout="wide")
         logging.warning(f"Ícone {icon_path} não encontrado, carregando sem favicon.")
     
     # Layout da página
@@ -636,7 +636,7 @@ def main():
     
     
   #___________________________________________________________
-    st.title("Detecção de lesões por Imagens com Aprendizado Profundo")
+    st.title("Classificação por Imagens com Aprendizado Profundo")
     st.write("Este aplicativo permite treinar um modelo de classificação de imagens e aplicar algoritmos de clustering para análise comparativa.")
     with st.expander("Transformações de Dados e Aumento de Dados no Treinamento de Redes Neurais"):
         st.write("""
