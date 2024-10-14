@@ -9,6 +9,3 @@ seaborn
 scikit-learn
 torchcam
 opencv-python-headless
-tensorflow
-segmentation-models-pytorch
-
