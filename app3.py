@@ -1288,7 +1288,7 @@ def main():
     
     Projeto Geomaker + IA 
     
-    https://doi.org/10.5281/zenodo.13925454
+    https://doi.org/10.5281/zenodo.13910277
     
     - Professor: Marcelo Claro.
     
