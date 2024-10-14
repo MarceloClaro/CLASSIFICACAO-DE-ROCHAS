@@ -580,16 +580,41 @@ def visualize_activations(model, image, class_names):
     # Normalizar o mapa de ativação para o intervalo [0, 1]
     activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
     
+    # Debugging: Mostrar informações sobre o mapa de ativação
+    st.write(f"Activation map shape before squeeze: {activation_map_resized.shape}, dtype: {activation_map_resized.dtype}")
+    
     # Certifique-se de que o mapa de ativação é 2D
     if activation_map_resized.ndim > 2:
         activation_map_resized = np.squeeze(activation_map_resized)
+        st.write(f"Activation map shape after squeeze: {activation_map_resized.shape}")
+    
+    if activation_map_resized.ndim != 2:
+        st.error(f"O mapa de ativação não é 2D após o processamento. Shape: {activation_map_resized.shape}")
+        return
+    
+    # Converter o mapa de ativação para uint8
+    activation_map_uint8 = np.uint8(255 * activation_map_resized)
+    st.write(f"Activation map dtype after conversion: {activation_map_uint8.dtype}")
+    
+    # Verificar se os valores estão no intervalo correto
+    st.write(f"Activation map min: {activation_map_uint8.min()}, max: {activation_map_uint8.max()}")
+    
+    # Converter o mapa de ativação em uma imagem RGB
+    try:
+        heatmap = cv2.applyColorMap(activation_map_uint8, cv2.COLORMAP_JET)
+    except Exception as e:
+        st.error(f"Erro ao aplicar o color map: {e}")
+        return
+    
+    heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
     
     # Converter a imagem para array NumPy
     image_np = np.array(image)
     
-    # Converter o mapa de ativação em uma imagem RGB
-    heatmap = cv2.applyColorMap(np.uint8(255 * activation_map_resized), cv2.COLORMAP_JET)
-    heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
+    # Ajustar o tamanho da imagem se necessário
+    if heatmap.shape != image_np.shape:
+        st.write(f"Redimensionando heatmap de {heatmap.shape} para {image_np.shape}")
+        heatmap = cv2.resize(heatmap, (image_np.shape[1], image_np.shape[0]))
     
     # Sobrepor o mapa de ativação na imagem original
     superimposed_img = heatmap * 0.4 + image_np * 0.6
@@ -610,8 +635,6 @@ def visualize_activations(model, image, class_names):
     
     # Exibir as imagens com o Streamlit
     st.pyplot(fig)
-
-
 
 
 def main():
