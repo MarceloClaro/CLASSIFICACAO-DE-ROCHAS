@@ -580,6 +580,10 @@ def visualize_activations(model, image, class_names):
     # Normalizar o mapa de ativação para o intervalo [0, 1]
     activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
     
+    # Certifique-se de que o mapa de ativação é 2D
+    if activation_map_resized.ndim > 2:
+        activation_map_resized = np.squeeze(activation_map_resized)
+    
     # Converter a imagem para array NumPy
     image_np = np.array(image)
     
@@ -606,6 +610,7 @@ def visualize_activations(model, image, class_names):
     
     # Exibir as imagens com o Streamlit
     st.pyplot(fig)
+
 
 
 
