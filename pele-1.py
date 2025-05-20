@@ -23,6 +23,7 @@ import gc
 import logging
 import base64
 import time
+import json
 
 # Adicionar esta linha para contornar o RuntimeError com torch.classes e Streamlit
 torch.classes.__path__ = []
@@ -565,6 +566,7 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     gc.collect()
     torch.cuda.empty_cache() # Limpar cache da GPU se estiver usando CUDA
     
+    # Return the model and classes
     return model, loaded_full_dataset.classes
 
 def plot_metrics(epochs, train_losses, valid_losses, train_accuracies, valid_accuracies):
@@ -779,6 +781,22 @@ def evaluate_image(model, image, classes):
         class_idx = predicted.item()
         class_name = classes[class_idx]
         return class_name, confidence.item()
+
+# Function to save configuration to JSON
+def save_config_to_json(config_data, model_name):
+    config_dir = "./configs"
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir)
+    # Create a dynamic filename, ensuring it's unique (e.g., using a timestamp or run number)
+    # For simplicity now, we'll use a basic name. Advanced version could add timestamp/counter.
+    filename = f"config_{model_name}_run1.json"
+    filepath = os.path.join(config_dir, filename)
+    try:
+        with open(filepath, 'w') as f:
+            json.dump(config_data, f, indent=4)
+        st.success(f"Configurações de treinamento salvas em: {filepath}")
+    except Exception as e:
+        st.error(f"Erro ao salvar as configurações em {filepath}: {e}")
 
 #________________________________________________
 
@@ -1849,7 +1867,7 @@ def main():
             {"Parâmetro": "Aumento de Dados", "Valor": str(data_augmentation_method)},
         ]
         st.table(config_data)
-        st.write("Configurações salvas como config_{model_name}_run1.json") # Placeholder, saving not implemented yet
+        save_config_to_json(config_data, model_name)
 
         # Limpar o diretório temporário
         shutil.rmtree(temp_dir)
