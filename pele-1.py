@@ -204,15 +204,12 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
         st.write(f"Subdiretórios encontrados: {dir_contents}")
         if not dir_contents:
             st.error("Erro: Nenhuma pasta de classe encontrada no diretório de dados. Certifique-se de que o arquivo ZIP contenha subdiretórios (classes).")
-            shutil.rmtree(temp_dir)
             return None, None
     except FileNotFoundError:
          st.error(f"Erro: O diretório {data_dir} não foi encontrado ao tentar listar seu conteúdo.")
-         shutil.rmtree(temp_dir)
          return None, None
     except Exception as e:
          st.error(f"Ocorreu um erro ao listar o conteúdo do diretório {data_dir}: {e}")
-         shutil.rmtree(temp_dir)
          return None, None
 
     # Carregar o conjunto de dados principal usando data_dir
@@ -406,6 +403,7 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
                 # não é apropriado para Mixup, pois os rótulos são misturados. Uma abordagem seria calcular
                 # uma 'soft' acurácia ou apenas reportar a acurácia no conjunto de validação/teste.
                 # Por simplicidade, manteremos o cálculo da acurácia padrão, mas esteja ciente dessa limitação.
+                _, preds = torch.max(outputs, 1) # Definir preds para cálculo de acurácia
                 # _, preds = torch.max(outputs, 1)
                 running_corrects += torch.sum(preds == labels.data)
 
@@ -460,6 +458,7 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
 
                 # Nota sobre Acurácia com Cutmix: Similar ao Mixup, o cálculo direto da acurácia não é apropriado.
                 # Manteremos o cálculo padrão, mas ciente da limitação.
+                _, preds = torch.max(outputs, 1) # Definir preds para cálculo de acurácia
                 # _, preds = torch.max(outputs, 1)
                 running_corrects += torch.sum(preds == labels.data)
 
@@ -493,12 +492,11 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
             # _, preds = torch.max(outputs, 1) # Já calculado acima dentro dos blocos if/else
             # running_corrects += torch.sum(preds == labels.data) # Já calculado acima dentro dos blocos if/else
 
-        # Após cada época de treinamento
-        if scheduler is not None and lr_scheduler_name != 'Política de Um Ciclo':
-             scheduler.step()
+        # Fim do loop de batches (i, (inputs, labels))
 
-    epoch_loss = running_loss / len(train_subset) # Nota: Ajustar denominador para Mixup/Cutmix se necessário no cálculo de running_loss
-    epoch_acc = running_corrects.double() / len(train_subset)
+        # Operações a serem feitas ao final de cada época
+        epoch_loss = running_loss / len(train_subset)
+        epoch_acc = running_corrects.double() / len(train_subset)
         train_losses.append(epoch_loss)
         train_accuracies.append(epoch_acc.item())
 
@@ -506,16 +504,13 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
         model.eval()
         valid_running_loss = 0.0
         valid_running_corrects = 0
-
         with torch.no_grad():
             for inputs, labels in valid_loader:
                 inputs = inputs.to(device)
                 labels = labels.to(device)
-
                 outputs = model(inputs)
                 _, preds = torch.max(outputs, 1)
                 loss = criterion(outputs, labels)
-
                 valid_running_loss += loss.item() * inputs.size(0)
                 valid_running_corrects += torch.sum(preds == labels.data)
 
@@ -524,27 +519,30 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
         valid_losses.append(valid_epoch_loss)
         valid_accuracies.append(valid_epoch_acc.item())
 
-        st.write(f'**Época {epoch+1}/{epochs}**')
+        st.write(f'**Época {epoch + 1}/{epochs}**')
         st.write(f'Perda de Treino: {epoch_loss:.4f} | Acurácia de Treino: {epoch_acc:.4f}')
         st.write(f'Perda de Validação: {valid_epoch_loss:.4f} | Acurácia de Validação: {valid_epoch_acc:.4f}')
 
         # Early Stopping
-        # Early stopping usa a perda de validação, que não é afetada diretamente por Mixup/Cutmix no loop de treinamento.
         if valid_epoch_loss < best_valid_loss:
             best_valid_loss = valid_epoch_loss
             epochs_no_improve = 0
-            # Salvar os pesos do modelo com a melhor perda de validação
             best_model_wts = model.state_dict()
         else:
             epochs_no_improve += 1
             if epochs_no_improve >= patience:
                 st.write('Early stopping!')
-                model.load_state_dict(best_model_wts) # Carregar os melhores pesos
+                model.load_state_dict(best_model_wts)
                 break
+        
+        # Aplicar o passo do agendador de taxa de aprendizado (se houver e for por época)
+        if scheduler is not None and lr_scheduler_name != 'Política de Um Ciclo':
+            scheduler.step()
+    # Fim do loop de épocas (epoch)
 
     # Carregar os melhores pesos do modelo após o treinamento (se early stopping ocorreu)
-    # Se não ocorreu early stopping, best_model_wts será os pesos da última época
-    if epochs_no_improve >= patience:
+    # Se não ocorreu early stopping, best_model_wts pode não ser os da última época se a última época foi a melhor
+    if 'best_model_wts' in locals() and epochs_no_improve >= patience: # Garante que best_model_wts existe
          model.load_state_dict(best_model_wts)
 
     # Gráficos de Perda e Acurácia
@@ -1710,13 +1708,13 @@ def main():
         if not os.path.isdir(data_dir):
             st.error(f"Erro crítico: O caminho do diretório de dados calculado \'{data_dir}\' não é um diretório válido ou acessível.")
             shutil.rmtree(temp_dir)
-            return None, None
+            return
 
         # Verify if data_dir contains subdirectories (classes)
         if not any(os.path.isdir(os.path.join(data_dir, item)) for item in os.listdir(data_dir)):
              st.error("Erro: O diretório de dados extraído não contém subdiretórios (classes). Certifique-se de que o arquivo ZIP contenha pastas, cada uma representando uma classe, com as imagens dentro.")
              shutil.rmtree(temp_dir)
-             return None, None
+             return
 
         st.info(f"Diretório de dados final para ImageFolder: {data_dir}")
         st.info(f"Conteúdo do diretório de dados: {os.listdir(data_dir)}")
@@ -1742,7 +1740,7 @@ def main():
             feature_extractor.add_module('global_pool', nn.AdaptiveAvgPool2d((1,1)))
         else:
             st.error("Modelo não suportado para extração de características.")
-            return None, None
+            return
 
         feature_extractor = feature_extractor.to(device)
         feature_extractor.eval()
@@ -1789,13 +1787,8 @@ def main():
              shutil.rmtree(temp_dir)
              return
 
-        # Validate num_classes
-        actual_num_classes = len(full_dataset.classes)
-        if num_classes != actual_num_classes:
-            st.error(f"Erro: O número de classes especificado ({num_classes}) não corresponde ao número de classes encontradas no conjunto de dados ({actual_num_classes}). Por favor, ajuste o Número de Classes na barra lateral.")
-            return None, None # Indicate failure
-    
         # Carregar o dataset completo para extração de características
+        # Este full_dataset é para extração de features, o train_model usa o seu próprio loaded_full_dataset
         full_dataset = datasets.ImageFolder(root=data_dir, transform=test_transforms)
         features, labels = extract_features(full_dataset, feature_extractor, batch_size)
 
