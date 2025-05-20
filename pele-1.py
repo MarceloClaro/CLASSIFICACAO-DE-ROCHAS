@@ -53,17 +53,16 @@ IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
 def set_seed(seed):
- """
- Define a seed para garantir a reprodutibilidade.
- """
- random.seed(seed)
- np.random.seed(seed)
- torch.manual_seed(seed)
- if torch.cuda.is_available():
- torch.cuda.manual_seed_all(seed)
- torch.backends.cudnn.deterministic = True
- torch.backends.cudnn.benchmark = False
-
+    """
+    Define a seed para garantir a reprodutibilidade.
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed) # Esta linha precisava de indentação
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 set_seed(42) # Definir a seed para reprodutibilidade
 
 # Definir as transformações para aumento de dados (aplicando transformações aleatórias)
