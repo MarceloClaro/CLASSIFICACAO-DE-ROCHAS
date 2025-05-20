@@ -799,17 +799,23 @@ def visualize_activations(model, image, class_names, cam_method='Grad-CAM'):
     if isinstance(model, models.ResNet):
         # Para ResNet, layer4[-1] geralmente funciona bem para as camadas mais profundas
         target_layer = model.layer4[-1]
-        st.write(f"Usando a camada {target_layer} da ResNet como alvo para {cam_method}.")
+        # Display a more user-friendly message about the target layer
+        layer_type = target_layer.__class__.__name__
+        st.write(f"Usando a camada do tipo '{layer_type}' da ResNet como alvo para {cam_method}.")
     elif isinstance(model, models.DenseNet):
         # Para DenseNet, o último bloco denso ou a camada de transição antes do classificador pode ser uma boa escolha.
         # Vamos tentar o último denselayer do último bloco denso.
         try:
             target_layer = model.features.denseblock4.denselayer16.conv2 # Exemplo, pode precisar de ajuste
-            st.write(f"Usando a camada {target_layer} da DenseNet como alvo para {cam_method}.")
+            # Display a more user-friendly message about the target layer
+            layer_type = target_layer.__class__.__name__
+            st.write(f"Usando a camada do tipo '{layer_type}' da DenseNet como alvo para {cam_method}.")
         except AttributeError:
              try:
                  target_layer = model.features.norm5 # Outra opção comum para DenseNet
-                 st.write(f"Usando a camada {target_layer} da DenseNet como alvo para {cam_method}.")
+                 # Display a more user-friendly message about the target layer
+                 layer_type = target_layer.__class__.__name__
+                 st.write(f"Usando a camada do tipo '{layer_type}' da DenseNet como alvo para {cam_method}.")
              except AttributeError:
                  st.error("Não foi possível encontrar uma camada alvo adequada para DenseNet. A visualização CAM pode não funcionar.")
                  model.train(was_training) # Restaurar o estado original
