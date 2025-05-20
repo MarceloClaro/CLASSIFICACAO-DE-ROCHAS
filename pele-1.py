@@ -130,7 +130,7 @@ def plot_class_distribution(dataset, classes):
     
     # Plotar o gráfico com as contagens
     fig, ax = plt.subplots(figsize=(10, 6))
-    sns.countplot(x=labels, ax=ax, palette="Set2")
+    sns.countplot(x=labels, ax=ax, palette="Set2", hue=labels, legend=False)
     
     # Adicionar os nomes das classes no eixo X
     ax.set_xticklabels(classes, rotation=45)
@@ -150,11 +150,11 @@ def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
     Retorna o modelo pré-treinado selecionado.
     """
     if model_name == 'ResNet18':
-        model = models.resnet18(pretrained=True)
+        model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
     elif model_name == 'ResNet50':
-        model = models.resnet50(pretrained=True)
+        model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
     elif model_name == 'DenseNet121':
-        model = models.densenet121(pretrained=True)
+        model = models.densenet121(weights=models.DenseNet121_Weights.DEFAULT)
     else:
         st.error("Modelo não suportado.")
         return None
@@ -188,12 +188,28 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     """
     set_seed(42)
 
+    # Display training progress
+    st.subheader(f"Treinando Modelo {model_name} - Execução 1")
+    st.write("\n") # Add a newline for spacing
+
     # Carregar o dataset original sem transformações (será usado para splits e rótulos)
     full_dataset = datasets.ImageFolder(root=data_dir)
 
+    # Validate num_classes
+    actual_num_classes = len(full_dataset.classes)
+    if num_classes != actual_num_classes:
+        st.error(f"Erro: O número de classes especificado ({num_classes}) não corresponde ao número de classes encontradas no conjunto de dados ({actual_num_classes}). Por favor, ajuste o Número de Classes na barra lateral.")
+        return None, None # Indicate failure
+
     # Exibir algumas imagens do dataset e distribuição de classes
+    st.write("Visualização de algumas imagens do conjunto de dados:")
+    st.write("Exemplos do Conjunto de Dados")
     visualize_data(full_dataset, full_dataset.classes)
+    st.write("\n") # Add a newline for spacing
+
+    st.write("Distribuição das Classes")
     plot_class_distribution(full_dataset, full_dataset.classes)
+    st.write("\n") # Add a newline for spacing
 
     # Definir as transformações com base no método de aumento de dados selecionado
     if data_augmentation_method == 'Padrão':
@@ -207,6 +223,7 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
         current_train_transforms = test_transforms
 
     # Criar os datasets com as transformações apropriadas
+    st.write("Processando os conjuntos de dados...")
     train_dataset = CustomDataset(full_dataset, transform=current_train_transforms)
     valid_dataset = CustomDataset(full_dataset, transform=test_transforms)
     test_dataset = CustomDataset(full_dataset, transform=test_transforms)
@@ -223,6 +240,7 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     valid_indices = indices[train_end:valid_end]
     test_indices = indices[valid_end:]
 
+    st.write(f"Criando subsets com divisões: Treino ({len(train_indices)}), Validação ({len(valid_indices)}), Teste ({len(test_indices)})")
     train_dataset = torch.utils.data.Subset(train_dataset, train_indices)
     valid_dataset = torch.utils.data.Subset(valid_dataset, valid_indices)
     test_dataset = torch.utils.data.Subset(test_dataset, test_indices)
@@ -245,8 +263,31 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False, worker_init_fn=seed_worker, generator=g)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, worker_init_fn=seed_worker, generator=g)
 
+    st.write("Criando DataLoaders...")
+
+    # Display augmented images sample
+    if data_augmentation_method == 'Padrão':
+        st.write("\n") # Add a newline for spacing
+        st.subheader("Amostra de Imagens Após Aumento de Dados (Treinamento)")
+        fig, axes = plt.subplots(1, 5, figsize=(15, 3))
+        # Get a batch from the training loader
+        try:
+            inputs, labels = next(iter(train_loader))
+            inputs = inputs.cpu().numpy().transpose(0, 2, 3, 1) # Convert to numpy and change channel order for matplotlib
+            # Denormalize if necessary for display (assuming ImageNet normalization for example)
+            # For simplicity, assuming ToTensor normalization [0, 1]
+            inputs = (inputs * 255).astype(np.uint8) # Simple denormalization assumption
+
+            for i in range(min(5, inputs.shape[0])):
+                axes[i].imshow(inputs[i])
+                axes[i].set_title(full_dataset.classes[labels[i].item()])
+                axes[i].axis('off')
+            st.pyplot(fig)
+        except Exception as e:
+             st.warning(f"Could not display augmented image sample: {e}")
+
     # Carregar o modelo
-    model = get_model(model_name, num_classes, dropout_p=0.5, fine_tune=fine_tune)
+    model = get_model(model_name, actual_num_classes, dropout_p=0.5, fine_tune=fine_tune) # Pass actual_num_classes to get_model
     if model is None:
         return None
 
@@ -844,7 +885,7 @@ def main():
     
     # Layout da página
     if os.path.exists('capa.png'):
-        st.image('capa.png', width=100, caption='Laboratório de Educação e Inteligência Artificial - Geomaker. "A melhor forma de prever o futuro é inventá-lo." - Alan Kay', use_column_width='always')
+        st.image('capa.png', width=100, caption='Laboratório de Educação e Inteligência Artificial - Geomaker. "A melhor forma de prever o futuro é inventá-lo." - Alan Kay', use_container_width=True)
     else:
         st.warning("Imagem 'capa.png' não encontrada.")
     
@@ -1688,6 +1729,30 @@ def main():
 
         # Limpar o diretório temporário
         shutil.rmtree(temp_dir)
+
+    # Add this section to display training configuration
+    st.subheader("Configurações Técnicas do Treinamento")
+    config_data = [
+        {"Parâmetro": "Modelo", "Valor": model_name},
+        {"Parâmetro": "Fine-Tuning Completo", "Valor": fine_tune},
+        {"Parâmetro": "Épocas", "Valor": epochs},
+        {"Parâmetro": "Taxa de Aprendizagem", "Valor": learning_rate},
+        {"Parâmetro": "Tamanho de Lote", "Valor": batch_size},
+        {"Parâmetro": "Train Split", "Valor": train_split},
+        {"Parâmetro": "Valid Split", "Valor": valid_split},
+        {"Parâmetro": "L2 Regularization", "Valor": l2_lambda},
+        {"Parâmetro": "Paciência Early Stopping", "Valor": patience},
+        {"Parâmetro": "Use Weighted Loss", "Valor": use_weighted_loss},
+    ]
+    st.table(config_data)
+
+    st.write("Configurações salvas como config_{model_name}_run1.json") # Placeholder, saving not implemented yet
+
+    st.write("\n") # Add a newline for spacing
+
+    st.write("Iniciando o treinamento supervisionado...")
+    # Modify this line to include optimizer_name, lr_scheduler_name, and data_augmentation_method
+    model_data = train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience, optimizer_name, lr_scheduler_name, data_augmentation_method)
 
 if __name__ == "__main__":
     main()
