@@ -714,71 +714,119 @@ def evaluate_image(model, image, classes):
 
 #________________________________________________
 
-def visualize_activations(model, image, class_names):
+def visualize_activations(model, image, class_names, cam_method='Grad-CAM'):
     """
-    Visualiza as ativações na imagem usando Grad-CAM.
+    Visualiza as ativações na imagem usando o método CAM selecionado.
     """
-    model.eval()  # Coloca o modelo em modo de avaliação
+    # Salvar o estado de treinamento atual do modelo
+    was_training = model.training
+    model.train()  # Coloca o modelo em modo de treinamento temporariamente para permitir gradientes
+
     input_tensor = test_transforms(image).unsqueeze(0).to(device)
-    
-    # Verificar se o modelo é suportado
+
+    # Verificar se o modelo é suportado e definir a(s) camada(s) alvo
+    target_layer = None
     if isinstance(model, models.ResNet):
+        # Para ResNet, layer4[-1] geralmente funciona bem para as camadas mais profundas
         target_layer = model.layer4[-1]
+        st.write(f"Usando a camada {target_layer} da ResNet como alvo para {cam_method}.")
     elif isinstance(model, models.DenseNet):
-        target_layer = model.features.denseblock4.denselayer16
+        # Para DenseNet, o último bloco denso ou a camada de transição antes do classificador pode ser uma boa escolha.
+        # Vamos tentar o último denselayer do último bloco denso.
+        try:
+            target_layer = model.features.denseblock4.denselayer16.conv2 # Exemplo, pode precisar de ajuste
+            st.write(f"Usando a camada {target_layer} da DenseNet como alvo para {cam_method}.")
+        except AttributeError:
+             try:
+                 target_layer = model.features.norm5 # Outra opção comum para DenseNet
+                 st.write(f"Usando a camada {target_layer} da DenseNet como alvo para {cam_method}.")
+             except AttributeError:
+                 st.error("Não foi possível encontrar uma camada alvo adequada para DenseNet. A visualização CAM pode não funcionar.")
+                 model.train(was_training) # Restaurar o estado original
+                 return
     else:
-        st.error("Modelo não suportado para Grad-CAM.")
+        st.error(f"Modelo {model.__class__.__name__} não suportado para visualização CAM no momento.")
+        model.train(was_training) # Restaurar o estado original
         return
-    
-    # Criar o objeto CAM usando torchcam
-    cam_extractor = SmoothGradCAMpp(model, target_layer=target_layer)
-    
-    # Habilitar gradientes explicitamente
+
+    if target_layer is None:
+         st.error("Camada alvo não definida para visualização CAM.")
+         model.train(was_training) # Restaurar o estado original
+         return
+
+
+    # Criar o objeto CAM usando torchcam com base no método selecionado
+    if cam_method == 'Grad-CAM':
+        cam_extractor = SmoothGradCAMpp(model, target_layer=target_layer)
+    elif cam_method == 'Score-CAM':
+         # Score-CAM pode precisar de parâmetros adicionais dependendo da implementação
+         cam_extractor = ScoreCAM(model, target_layer=target_layer)
+    elif cam_method == 'LayerCAM':
+         # LayerCAM pode precisar de parâmetros adicionais dependendo da implementação
+         cam_extractor = LayerCAM(model, target_layer=target_layer)
+    else:
+         st.warning(f"Método CAM {cam_method} não reconhecido. Usando Grad-CAM como padrão.")
+         cam_extractor = SmoothGradCAMpp(model, target_layer=target_layer)
+
+    # Habilitar gradientes explicitamente (embora model.train() já faça isso, é bom ser explícito)
     with torch.set_grad_enabled(True):
         out = model(input_tensor)  # Faz a previsão
-        _, pred = torch.max(out, 1)  # Obtém a classe predita
+        # Nota: Ao usar SmoothGradCAMpp, a previsão é feita internamente com perturbações.
+        # Para outros métodos CAM, pode ser necessário passar o output da previsão original.
+        # A biblioteca torchcam lida com isso; passamos a previsão e o extrator usa o necessário.
+        _, pred = torch.max(out, 1)  # Obtém a classe predita da previsão
         pred_class = pred.item()
-    
+
+
     # Gerar o mapa de ativação
+    # Passamos o índice da classe predita e o output da rede para o extrator
     activation_map = cam_extractor(pred_class, out)
-    
-    # Obter o mapa de ativação da primeira imagem no lote
+
+    # Obter o mapa de ativação da primeira imagem no lote (única imagem)
     activation_map = activation_map[0].cpu().numpy()
-    
+
     # Redimensionar o mapa de ativação para coincidir com o tamanho da imagem original
     activation_map_resized = cv2.resize(activation_map, (image.size[0], image.size[1]))
-    
+
     # Normalizar o mapa de ativação para o intervalo [0, 1]
-    activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
-    
+    # Adicionar um pequeno valor para evitar divisão por zero se min e max forem iguais
+    min_val = activation_map_resized.min()
+    max_val = activation_map_resized.max()
+    if max_val - min_val > 1e-8:
+        activation_map_resized = (activation_map_resized - min_val) / (max_val - min_val)
+    else:
+        activation_map_resized = np.zeros_like(activation_map_resized)
+
+
     # Converter a imagem para array NumPy
     image_np = np.array(image)
-    
+
     # Converter o mapa de ativação em uma imagem RGB
     heatmap = cv2.applyColorMap(np.uint8(255 * activation_map_resized), cv2.COLORMAP_JET)
     heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
-    
+
     # Sobrepor o mapa de ativação na imagem original
-    superimposed_img = heatmap * 0.4 + image_np * 0.6
+    superimposed_img = heatmap * 0.4 + image_np * 0.6 # Ajustar o alpha conforme necessário
     superimposed_img = np.uint8(superimposed_img)
-    
+
     # Exibir a imagem original e o mapa de ativação sobreposto
     fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-    
+
     # Imagem original
     ax[0].imshow(image_np)
     ax[0].set_title('Imagem Original')
     ax[0].axis('off')
-    
-    # Imagem com Grad-CAM
+
+    # Imagem com CAM (nome do método no título)
     ax[1].imshow(superimposed_img)
-    ax[1].set_title('Grad-CAM')
+    ax[1].set_title(cam_method) # Usar o nome do método selecionado no título
     ax[1].axis('off')
-    
+
     # Exibir as imagens com o Streamlit
     st.pyplot(fig)
 
-
+    # Restaurar o estado de treinamento original do modelo
+    model.train(was_training)
 
 def main():
 
@@ -1636,7 +1684,7 @@ def main():
                 st.write(f"**Confiança:** {confidence:.4f}")
 
                 # Visualizar ativações
-                visualize_activations(model, eval_image, classes)
+                visualize_activations(model, eval_image, classes, cam_method)
 
         # Limpar o diretório temporário
         shutil.rmtree(temp_dir)
