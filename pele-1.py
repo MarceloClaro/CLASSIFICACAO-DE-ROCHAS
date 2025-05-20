@@ -331,14 +331,14 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     elif optimizer_name == 'Ranger':
         # Ranger está em torch_optimizer
         optimizer = optim_adv.Ranger(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=l2_lambda)
-    elif optimizer_name == 'Lion':
-        # Lion está em torch_optimizer
-        optimizer = optim_adv.Lion(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=l2_lambda)
-    elif optimizer_name == 'Sophia':
-        # Sophia está em torch_optimizer
-        # Sophia usa um agendador interno para o aquecimento (warmup) do Hessian
-        # Pode precisar de ajustes dependendo da implementação específica em torch_optimizer
-        optimizer = optim_adv.SophiaH(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=l2_lambda)
+    # elif optimizer_name == 'Lion':
+    #     # Lion está em torch_optimizer
+    #     optimizer = optim_adv.Lion(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=l2_lambda)
+    # elif optimizer_name == 'Sophia':
+    #     # Sophia está em torch_optimizer
+    #     # Sophia usa um agendador interno para o aquecimento (warmup) do Hessian
+    #     # Pode precisar de ajustes dependendo da implementação específica em torch_optimizer
+    #     optimizer = optim_adv.SophiaH(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=l2_lambda)
     else:
         # Fallback para Adam ou erro
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=l2_lambda)
@@ -1563,7 +1563,7 @@ def main():
 
     optimizer_name = st.sidebar.selectbox(
         "Otimizador:",
-        options=['Adam', 'AdamW', 'Ranger', 'Lion', 'Sophia']
+        options=['Adam', 'AdamW', 'Ranger'] # Removed 'Lion', 'Sophia'
     )
 
     lr_scheduler_name = st.sidebar.selectbox(
