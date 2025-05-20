@@ -1817,7 +1817,7 @@ def main():
                     st.error(f"Erro ao abrir a imagem: {e}")
                     return
 
-                st.image(eval_image, caption='Imagem para avaliação', use_column_width=True)
+                st.image(eval_image, caption='Imagem para avaliação', use_container_width=True)
                 class_name, confidence = evaluate_image(model, eval_image, classes)
                 st.write(f"**Classe Predita:** {class_name}")
                 st.write(f"**Confiança:** {confidence:.4f}")
