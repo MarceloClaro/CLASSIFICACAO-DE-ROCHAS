@@ -135,7 +135,8 @@ def plot_class_distribution(dataset, classes):
     sns.countplot(x=labels, ax=ax, palette="Set2", hue=labels, legend=False)
     
     # Adicionar os nomes das classes no eixo X
-    ax.set_xticklabels(classes, rotation=45)
+    ax.set_xticks(np.arange(len(classes)))
+    ax.set_xticklabels(classes, rotation=45, ha="right") # Use ha="right" for better label alignment
     
     # Adicionar as contagens acima das barras
     for i, count in enumerate(class_counts):
@@ -297,8 +298,9 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     # Display augmented images sample
     if data_augmentation_method == 'Padrão':
         st.write("\n") # Add a newline for spacing
-        st.subheader("Amostra de Imagens Após Aumento de Dados (Treinamento)")
-        fig, axes = plt.subplots(1, 5, figsize=(15, 3))
+        st.subheader("Visualização de Imagens Após Aumento de Dados (Conjunto de Treinamento)")
+        num_augmented_samples_to_show = 10 # Increase the number of samples shown
+        fig, axes = plt.subplots(1, num_augmented_samples_to_show, figsize=(20, 3))
         # Get a batch from the training loader
         try:
             inputs, labels = next(iter(train_loader))
@@ -307,7 +309,7 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
             # For simplicity, assuming ToTensor normalization [0, 1]
             inputs = (inputs * 255).astype(np.uint8) # Simple denormalization assumption
 
-            for i in range(min(5, inputs.shape[0])):
+            for i in range(min(num_augmented_samples_to_show, inputs.shape[0])):
                 axes[i].imshow(inputs[i])
                 axes[i].set_title(loaded_full_dataset.classes[labels[i].item()])
                 axes[i].axis('off')
@@ -1828,6 +1830,35 @@ def main():
 
         # Visualizar clusters
         visualize_clusters(features_reshaped, labels, hierarchical_labels, kmeans_labels, classes)
+
+        # Visualize embeddings of Augmented Data
+        st.subheader("Visualização de Embeddings Após Aumento de Dados (Conjunto de Treinamento)")
+        # Create a dataset with training transforms applied to the full dataset
+        augmented_full_dataset = datasets.ImageFolder(root=data_dir, transform=train_transforms)
+
+        # Extract features from the augmented dataset
+        augmented_features, augmented_labels = extract_features(augmented_full_dataset, feature_extractor, batch_size)
+
+        # Reshape features for PCA
+        augmented_features_reshaped = augmented_features.reshape(len(augmented_features), -1)
+
+        # Reduce dimensionality with PCA for visualization
+        pca_augmented = PCA(n_components=2)
+        reduced_augmented_features = pca_augmented.fit_transform(augmented_features_reshaped)
+
+        # Map true labels to class names
+        augmented_true_labels_named = [classes[label] for label in augmented_labels]
+
+        # Use distinct and visible colors
+        augmented_color_palette = sns.color_palette("tab10", len(set(augmented_labels)))
+
+        # Plot the augmented embeddings
+        fig_augmented, ax_augmented = plt.subplots(figsize=(10, 6))
+        sns.scatterplot(x=reduced_augmented_features[:, 0], y=reduced_augmented_features[:, 1], hue=augmented_true_labels_named, palette=augmented_color_palette, ax=ax_augmented, legend='full')
+        ax_augmented.set_title('Embeddings do Conjunto de Treinamento (Após Aumento de Dados)')
+        ax_augmented.set_xlabel('Componente Principal 1')
+        ax_augmented.set_ylabel('Componente Principal 2')
+        st.pyplot(fig_augmented)
 
         # Avaliação de uma imagem individual
         evaluate = st.radio("Deseja avaliar uma imagem?", ("Sim", "Não"))
