@@ -10,7 +10,6 @@ streamlit
 torchcam
 opencv-python
 logging
-gc
 base64
 cv2
 tempfile
