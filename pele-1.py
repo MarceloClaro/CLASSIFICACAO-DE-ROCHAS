@@ -22,6 +22,7 @@ import streamlit as st
 import gc
 import logging
 import base64
+import time
 
 # Adicionar esta linha para contornar o RuntimeError com torch.classes e Streamlit
 torch.classes.__path__ = []
@@ -188,12 +189,31 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     """
     set_seed(42)
 
-    # Display training progress
-    st.subheader(f"Treinando Modelo {model_name} - Execução 1")
-    st.write("\n") # Add a newline for spacing
+    # Add a final check for data_dir right before ImageFolder
+    if not os.path.exists(data_dir):
+        st.error(f"Erro crítico dentro de train_model: O diretório de dados especificado \'{data_dir}\' não foi encontrado.")
+        return None, None
+    if not os.path.isdir(data_dir):
+         st.error(f"Erro crítico dentro de train_model: O caminho especificado \'{data_dir}\' não é um diretório válido.")
+         return None, None
 
-    # Carregar o dataset original sem transformações (será usado para splits e rótulos)
-    full_dataset = datasets.ImageFolder(root=data_dir)
+    # Explicitly list directory contents for debugging
+    st.write(f"Verificando o conteúdo do diretório: {data_dir}")
+    try:
+        dir_contents = [item.name for item in os.scandir(data_dir) if item.is_dir()]
+        st.write(f"Subdiretórios encontrados: {dir_contents}")
+        if not dir_contents:
+            st.error("Erro: Nenhuma pasta de classe encontrada no diretório de dados. Certifique-se de que o arquivo ZIP contenha subdiretórios (classes).")
+            shutil.rmtree(temp_dir)
+            return None, None
+    except FileNotFoundError:
+         st.error(f"Erro: O diretório {data_dir} não foi encontrado ao tentar listar seu conteúdo.")
+         shutil.rmtree(temp_dir)
+         return None, None
+    except Exception as e:
+         st.error(f"Ocorreu um erro ao listar o conteúdo do diretório {data_dir}: {e}")
+         shutil.rmtree(temp_dir)
+         return None, None
 
     # Validate num_classes
     actual_num_classes = len(full_dataset.classes)
@@ -1662,7 +1682,33 @@ def main():
             f.write(zip_file.read())
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(temp_dir)
-        data_dir = temp_dir
+
+        # Add a small delay to ensure file system is ready after extraction
+        time.sleep(2)
+
+        # Check if the extracted content is a single subdirectory and use that as data_dir
+        extracted_contents = os.listdir(temp_dir)
+        if len(extracted_contents) == 1 and os.path.isdir(os.path.join(temp_dir, extracted_contents[0])):
+            data_dir = os.path.join(temp_dir, extracted_contents[0])
+            st.info(f"Detected single root directory '\\{extracted_contents[0]}\' inside the ZIP. Using this as the data directory.")
+        else:
+            data_dir = temp_dir
+            st.info("Using the root of the extracted ZIP content as the data directory.")
+
+        # Verify if data_dir itself is a valid directory
+        if not os.path.isdir(data_dir):
+            st.error(f"Erro crítico: O caminho do diretório de dados calculado \'{data_dir}\' não é um diretório válido ou acessível.")
+            shutil.rmtree(temp_dir)
+            return None, None
+
+        # Verify if data_dir contains subdirectories (classes)
+        if not any(os.path.isdir(os.path.join(data_dir, item)) for item in os.listdir(data_dir)):
+             st.error("Erro: O diretório de dados extraído não contém subdiretórios (classes). Certifique-se de que o arquivo ZIP contenha pastas, cada uma representando uma classe, com as imagens dentro.")
+             shutil.rmtree(temp_dir)
+             return None, None
+
+        st.info(f"Diretório de dados final para ImageFolder: {data_dir}")
+        st.info(f"Conteúdo do diretório de dados: {os.listdir(data_dir)}")
 
         st.write("Iniciando o treinamento supervisionado...")
         model_data = train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience, optimizer_name, lr_scheduler_name, data_augmentation_method)
@@ -1670,7 +1716,7 @@ def main():
         if model_data is None:
             st.error("Erro no treinamento do modelo.")
             shutil.rmtree(temp_dir)
-            return
+            return None, None
 
         model, classes = model_data
         st.success("Treinamento concluído!")
@@ -1685,10 +1731,58 @@ def main():
             feature_extractor.add_module('global_pool', nn.AdaptiveAvgPool2d((1,1)))
         else:
             st.error("Modelo não suportado para extração de características.")
-            return
+            return None, None
 
         feature_extractor = feature_extractor.to(device)
         feature_extractor.eval()
+
+        # Carregar o dataset original sem transformações (será usado para splits e rótulos)
+        # Retry loading the dataset with ImageFolder due to potential transient file system issues
+        retry_attempts = 5 # Increased retry attempts
+        full_dataset = None
+        for attempt in range(retry_attempts):
+            try:
+                # Explicitly list directories to check structure before ImageFolder
+                st.info(f"Attempt {attempt + 1}/{retry_attempts}: Checking directory structure in {data_dir}")
+                subdirs = [d for d in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, d))]
+                if not subdirs:
+                     st.warning(f"Attempt {attempt + 1}/{retry_attempts}: No subdirectories found in {data_dir}. This might cause ImageFolder to fail.")
+                     if attempt < retry_attempts - 1:
+                         time.sleep(3) # Wait before retrying
+                         continue # Skip to next attempt
+                     else:
+                          st.error(f"After {retry_attempts} attempts, no subdirectories found in {data_dir}. Please check the structure of your ZIP file. It should contain subfolders for each class.")
+                          shutil.rmtree(temp_dir)
+                          return None, None
+                st.info(f"Attempt {attempt + 1}/{retry_attempts}: Found subdirectories: {subdirs}")
+
+                full_dataset = datasets.ImageFolder(root=data_dir)
+                st.success(f"Conjunto de dados carregado com sucesso em {data_dir} (Tentativa {attempt + 1}).")
+                break # Exit retry loop if successful
+            except FileNotFoundError as e:
+                if attempt < retry_attempts - 1:
+                    st.warning(f"Tentativa {attempt + 1}/{retry_attempts} falhou ao carregar o conjunto de dados. Diretório '{data_dir}' não encontrado. Retentando em 3 segundos...")
+                    time.sleep(3) # Increased delay
+                else:
+                    st.error(f"Todas as {retry_attempts} tentativas falharam ao carregar o conjunto de dados. Diretório '{data_dir}' não encontrado. Verifique a estrutura do arquivo ZIP e as permissões no ambiente Streamlit Cloud. Detalhes do último erro: {e}")
+                    shutil.rmtree(temp_dir)
+                    return None, None
+            except Exception as e:
+                st.error(f"Ocorreu um erro inesperado ao carregar o conjunto de dados (Tentativa {attempt + 1}): {e}")
+                shutil.rmtree(temp_dir)
+                return None, None
+
+        # If full_dataset is still None after retries, something went wrong
+        if full_dataset is None:
+             st.error("Falha ao carregar o conjunto de dados após múltiplas tentativas.")
+             shutil.rmtree(temp_dir)
+             return None, None
+
+        # Validate num_classes
+        actual_num_classes = len(full_dataset.classes)
+        if num_classes != actual_num_classes:
+            st.error(f"Erro: O número de classes especificado ({num_classes}) não corresponde ao número de classes encontradas no conjunto de dados ({actual_num_classes}). Por favor, ajuste o Número de Classes na barra lateral.")
+            return None, None # Indicate failure
 
         # Carregar o dataset completo para extração de características
         full_dataset = datasets.ImageFolder(root=data_dir, transform=test_transforms)
@@ -1717,7 +1811,7 @@ def main():
                     eval_image = Image.open(eval_image_file).convert("RGB")
                 except Exception as e:
                     st.error(f"Erro ao abrir a imagem: {e}")
-                    return
+                    return None, None
 
                 st.image(eval_image, caption='Imagem para avaliação', use_column_width=True)
                 class_name, confidence = evaluate_image(model, eval_image, classes)
