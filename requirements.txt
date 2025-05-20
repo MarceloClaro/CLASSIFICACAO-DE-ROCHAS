@@ -9,11 +9,4 @@ scikit-learn
 streamlit
 torchcam
 opencv-python
-logging
-base64
-cv2
-tempfile
-zipfile
-shutil
-random
-os 
+logging 
