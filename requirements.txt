@@ -9,5 +9,4 @@ scikit-learn
 streamlit
 torchcam
 opencv-python
-logging 
-cv2
+torch_optimizer 
