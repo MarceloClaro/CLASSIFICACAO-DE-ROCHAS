@@ -250,9 +250,19 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
             inputs = inputs.to(device)
             labels = labels.to(device)
 
+            # Add these print statements
+            print(f"Labels type: {labels.dtype}")
+            print(f"Labels shape: {labels.shape}")
+            print(f"Labels min: {labels.min()}")
+            print(f"Labels max: {labels.max()}")
+            print(f"Number of classes: {num_classes}")
+
             optimizer.zero_grad()
             try:
                 outputs = model(inputs)
+                # Add these print statements
+                print(f"Outputs type: {outputs.dtype}")
+                print(f"Outputs shape: {outputs.shape}")
             except Exception as e:
                 st.error(f"Erro durante o treinamento: {e}")
                 return None
@@ -1144,6 +1154,7 @@ def main():
             - AL‐RIMY, B.; SAEED, F.; AL-SAREM, M.; ALBARRAK, A.; QASEM, S. An adaptive early stopping technique for densenet169-based knee osteoarthritis detection model. *Diagnostics*, 13(11), 1903, 2023. https://doi.org/10.3390/diagnostics13111903
             - FRIEDRICH, S. et al. Regularization approaches in clinical biostatistics: a review of methods and their applications. *Statistical Methods in Medical Research*, 32(2), 425-440, 2022. https://doi.org/10.1177/09622802221133557
             - PIOTROWSKI, A.; NAPIORKOWSKI, J. A comparison of methods to avoid overfitting in neural networks training in the case of catchment runoff modelling. *Journal of Hydrology*, 476, 97-111, 2013. https://doi.org/10.1016/j.jhydrol.2012.10.019
+            - REZAEEZADE, A.; BATINA, L. Regularizers to the rescue: fighting overfitting in deeplearning-based side-channel analysis. 2022. https://doi.org/10.21203/rs.3.rs-2386625/v1
             - SAKIZADEH, M.; MALIAN, A.; AHMADPOUR, E. Groundwater quality modeling with a small data set. *Ground Water*, 54(1), 115-120, 2015. https://doi.org/10.1111/gwat.12317
             """)
     
