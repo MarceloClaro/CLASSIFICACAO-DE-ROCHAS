@@ -1829,13 +1829,13 @@ def main():
         st.subheader("Configurações Técnicas do Treinamento Realizado")
         config_data = [
             {"Parâmetro": "Modelo", "Valor": model_name},
-            {"Parâmetro": "Fine-Tuning Completo", "Valor": fine_tune},
+            {"Parâmetro": "Fine-Tuning Completo", "Valor": "Sim" if fine_tune else "Não"},
             {"Parâmetro": "Épocas", "Valor": epochs},
             {"Parâmetro": "Taxa de Aprendizagem", "Valor": learning_rate},
             {"Parâmetro": "Tamanho de Lote", "Valor": batch_size},
             {"Parâmetro": "Train Split", "Valor": train_split},
             {"Parâmetro": "Valid Split", "Valor": valid_split},
-            {"Parâmetro": "L2 Regularization", "Valor": l2_lambda},
+            {"Parâmetro": "L2 Regularization", "Valor": str(l2_lambda)}, # Convert float to string just to be safe
             {"Parâmetro": "Paciência Early Stopping", "Valor": patience},
             {"Parâmetro": "Use Weighted Loss", "Valor": use_weighted_loss},
             {"Parâmetro": "Otimizador", "Valor": optimizer_name},
