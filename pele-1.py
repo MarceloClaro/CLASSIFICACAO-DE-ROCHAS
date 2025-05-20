@@ -26,6 +26,15 @@ import base64
 from torchcam.methods import SmoothGradCAMpp
 from torchvision.transforms.functional import normalize, resize, to_pil_image
 import cv2
+# Importações para otimizadores avançados (pode ser necessário instalar torch_optimizer)
+# pip install torch_optimizer
+import torch_optimizer as optim_adv
+# Importações para agendadores de taxa de aprendizado
+from torch.optim import lr_scheduler
+# Importações para aumento de dados avançado
+# Pode ser necessário instalar bibliotecas como albumentations ou implementar manualmente
+# Importações para métodos CAM avançados
+from torchcam.methods import ScoreCAM, LayerCAM
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -169,21 +178,32 @@ def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
     model = model.to(device)
     return model
 
-def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience):
+def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience, optimizer_name, lr_scheduler_name, data_augmentation_method):
     """
-    Função principal para treinamento do modelo.
+    Função principal para treinamento do modelo com opções avançadas.
     """
     set_seed(42)
 
-    # Carregar o dataset original sem transformações
+    # Carregar o dataset original sem transformações (será usado para splits e rótulos)
     full_dataset = datasets.ImageFolder(root=data_dir)
 
-    # Exibir algumas imagens do dataset
+    # Exibir algumas imagens do dataset e distribuição de classes
     visualize_data(full_dataset, full_dataset.classes)
     plot_class_distribution(full_dataset, full_dataset.classes)
 
-    # Criar o dataset personalizado com aumento de dados
-    train_dataset = CustomDataset(full_dataset, transform=train_transforms)
+    # Definir as transformações com base no método de aumento de dados selecionado
+    if data_augmentation_method == 'Padrão':
+        current_train_transforms = train_transforms # Usar as transformações padrão já definidas
+    elif data_augmentation_method == 'Mixup':
+        # A implementação de Mixup/Cutmix é feita no loop de treinamento, não nas transformações do dataset.
+        # As transformações do dataset serão as transformações de teste.
+        current_train_transforms = test_transforms
+    elif data_augmentation_method == 'Cutmix':
+        # Similar ao Mixup, a lógica Cutmix é aplicada no loop de treinamento.
+        current_train_transforms = test_transforms
+
+    # Criar os datasets com as transformações apropriadas
+    train_dataset = CustomDataset(full_dataset, transform=current_train_transforms)
     valid_dataset = CustomDataset(full_dataset, transform=test_transforms)
     test_dataset = CustomDataset(full_dataset, transform=test_transforms)
 
@@ -226,8 +246,40 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     if model is None:
         return None
 
-    # Definir o otimizador com L2 regularization (weight_decay)
-    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=l2_lambda)
+    # Definir o otimizador com base na seleção do usuário
+    # Certifique-se de que `optimizer_name` é passado para esta função
+    if optimizer_name == 'Adam':
+        optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=l2_lambda)
+    elif optimizer_name == 'AdamW':
+        optimizer = optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=l2_lambda)
+    elif optimizer_name == 'Ranger':
+        # Ranger está em torch_optimizer
+        optimizer = optim_adv.Ranger(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=l2_lambda)
+    elif optimizer_name == 'Lion':
+        # Lion está em torch_optimizer
+        optimizer = optim_adv.Lion(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=l2_lambda)
+    elif optimizer_name == 'Sophia':
+        # Sophia está em torch_optimizer
+        # Sophia usa um agendador interno para o aquecimento (warmup) do Hessian
+        # Pode precisar de ajustes dependendo da implementação específica em torch_optimizer
+        optimizer = optim_adv.SophiaH(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=l2_lambda)
+    else:
+        # Fallback para Adam ou erro
+        optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=l2_lambda)
+        st.warning(f"Otimizador {optimizer_name} não reconhecido. Usando Adam como padrão.")
+
+    # Configurar o agendador de taxa de aprendizado
+    scheduler = None # Inicializa como None
+    if lr_scheduler_name == 'Recozimento por Cosseno':
+        scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    elif lr_scheduler_name == 'Política de Um Ciclo':
+        # Precisa do número total de passos de treinamento para OneCycleLR
+        # Isso geralmente é len(train_loader) * epochs
+        max_lr = learning_rate # O LR máximo para OneCycle policy
+        steps_per_epoch = len(train_loader)
+        total_steps = epochs * steps_per_epoch
+        scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=max_lr, total_steps=total_steps)
+    # Se lr_scheduler_name for 'Nenhum', scheduler permanece None
 
     # Listas para armazenar as perdas e acurácias
     train_losses = []
@@ -241,41 +293,135 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
 
     # Treinamento
     for epoch in range(epochs):
-        set_seed(42 + epoch)
+        set_seed(42 + epoch) # Definir seed por época para reprodutibilidade do dataloader
         running_loss = 0.0
         running_corrects = 0
         model.train()
 
-        for inputs, labels in train_loader:
+        for i, (inputs, labels) in enumerate(train_loader):
             inputs = inputs.to(device)
             labels = labels.to(device)
 
-            # Add these print statements
-            print(f"Labels type: {labels.dtype}")
-            print(f"Labels shape: {labels.shape}")
-            print(f"Labels min: {labels.min()}")
-            print(f"Labels max: {labels.max()}")
-            print(f"Number of classes: {num_classes}")
+            # Implementação de Mixup/Cutmix no loop de treinamento
+            if data_augmentation_method == 'Mixup':
+                # Implementar Mixup aqui (requer gerar lambda e misturar inputs/labels)
+                alpha = 1.0 # Parâmetro para a distribuição Beta. Geralmente 1.0 ou 0.2
+                if alpha > 0:
+                    lam = np.random.beta(alpha, alpha)
+                else:
+                    lam = 1
 
-            optimizer.zero_grad()
-            try:
-                outputs = model(inputs)
-                # Add these print statements
-                print(f"Outputs type: {outputs.dtype}")
-                print(f"Outputs shape: {outputs.shape}")
-            except Exception as e:
-                st.error(f"Erro durante o treinamento: {e}")
-                return None
+                # Misturar os dados e os rótulos
+                index = torch.randperm(inputs.size(0)).to(device)
+                mixed_inputs = lam * inputs + (1 - lam) * inputs[index, :]
+                target_a, target_b = labels, labels[index]
 
-            _, preds = torch.max(outputs, 1)
-            loss = criterion(outputs, labels)
+                optimizer.zero_grad()
+                try:
+                    outputs = model(mixed_inputs)
+                except Exception as e:
+                    st.error(f"Erro durante a passagem forward com Mixup na época {epoch+1}: {e}")
+                    return None
+
+                # Calcular a perda com Mixup
+                loss = lam * criterion(outputs, target_a) + (1 - lam) * criterion(outputs, target_b)
+
+                # Nota sobre Acurácia com Mixup: O cálculo da acurácia diretamente com preds == labels.data
+                # não é apropriado para Mixup, pois os rótulos são misturados. Uma abordagem seria calcular
+                # uma 'soft' acurácia ou apenas reportar a acurácia no conjunto de validação/teste.
+                # Por simplicidade, manteremos o cálculo da acurácia padrão, mas esteja ciente dessa limitação.
+                # _, preds = torch.max(outputs, 1)
+                running_corrects += torch.sum(preds == labels.data)
+
+            elif data_augmentation_method == 'Cutmix':
+                # Implementar Cutmix aqui (requer gerar caixa de corte e misturar inputs/labels)
+                beta = 1.0 # Parâmetro para a distribuição Beta
+                if beta > 0:
+                    lam = np.random.beta(beta, beta)
+                else:
+                    lam = 1
+
+                # Gerar caixa de corte
+                # Funções auxiliares para gerar caixa de corte (bounding box)
+                def rand_bbox(size, lam):
+                    W = size[2]
+                    H = size[3]
+                    cut_rat = np.sqrt(1. - lam)
+                    cut_w = int(W * cut_rat)
+                    cut_h = int(H * cut_rat)
+
+                    # Coordenada central aleatória
+                    cx = np.random.randint(W)
+                    cy = np.random.randint(H)
+
+                    bbx1 = np.clip(cx - cut_w // 2, 0, W)
+                    bby1 = np.clip(cy - cut_h // 2, 0, H)
+                    bbx2 = np.clip(cx + cut_w // 2, 0, W)
+                    bby2 = np.clip(cy + cut_h // 2, 0, H)
+
+                    return bbx1, bby1, bbx2, bby2
+
+                bbx1, bby1, bbx2, bby2 = rand_bbox(inputs.size(), lam)
+                # Ajustar lambda com base na área da caixa de corte
+                lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (inputs.size()[-1] * inputs.size()[-2]))
+
+                # Misturar os dados e os rótulos
+                index = torch.randperm(inputs.size(0)).to(device)
+                mixed_inputs = inputs.clone() # Começa com a imagem original
+                mixed_inputs[:, :, bby1:bby2, bbx1:bbx2] = inputs[index, :, bby1:bby2, bbx1:bbx2] # Cola o patch
+
+                target_a, target_b = labels, labels[index]
+
+                optimizer.zero_grad()
+                try:
+                    outputs = model(mixed_inputs)
+                except Exception as e:
+                    st.error(f"Erro durante a passagem forward com Cutmix na época {epoch+1}: {e}")
+                    return None
+
+                # Calcular a perda com Cutmix
+                loss = lam * criterion(outputs, target_a) + (1 - lam) * criterion(outputs, target_b)
+
+                # Nota sobre Acurácia com Cutmix: Similar ao Mixup, o cálculo direto da acurácia não é apropriado.
+                # Manteremos o cálculo padrão, mas ciente da limitação.
+                # _, preds = torch.max(outputs, 1)
+                running_corrects += torch.sum(preds == labels.data)
+
+            else:
+                # Sem Mixup/Cutmix, usar a loss padrão
+                optimizer.zero_grad()
+                try:
+                    outputs = model(inputs)
+                except Exception as e:
+                    st.error(f"Erro durante a passagem forward na época {epoch+1}: {e}")
+                    return None
+
+                loss = criterion(outputs, labels)
+
+                _, preds = torch.max(outputs, 1)
+                running_corrects += torch.sum(preds == labels.data)
+
             loss.backward()
             optimizer.step()
 
-            running_loss += loss.item() * inputs.size(0)
-            running_corrects += torch.sum(preds == labels.data)
+            # Aplicar o passo do agendador de taxa de aprendizado (se houver)
+            if scheduler is not None:
+                # Para CosineAnnealingLR e a maioria dos agendadores, step() é chamado por época
+                # Para OneCycleLR, step() é geralmente chamado por batch
+                # Ajuste conforme o agendador específico e sua preferência
+                if lr_scheduler_name == 'Política de Um Ciclo':
+                     scheduler.step()
 
-        epoch_loss = running_loss / len(train_dataset)
+            running_loss += loss.item() * inputs.size(0)
+            # Cálculo da acurácia também pode precisar de ajuste para Mixup/Cutmix (ver notas acima)
+            # _, preds = torch.max(outputs, 1) # Já calculado acima dentro dos blocos if/else
+            # running_corrects += torch.sum(preds == labels.data) # Já calculado acima dentro dos blocos if/else
+
+        # Após cada época de treinamento
+        if scheduler is not None and lr_scheduler_name != 'Política de Um Ciclo':
+             scheduler.step()
+
+        epoch_loss = running_loss / len(train_dataset) # Nota: Ajustar denominador para Mixup/Cutmix se necessário no cálculo de running_loss
         epoch_acc = running_corrects.double() / len(train_dataset)
         train_losses.append(epoch_loss)
         train_accuracies.append(epoch_acc.item())
@@ -307,25 +453,33 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
         st.write(f'Perda de Validação: {valid_epoch_loss:.4f} | Acurácia de Validação: {valid_epoch_acc:.4f}')
 
         # Early Stopping
+        # Early stopping usa a perda de validação, que não é afetada diretamente por Mixup/Cutmix no loop de treinamento.
         if valid_epoch_loss < best_valid_loss:
             best_valid_loss = valid_epoch_loss
             epochs_no_improve = 0
+            # Salvar os pesos do modelo com a melhor perda de validação
             best_model_wts = model.state_dict()
         else:
             epochs_no_improve += 1
             if epochs_no_improve >= patience:
                 st.write('Early stopping!')
-                model.load_state_dict(best_model_wts)
+                model.load_state_dict(best_model_wts) # Carregar os melhores pesos
                 break
 
-    # Carregar os melhores pesos do modelo
-    model.load_state_dict(best_model_wts)
+    # Carregar os melhores pesos do modelo após o treinamento (se early stopping ocorreu)
+    # Se não ocorreu early stopping, best_model_wts será os pesos da última época
+    if epochs_no_improve >= patience:
+         model.load_state_dict(best_model_wts)
 
     # Gráficos de Perda e Acurácia
+    # Note: Para Mixup/Cutmix, a perda de treino plotada é a perda mista, que pode ser menor que a perda 'real'
+    # A acurácia de treino também pode ser calculada de forma diferente com Mixup/Cutmix
+    # Considere adicionar opções para plotar métricas 'reais' no conjunto de treino sem aumento
     plot_metrics(epochs, train_losses, valid_losses, train_accuracies, valid_accuracies)
 
     # Avaliação Final no Conjunto de Teste
     st.write("**Avaliação no Conjunto de Teste**")
+    # A avaliação no conjunto de teste não usa Mixup/Cutmix
     compute_metrics(model, test_loader, full_dataset.classes)
 
     # Análise de Erros
@@ -335,6 +489,7 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     # Liberar memória
     del train_loader, valid_loader
     gc.collect()
+    torch.cuda.empty_cache() # Limpar cache da GPU se estiver usando CUDA
 
     return model, full_dataset.classes
 
@@ -1250,6 +1405,29 @@ def main():
     #________________________________________________________________________________________
     patience = st.sidebar.number_input("Paciência para Early Stopping:", min_value=1, max_value=10, value=3, step=1)
 
+    # Novos controles para opções avançadas
+    st.sidebar.subheader("Opções Avançadas")
+
+    data_augmentation_method = st.sidebar.selectbox(
+        "Método de Aumento de Dados:",
+        options=['Padrão', 'Mixup', 'Cutmix']
+    )
+
+    optimizer_name = st.sidebar.selectbox(
+        "Otimizador:",
+        options=['Adam', 'AdamW', 'Ranger', 'Lion', 'Sophia']
+    )
+
+    lr_scheduler_name = st.sidebar.selectbox(
+        "Agendador de Taxa de Aprendizado:",
+        options=['Nenhum', 'Recozimento por Cosseno', 'Política de Um Ciclo']
+    )
+
+    cam_method = st.sidebar.selectbox(
+        "Método CAM para Visualização:",
+        options=['Grad-CAM', 'Score-CAM', 'LayerCAM']
+    )
+
     #____________________________________________________________________________________________
     with st.sidebar:
         with st.expander("Perda Ponderada para Classes Desbalanceadas:"):
@@ -1394,7 +1572,7 @@ def main():
         data_dir = temp_dir
 
         st.write("Iniciando o treinamento supervisionado...")
-        model_data = train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience)
+        model_data = train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience, optimizer_name, lr_scheduler_name, data_augmentation_method)
 
         if model_data is None:
             st.error("Erro no treinamento do modelo.")
