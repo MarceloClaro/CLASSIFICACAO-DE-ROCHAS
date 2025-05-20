@@ -215,8 +215,19 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
          shutil.rmtree(temp_dir)
          return None, None
 
+    # Carregar o conjunto de dados principal usando data_dir
+    try:
+        st.write(f"Tentando carregar ImageFolder de: {data_dir}")
+        # Este full_dataset será usado para obter classes, dividir dados, etc.
+        loaded_full_dataset = datasets.ImageFolder(root=data_dir)
+        st.success(f"ImageFolder carregado com sucesso para configuração. Classes: {loaded_full_dataset.classes}")
+    except Exception as e:
+        st.error(f"Erro crítico ao carregar o conjunto de dados de '{data_dir}' dentro de train_model: {e}")
+        st.error("Verifique se o diretório de dados está estruturado corretamente com subpastas para cada classe.")
+        return None, None
+
     # Validate num_classes
-    actual_num_classes = len(full_dataset.classes)
+    actual_num_classes = len(loaded_full_dataset.classes)
     if num_classes != actual_num_classes:
         st.error(f"Erro: O número de classes especificado ({num_classes}) não corresponde ao número de classes encontradas no conjunto de dados ({actual_num_classes}). Por favor, ajuste o Número de Classes na barra lateral.")
         return None, None # Indicate failure
@@ -224,11 +235,11 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     # Exibir algumas imagens do dataset e distribuição de classes
     st.write("Visualização de algumas imagens do conjunto de dados:")
     st.write("Exemplos do Conjunto de Dados")
-    visualize_data(full_dataset, full_dataset.classes)
+    visualize_data(loaded_full_dataset, loaded_full_dataset.classes)
     st.write("\n") # Add a newline for spacing
 
     st.write("Distribuição das Classes")
-    plot_class_distribution(full_dataset, full_dataset.classes)
+    plot_class_distribution(loaded_full_dataset, loaded_full_dataset.classes)
     st.write("\n") # Add a newline for spacing
 
     # Definir as transformações com base no método de aumento de dados selecionado
@@ -244,12 +255,12 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
 
     # Criar os datasets com as transformações apropriadas
     st.write("Processando os conjuntos de dados...")
-    train_dataset = CustomDataset(full_dataset, transform=current_train_transforms)
-    valid_dataset = CustomDataset(full_dataset, transform=test_transforms)
-    test_dataset = CustomDataset(full_dataset, transform=test_transforms)
+    train_dataset_transformed = CustomDataset(loaded_full_dataset, transform=current_train_transforms)
+    valid_dataset_transformed = CustomDataset(loaded_full_dataset, transform=test_transforms) # Usado para criar subsets
+    # test_dataset_transformed = CustomDataset(loaded_full_dataset, transform=test_transforms) # O subset de teste usará valid_dataset_transformed
 
     # Dividir os índices para treino, validação e teste
-    dataset_size = len(full_dataset)
+    dataset_size = len(loaded_full_dataset)
     indices = list(range(dataset_size))
     np.random.shuffle(indices)
 
@@ -261,16 +272,16 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     test_indices = indices[valid_end:]
 
     st.write(f"Criando subsets com divisões: Treino ({len(train_indices)}), Validação ({len(valid_indices)}), Teste ({len(test_indices)})")
-    train_dataset = torch.utils.data.Subset(train_dataset, train_indices)
-    valid_dataset = torch.utils.data.Subset(valid_dataset, valid_indices)
-    test_dataset = torch.utils.data.Subset(test_dataset, test_indices)
+    train_subset = torch.utils.data.Subset(train_dataset_transformed, train_indices)
+    valid_subset = torch.utils.data.Subset(valid_dataset_transformed, valid_indices)
+    test_subset = torch.utils.data.Subset(valid_dataset_transformed, test_indices) # Usa a mesma base transformada
 
     # Dataloaders
     g = torch.Generator()
     g.manual_seed(42)
 
     if use_weighted_loss:
-        targets = [full_dataset.targets[i] for i in train_indices]
+        targets = [loaded_full_dataset.targets[i] for i in train_indices]
         class_counts = np.bincount(targets)
         class_counts = class_counts + 1e-6  # Para evitar divisão por zero
         class_weights = 1.0 / class_counts
@@ -279,9 +290,9 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     else:
         criterion = nn.CrossEntropyLoss()
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, worker_init_fn=seed_worker, generator=g)
-    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False, worker_init_fn=seed_worker, generator=g)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, worker_init_fn=seed_worker, generator=g)
+    train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, worker_init_fn=seed_worker, generator=g)
+    valid_loader = DataLoader(valid_subset, batch_size=batch_size, shuffle=False, worker_init_fn=seed_worker, generator=g)
+    test_loader = DataLoader(test_subset, batch_size=batch_size, shuffle=False, worker_init_fn=seed_worker, generator=g)
 
     st.write("Criando DataLoaders...")
 
@@ -300,7 +311,7 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
 
             for i in range(min(5, inputs.shape[0])):
                 axes[i].imshow(inputs[i])
-                axes[i].set_title(full_dataset.classes[labels[i].item()])
+                axes[i].set_title(loaded_full_dataset.classes[labels[i].item()])
                 axes[i].axis('off')
             st.pyplot(fig)
         except Exception as e:
@@ -476,7 +487,7 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
                 # Ajuste conforme o agendador específico e sua preferência
                 if lr_scheduler_name == 'Política de Um Ciclo':
                      scheduler.step()
-
+            
             running_loss += loss.item() * inputs.size(0)
             # Cálculo da acurácia também pode precisar de ajuste para Mixup/Cutmix (ver notas acima)
             # _, preds = torch.max(outputs, 1) # Já calculado acima dentro dos blocos if/else
@@ -486,8 +497,8 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
         if scheduler is not None and lr_scheduler_name != 'Política de Um Ciclo':
              scheduler.step()
 
-        epoch_loss = running_loss / len(train_dataset) # Nota: Ajustar denominador para Mixup/Cutmix se necessário no cálculo de running_loss
-        epoch_acc = running_corrects.double() / len(train_dataset)
+    epoch_loss = running_loss / len(train_subset) # Nota: Ajustar denominador para Mixup/Cutmix se necessário no cálculo de running_loss
+    epoch_acc = running_corrects.double() / len(train_subset)
         train_losses.append(epoch_loss)
         train_accuracies.append(epoch_acc.item())
 
@@ -508,8 +519,8 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
                 valid_running_loss += loss.item() * inputs.size(0)
                 valid_running_corrects += torch.sum(preds == labels.data)
 
-        valid_epoch_loss = valid_running_loss / len(valid_dataset)
-        valid_epoch_acc = valid_running_corrects.double() / len(valid_dataset)
+        valid_epoch_loss = valid_running_loss / len(valid_subset)
+        valid_epoch_acc = valid_running_corrects.double() / len(valid_subset)
         valid_losses.append(valid_epoch_loss)
         valid_accuracies.append(valid_epoch_acc.item())
 
@@ -545,18 +556,18 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     # Avaliação Final no Conjunto de Teste
     st.write("**Avaliação no Conjunto de Teste**")
     # A avaliação no conjunto de teste não usa Mixup/Cutmix
-    compute_metrics(model, test_loader, full_dataset.classes)
+    compute_metrics(model, test_loader, loaded_full_dataset.classes)
 
     # Análise de Erros
     st.write("**Análise de Erros**")
-    error_analysis(model, test_loader, full_dataset.classes)
+    error_analysis(model, test_loader, loaded_full_dataset.classes)
 
     # Liberar memória
     del train_loader, valid_loader
     gc.collect()
     torch.cuda.empty_cache() # Limpar cache da GPU se estiver usando CUDA
-
-    return model, full_dataset.classes
+    
+    return model, loaded_full_dataset.classes
 
 def plot_metrics(epochs, train_losses, valid_losses, train_accuracies, valid_accuracies):
     """
@@ -1716,7 +1727,7 @@ def main():
         if model_data is None:
             st.error("Erro no treinamento do modelo.")
             shutil.rmtree(temp_dir)
-            return None, None
+            return
 
         model, classes = model_data
         st.success("Treinamento concluído!")
@@ -1753,37 +1764,37 @@ def main():
                      else:
                           st.error(f"After {retry_attempts} attempts, no subdirectories found in {data_dir}. Please check the structure of your ZIP file. It should contain subfolders for each class.")
                           shutil.rmtree(temp_dir)
-                          return None, None
+                          return
                 st.info(f"Attempt {attempt + 1}/{retry_attempts}: Found subdirectories: {subdirs}")
 
                 full_dataset = datasets.ImageFolder(root=data_dir)
                 st.success(f"Conjunto de dados carregado com sucesso em {data_dir} (Tentativa {attempt + 1}).")
                 break # Exit retry loop if successful
-            except FileNotFoundError as e:
+            except FileNotFoundError as e: # pylint: disable=unused-variable # (e é usado no log abaixo)
                 if attempt < retry_attempts - 1:
                     st.warning(f"Tentativa {attempt + 1}/{retry_attempts} falhou ao carregar o conjunto de dados. Diretório '{data_dir}' não encontrado. Retentando em 3 segundos...")
                     time.sleep(3) # Increased delay
                 else:
                     st.error(f"Todas as {retry_attempts} tentativas falharam ao carregar o conjunto de dados. Diretório '{data_dir}' não encontrado. Verifique a estrutura do arquivo ZIP e as permissões no ambiente Streamlit Cloud. Detalhes do último erro: {e}")
                     shutil.rmtree(temp_dir)
-                    return None, None
-            except Exception as e:
+                    return
+            except Exception as e: # pylint: disable=unused-variable # (e é usado no log abaixo)
                 st.error(f"Ocorreu um erro inesperado ao carregar o conjunto de dados (Tentativa {attempt + 1}): {e}")
                 shutil.rmtree(temp_dir)
-                return None, None
+                return
 
         # If full_dataset is still None after retries, something went wrong
         if full_dataset is None:
              st.error("Falha ao carregar o conjunto de dados após múltiplas tentativas.")
              shutil.rmtree(temp_dir)
-             return None, None
+             return
 
         # Validate num_classes
         actual_num_classes = len(full_dataset.classes)
         if num_classes != actual_num_classes:
             st.error(f"Erro: O número de classes especificado ({num_classes}) não corresponde ao número de classes encontradas no conjunto de dados ({actual_num_classes}). Por favor, ajuste o Número de Classes na barra lateral.")
             return None, None # Indicate failure
-
+    
         # Carregar o dataset completo para extração de características
         full_dataset = datasets.ImageFolder(root=data_dir, transform=test_transforms)
         features, labels = extract_features(full_dataset, feature_extractor, batch_size)
@@ -1811,7 +1822,7 @@ def main():
                     eval_image = Image.open(eval_image_file).convert("RGB")
                 except Exception as e:
                     st.error(f"Erro ao abrir a imagem: {e}")
-                    return None, None
+                    return
 
                 st.image(eval_image, caption='Imagem para avaliação', use_column_width=True)
                 class_name, confidence = evaluate_image(model, eval_image, classes)
@@ -1821,32 +1832,29 @@ def main():
                 # Visualizar ativações
                 visualize_activations(model, eval_image, classes, cam_method)
 
+        # Add this section to display training configuration for the completed run
+        st.subheader("Configurações Técnicas do Treinamento Realizado")
+        config_data = [
+            {"Parâmetro": "Modelo", "Valor": model_name},
+            {"Parâmetro": "Fine-Tuning Completo", "Valor": fine_tune},
+            {"Parâmetro": "Épocas", "Valor": epochs},
+            {"Parâmetro": "Taxa de Aprendizagem", "Valor": learning_rate},
+            {"Parâmetro": "Tamanho de Lote", "Valor": batch_size},
+            {"Parâmetro": "Train Split", "Valor": train_split},
+            {"Parâmetro": "Valid Split", "Valor": valid_split},
+            {"Parâmetro": "L2 Regularization", "Valor": l2_lambda},
+            {"Parâmetro": "Paciência Early Stopping", "Valor": patience},
+            {"Parâmetro": "Use Weighted Loss", "Valor": use_weighted_loss},
+            {"Parâmetro": "Otimizador", "Valor": optimizer_name},
+            {"Parâmetro": "Agendador LR", "Valor": lr_scheduler_name},
+            {"Parâmetro": "Aumento de Dados", "Valor": data_augmentation_method},
+        ]
+        st.table(config_data)
+        st.write("Configurações salvas como config_{model_name}_run1.json") # Placeholder, saving not implemented yet
+
         # Limpar o diretório temporário
         shutil.rmtree(temp_dir)
-
-    # Add this section to display training configuration
-    st.subheader("Configurações Técnicas do Treinamento")
-    config_data = [
-        {"Parâmetro": "Modelo", "Valor": model_name},
-        {"Parâmetro": "Fine-Tuning Completo", "Valor": fine_tune},
-        {"Parâmetro": "Épocas", "Valor": epochs},
-        {"Parâmetro": "Taxa de Aprendizagem", "Valor": learning_rate},
-        {"Parâmetro": "Tamanho de Lote", "Valor": batch_size},
-        {"Parâmetro": "Train Split", "Valor": train_split},
-        {"Parâmetro": "Valid Split", "Valor": valid_split},
-        {"Parâmetro": "L2 Regularization", "Valor": l2_lambda},
-        {"Parâmetro": "Paciência Early Stopping", "Valor": patience},
-        {"Parâmetro": "Use Weighted Loss", "Valor": use_weighted_loss},
-    ]
-    st.table(config_data)
-
-    st.write("Configurações salvas como config_{model_name}_run1.json") # Placeholder, saving not implemented yet
-
-    st.write("\n") # Add a newline for spacing
-
-    st.write("Iniciando o treinamento supervisionado...")
-    # Modify this line to include optimizer_name, lr_scheduler_name, and data_augmentation_method
-    model_data = train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience, optimizer_name, lr_scheduler_name, data_augmentation_method)
+    # Fim do bloco if zip_file is not None
 
 if __name__ == "__main__":
     main()
