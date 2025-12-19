@@ -117,10 +117,11 @@ def plot_class_distribution(dataset, classes):
     
     # Plotar o gráfico com as contagens
     fig, ax = plt.subplots(figsize=(10, 6))
-    sns.countplot(x=labels, ax=ax, palette="Set2")
+    sns.countplot(x=labels, hue=labels, ax=ax, palette="Set2", legend=False)
     
     # Adicionar os nomes das classes no eixo X
-    ax.set_xticklabels(classes, rotation=45)
+    ax.set_xticks(range(len(classes)))
+    ax.set_xticklabels(classes, rotation=45, ha='right')
     
     # Adicionar as contagens acima das barras
     for i, count in enumerate(class_counts):
@@ -137,11 +138,11 @@ def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
     Retorna o modelo pré-treinado selecionado.
     """
     if model_name == 'ResNet18':
-        model = models.resnet18(pretrained=True)
+        model = models.resnet18(weights='DEFAULT')
     elif model_name == 'ResNet50':
-        model = models.resnet50(pretrained=True)
+        model = models.resnet50(weights='DEFAULT')
     elif model_name == 'DenseNet121':
-        model = models.densenet121(pretrained=True)
+        model = models.densenet121(weights='DEFAULT')
     else:
         st.error("Modelo não suportado.")
         return None
@@ -156,12 +157,18 @@ def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
             nn.Dropout(p=dropout_p),
             nn.Linear(num_ftrs, num_classes)
         )
+        # Ensure final layer requires grad
+        for param in model.fc.parameters():
+            param.requires_grad = True
     elif model_name.startswith('DenseNet'):
         num_ftrs = model.classifier.in_features
         model.classifier = nn.Sequential(
             nn.Dropout(p=dropout_p),
             nn.Linear(num_ftrs, num_classes)
         )
+        # Ensure final layer requires grad
+        for param in model.classifier.parameters():
+            param.requires_grad = True
     else:
         st.error("Modelo não suportado.")
         return None
@@ -433,8 +440,14 @@ def error_analysis(model, dataloader, classes):
 
     if misclassified_images:
         st.write("Algumas imagens mal classificadas:")
-        fig, axes = plt.subplots(1, min(5, len(misclassified_images)), figsize=(15, 3))
-        for i in range(min(5, len(misclassified_images))):
+        num_images = min(5, len(misclassified_images))
+        fig, axes = plt.subplots(1, num_images, figsize=(15, 3))
+        
+        # Handle case when only one image (axes is not an array)
+        if num_images == 1:
+            axes = [axes]
+            
+        for i in range(num_images):
             image = misclassified_images[i]
             image = image.permute(1, 2, 0).numpy()
             axes[i].imshow(image)
@@ -549,65 +562,79 @@ def visualize_activations(model, image, class_names):
     """
     Visualiza as ativações na imagem usando Grad-CAM.
     """
-    model.eval()  # Coloca o modelo em modo de avaliação
-    input_tensor = test_transforms(image).unsqueeze(0).to(device)
-    
-    # Verificar se o modelo é suportado
-    if isinstance(model, models.ResNet):
-        target_layer = model.layer4[-1]
-    elif isinstance(model, models.DenseNet):
-        target_layer = model.features.denseblock4.denselayer16
-    else:
-        st.error("Modelo não suportado para Grad-CAM.")
-        return
-    
-    # Criar o objeto CAM usando torchcam
-    cam_extractor = SmoothGradCAMpp(model, target_layer=target_layer)
-    
-    # Habilitar gradientes explicitamente
-    with torch.set_grad_enabled(True):
-        out = model(input_tensor)  # Faz a previsão
-        _, pred = torch.max(out, 1)  # Obtém a classe predita
-        pred_class = pred.item()
-    
-    # Gerar o mapa de ativação
-    activation_map = cam_extractor(pred_class, out)
-    
-    # Obter o mapa de ativação da primeira imagem no lote
-    activation_map = activation_map[0].cpu().numpy()
-    
-    # Redimensionar o mapa de ativação para coincidir com o tamanho da imagem original
-    activation_map_resized = cv2.resize(activation_map, (image.size[0], image.size[1]))
-    
-    # Normalizar o mapa de ativação para o intervalo [0, 1]
-    activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min())
-    
-    # Converter a imagem para array NumPy
-    image_np = np.array(image)
-    
-    # Converter o mapa de ativação em uma imagem RGB
-    heatmap = cv2.applyColorMap(np.uint8(255 * activation_map_resized), cv2.COLORMAP_JET)
-    heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
-    
-    # Sobrepor o mapa de ativação na imagem original
-    superimposed_img = heatmap * 0.4 + image_np * 0.6
-    superimposed_img = np.uint8(superimposed_img)
-    
-    # Exibir a imagem original e o mapa de ativação sobreposto
-    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-    
-    # Imagem original
-    ax[0].imshow(image_np)
-    ax[0].set_title('Imagem Original')
-    ax[0].axis('off')
-    
-    # Imagem com Grad-CAM
-    ax[1].imshow(superimposed_img)
-    ax[1].set_title('Grad-CAM')
-    ax[1].axis('off')
-    
-    # Exibir as imagens com o Streamlit
-    st.pyplot(fig)
+    try:
+        # Ensure model is in eval mode and enable gradients for Grad-CAM
+        model.eval()
+        
+        # Enable requires_grad for necessary layers
+        for param in model.parameters():
+            param.requires_grad = True
+        
+        input_tensor = test_transforms(image).unsqueeze(0).to(device)
+        input_tensor.requires_grad = True
+        
+        # Verificar se o modelo é suportado
+        model_type = type(model).__name__
+        if 'ResNet' in model_type:
+            target_layer = model.layer4[-1]
+        elif 'DenseNet' in model_type:
+            target_layer = model.features.denseblock4.denselayer16
+        else:
+            st.error("Modelo não suportado para Grad-CAM.")
+            return
+        
+        # Criar o objeto CAM usando torchcam
+        cam_extractor = SmoothGradCAMpp(model, target_layer=target_layer)
+        
+        # Habilitar gradientes explicitamente
+        with torch.set_grad_enabled(True):
+            out = model(input_tensor)  # Faz a previsão
+            _, pred = torch.max(out, 1)  # Obtém a classe predita
+            pred_class = pred.item()
+        
+        # Gerar o mapa de ativação
+        activation_map = cam_extractor(pred_class, out)
+        
+        # Obter o mapa de ativação da primeira imagem no lote
+        activation_map = activation_map[0].cpu().detach().numpy()
+        
+        # Redimensionar o mapa de ativação para coincidir com o tamanho da imagem original
+        activation_map_resized = cv2.resize(activation_map, (image.size[0], image.size[1]))
+        
+        # Normalizar o mapa de ativação para o intervalo [0, 1]
+        activation_map_resized = (activation_map_resized - activation_map_resized.min()) / (activation_map_resized.max() - activation_map_resized.min() + 1e-8)
+        
+        # Converter a imagem para array NumPy
+        image_np = np.array(image)
+        
+        # Converter o mapa de ativação em uma imagem RGB
+        heatmap = cv2.applyColorMap(np.uint8(255 * activation_map_resized), cv2.COLORMAP_JET)
+        heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
+        
+        # Sobrepor o mapa de ativação na imagem original
+        superimposed_img = heatmap * 0.4 + image_np * 0.6
+        superimposed_img = np.uint8(superimposed_img)
+        
+        # Exibir a imagem original e o mapa de ativação sobreposto
+        fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+        
+        # Imagem original
+        ax[0].imshow(image_np)
+        ax[0].set_title('Imagem Original')
+        ax[0].axis('off')
+        
+        # Imagem com Grad-CAM
+        ax[1].imshow(superimposed_img)
+        ax[1].set_title('Grad-CAM')
+        ax[1].axis('off')
+        
+        # Exibir as imagens com o Streamlit
+        st.pyplot(fig)
+        
+    except Exception as e:
+        st.error(f"Erro ao gerar Grad-CAM: {str(e)}")
+        st.info("Visualização Grad-CAM não disponível para este modelo/configuração.")
+
 
 
 
@@ -627,7 +654,7 @@ def main():
     
     # Layout da página
     if os.path.exists('capa.png'):
-        st.image('capa.png', width=100, caption='Laboratório de Educação e Inteligência Artificial - Geomaker. "A melhor forma de prever o futuro é inventá-lo." - Alan Kay', use_column_width='always')
+        st.image('capa.png', caption='Laboratório de Educação e Inteligência Artificial - Geomaker. "A melhor forma de prever o futuro é inventá-lo." - Alan Kay', use_container_width=True)
     else:
         st.warning("Imagem 'capa.png' não encontrada.")
     
@@ -1437,7 +1464,7 @@ def main():
                     st.error(f"Erro ao abrir a imagem: {e}")
                     return
 
-                st.image(eval_image, caption='Imagem para avaliação', use_column_width=True)
+                st.image(eval_image, caption='Imagem para avaliação', use_container_width=True)
                 class_name, confidence = evaluate_image(model, eval_image, classes)
                 st.write(f"**Classe Predita:** {class_name}")
                 st.write(f"**Confiança:** {confidence:.4f}")
