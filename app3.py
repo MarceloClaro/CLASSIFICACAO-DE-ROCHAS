@@ -22,10 +22,13 @@ import streamlit as st
 import gc
 import logging
 import base64
+import time
 # Importações adicionais para Grad-CAM
 from torchcam.methods import SmoothGradCAMpp
 from torchvision.transforms.functional import normalize, resize, to_pil_image
 import cv2
+# Importar módulo de análise de performance
+from performance_analyzer import PerformanceAnalyzer
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -321,12 +324,95 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     # Análise de Erros
     st.write("**Análise de Erros**")
     error_analysis(model, test_loader, full_dataset.classes)
+    
+    # ===== ANÁLISE DE EFICIÊNCIA E DESEMPENHO =====
+    st.write("---")
+    st.write("## 📊 Análise de Eficiência e Desempenho")
+    st.write("Análise científica detalhada para qualidade Qualis A1")
+    
+    # Criar analisador de performance
+    performance_analyzer = PerformanceAnalyzer(device)
+    
+    # Análise de performance
+    with st.spinner('Analisando desempenho do modelo...'):
+        # Medir tempo de inferência
+        st.write("**Medindo tempo de inferência...**")
+        avg_time, std_time = performance_analyzer.measure_inference_time(model, test_loader, num_samples=50)
+        st.success(f"✓ Tempo médio de inferência: {avg_time*1000:.2f} ms (±{std_time*1000:.2f} ms)")
+        
+        # Medir uso de memória
+        st.write("**Analisando uso de memória...**")
+        model_mem, system_mem, gpu_mem = performance_analyzer.measure_memory_usage(model)
+        st.success(f"✓ Memória do modelo: {model_mem:.2f} MB")
+        
+        # Calcular métricas detalhadas
+        st.write("**Calculando métricas detalhadas...**")
+        class_metrics, all_labels, all_preds, all_probs = performance_analyzer.compute_detailed_metrics(
+            model, test_loader, full_dataset.classes
+        )
+        
+        # Calcular score de eficiência
+        efficiency_score = performance_analyzer.compute_efficiency_score()
+        
+    # Exibir relatório de performance
+    st.write("### 📈 Relatório de Performance")
+    performance_report = performance_analyzer.generate_performance_report()
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write("**Métricas de Classificação:**")
+        for metric, value in performance_report['Métricas de Classificação'].items():
+            st.metric(metric, value)
+    
+    with col2:
+        st.write("**Métricas de Eficiência:**")
+        for metric, value in performance_report['Métricas de Eficiência'].items():
+            st.metric(metric, value)
+    
+    st.write("**Uso de Memória:**")
+    col3, col4, col5 = st.columns(3)
+    mem_data = performance_report['Uso de Memória']
+    col3.metric("Modelo", mem_data['Memória do Modelo (MB)'])
+    col4.metric("Sistema", mem_data['Memória do Sistema (MB)'])
+    col5.metric("GPU", mem_data['Memória GPU (MB)'])
+    
+    # Score de eficiência geral com gauge visual
+    st.write("### 🎯 Score de Eficiência Geral")
+    score = float(performance_report['Score de Eficiência Geral'])
+    st.progress(score)
+    if score >= 0.8:
+        st.success(f"✅ Excelente! Score: {score:.3f} - Qualidade Qualis A1")
+    elif score >= 0.6:
+        st.info(f"✓ Bom! Score: {score:.3f} - Acima da média")
+    else:
+        st.warning(f"⚠ Score: {score:.3f} - Pode ser melhorado")
+    
+    # Gráficos de métricas detalhadas
+    st.write("### 📊 Análise Detalhada por Classe")
+    fig_detailed = performance_analyzer.plot_detailed_metrics(class_metrics, full_dataset.classes)
+    st.pyplot(fig_detailed)
+    
+    # Opção de exportar relatório
+    st.write("### 💾 Exportar Resultados")
+    if st.button("📥 Exportar Relatório de Performance (CSV)"):
+        csv_filename = performance_analyzer.export_report_to_csv('performance_report.csv')
+        st.success(f"Relatório exportado: {csv_filename}")
+        
+        # Disponibilizar download
+        with open(csv_filename, 'rb') as f:
+            st.download_button(
+                label="⬇️ Download Relatório CSV",
+                data=f,
+                file_name='performance_report.csv',
+                mime='text/csv'
+            )
 
     # Liberar memória
     del train_loader, valid_loader
     gc.collect()
 
-    return model, full_dataset.classes
+    return model, full_dataset.classes, performance_analyzer
 
 def plot_metrics(epochs, train_losses, valid_losses, train_accuracies, valid_accuracies):
     """
@@ -1390,7 +1476,7 @@ def main():
             shutil.rmtree(temp_dir)
             return
 
-        model, classes = model_data
+        model, classes, performance_analyzer = model_data
         st.success("Treinamento concluído!")
 
         # Extrair características usando o modelo pré-treinado (sem a camada final)
