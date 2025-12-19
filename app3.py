@@ -175,6 +175,12 @@ def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
 def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience):
     """
     Função principal para treinamento do modelo.
+    
+    Returns:
+        tuple: (model, classes, performance_analyzer) ou None em caso de erro
+            - model: Modelo treinado
+            - classes: Lista de nomes das classes
+            - performance_analyzer: Objeto PerformanceAnalyzer com métricas detalhadas
     """
     set_seed(42)
 

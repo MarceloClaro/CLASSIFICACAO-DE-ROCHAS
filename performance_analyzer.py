@@ -129,7 +129,8 @@ class PerformanceAnalyzer:
             try:
                 roc_auc = roc_auc_score(binarized_labels, np.array(all_probs), average='weighted', multi_class='ovr')
                 self.metrics['roc_auc_weighted'] = roc_auc
-            except:
+            except (ValueError, IndexError) as e:
+                # Não foi possível calcular AUC-ROC (ex: apenas uma classe presente)
                 self.metrics['roc_auc_weighted'] = 0.0
         
         return class_metrics, all_labels, all_preds, all_probs
@@ -138,16 +139,20 @@ class PerformanceAnalyzer:
         """
         Calcula um score de eficiência baseado em múltiplos fatores
         """
+        # Constantes de normalização
+        TIME_NORMALIZATION_FACTOR = 100  # ms
+        MEMORY_NORMALIZATION_FACTOR = 100  # MB
+        
         # Normalizar métricas (valores entre 0 e 1)
         accuracy_score = self.metrics.get('accuracy', 0)
         
         # Inferência rápida é melhor (normalizar para 0-1)
         inference_time = self.timing_data.get('inference_avg_ms', 1000)
-        time_score = 1.0 / (1.0 + inference_time / 100)  # Normalização
+        time_score = 1.0 / (1.0 + inference_time / TIME_NORMALIZATION_FACTOR)
         
         # Memória baixa é melhor
         memory_mb = self.metrics.get('model_memory_mb', 1000)
-        memory_score = 1.0 / (1.0 + memory_mb / 100)
+        memory_score = 1.0 / (1.0 + memory_mb / MEMORY_NORMALIZATION_FACTOR)
         
         # Score ponderado
         efficiency_score = (
