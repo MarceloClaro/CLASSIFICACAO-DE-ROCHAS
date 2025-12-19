@@ -246,7 +246,7 @@ def main():
                     return
 
                 # Exibir a imagem
-                st.image(eval_image, caption='Imagem para avaliação', use_column_width=True)
+                st.image(eval_image, caption='Imagem para avaliação', width='stretch')
 
                 # Avaliar a imagem
                 class_name, confidence = evaluate_image(model, eval_image, classes)

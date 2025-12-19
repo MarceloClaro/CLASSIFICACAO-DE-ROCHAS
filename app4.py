@@ -117,7 +117,7 @@ def plot_class_distribution(dataset, classes):
     
     # Plotar o gráfico com as contagens
     fig, ax = plt.subplots(figsize=(10, 6))
-    sns.countplot(x=labels, hue=labels, ax=ax, palette="Set2", legend=False)
+    sns.countplot(x=labels, ax=ax, palette="Set2")
     
     # Adicionar os nomes das classes no eixo X
     ax.set_xticks(range(len(classes)))
@@ -654,7 +654,7 @@ def main():
     
     # Layout da página
     if os.path.exists('capa.png'):
-        st.image('capa.png', caption='Laboratório de Educação e Inteligência Artificial - Geomaker. "A melhor forma de prever o futuro é inventá-lo." - Alan Kay', use_container_width=True)
+        st.image('capa.png', caption='Laboratório de Educação e Inteligência Artificial - Geomaker. "A melhor forma de prever o futuro é inventá-lo." - Alan Kay', width='stretch')
     else:
         st.warning("Imagem 'capa.png' não encontrada.")
     
@@ -1464,7 +1464,7 @@ def main():
                     st.error(f"Erro ao abrir a imagem: {e}")
                     return
 
-                st.image(eval_image, caption='Imagem para avaliação', use_container_width=True)
+                st.image(eval_image, caption='Imagem para avaliação', width='stretch')
                 class_name, confidence = evaluate_image(model, eval_image, classes)
                 st.write(f"**Classe Predita:** {class_name}")
                 st.write(f"**Confiança:** {confidence:.4f}")
