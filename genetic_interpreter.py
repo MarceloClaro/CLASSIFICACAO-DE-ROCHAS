@@ -398,10 +398,17 @@ class GeneticDiagnosticInterpreter:
             report += interpretation
             
             # Add reference-based insight for each perspective
-            if academic_references and i < len(academic_references):
-                ref = academic_references[i]
+            # Use modulo to cycle through references if there are more perspectives than references
+            if academic_references:
+                ref_index = i % len(academic_references)
+                ref = academic_references[ref_index]
                 report += f"\n**💡 Insight da Literatura Científica:**\n"
-                report += f"Segundo {ref.get('authors', 'N/A').split(',')[0]} et al. ({ref.get('year', 'N/A')}), "
+                
+                # Safely extract first author
+                authors_str = ref.get('authors', 'N/A')
+                first_author = authors_str.split(',')[0] if ',' in authors_str else authors_str
+                
+                report += f"Segundo {first_author} et al. ({ref.get('year', 'N/A')}), "
                 if ref.get('abstract_pt'):
                     # Use Portuguese abstract summary
                     abstract_summary = self._truncate_abstract(ref.get('abstract_pt', ''), 200)

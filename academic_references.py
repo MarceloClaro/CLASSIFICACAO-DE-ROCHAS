@@ -64,7 +64,13 @@ class AcademicReferenceFetcher:
         # AI configuration for translation and critical reviews
         self.ai_provider = ai_provider
         self.ai_api_key = ai_api_key
-        self.ai_model = ai_model or "gemini-1.5-flash"
+        # Set default model based on provider
+        if ai_model:
+            self.ai_model = ai_model
+        elif ai_provider == 'groq':
+            self.ai_model = "mixtral-8x7b-32768"
+        else:
+            self.ai_model = "gemini-1.5-flash"
         self.ai_client = None
         self.ai_model_obj = None
         
@@ -102,11 +108,15 @@ class AcademicReferenceFetcher:
             return abstract
         
         try:
+            # Sanitize inputs - limit length to prevent prompt injection
+            safe_title = title[:500] if title else ""
+            safe_abstract = abstract[:2000] if abstract else ""
+            
             prompt = f"""Traduza o seguinte resumo científico do inglês para o português brasileiro de forma clara e precisa, mantendo a terminologia técnica apropriada:
 
-Título: {title}
+Título: {safe_title}
 
-Resumo: {abstract}
+Resumo: {safe_abstract}
 
 Forneça APENAS a tradução do resumo, sem adicionar comentários ou explicações extras."""
 
@@ -150,13 +160,14 @@ Forneça APENAS a tradução do resumo, sem adicionar comentários ou explicaç�
             return "Resenha crítica não disponível (requer configuração de API de IA)"
         
         try:
-            title = reference.get('title', 'N/A')
-            authors = reference.get('authors', 'N/A')
-            year = reference.get('year', 'N/A')
-            journal = reference.get('journal', 'N/A')
-            abstract = reference.get('abstract', 'Abstract not available')
-            citation_count = reference.get('citation_count', 'N/A')
-            platform = reference.get('platform', 'N/A')
+            # Sanitize inputs - limit length to prevent prompt injection
+            title = reference.get('title', 'N/A')[:500]
+            authors = reference.get('authors', 'N/A')[:200]
+            year = str(reference.get('year', 'N/A'))[:10]
+            journal = reference.get('journal', 'N/A')[:200]
+            abstract = reference.get('abstract', 'Abstract not available')[:2000]
+            citation_count = str(reference.get('citation_count', 'N/A'))[:10]
+            platform = reference.get('platform', 'N/A')[:100]
             
             prompt = f"""Como especialista em análise crítica de literatura científica, forneça uma resenha crítica detalhada do seguinte artigo científico:
 
@@ -236,8 +247,9 @@ Mantenha um tom acadêmico e objetivo. Limite a resenha a aproximadamente 150-20
             
             enriched.append(ref)
             
-            # Small delay to avoid rate limiting
-            time.sleep(self.RATE_LIMIT_DELAY)
+            # Small delay to avoid rate limiting (skip for last item)
+            if i < len(references) - 1:
+                time.sleep(self.RATE_LIMIT_DELAY)
         
         return enriched
     
