@@ -63,7 +63,7 @@ class AcademicReferenceFetcher:
         }
         # AI configuration for translation and critical reviews
         self.ai_provider = ai_provider
-        self.ai_api_key = api_key
+        self.ai_api_key = ai_api_key
         # Set default model based on provider (using current recommended models)
         # Reference: https://github.com/google-gemini/cookbook
         if ai_model:
@@ -413,7 +413,7 @@ Mantenha um tom acadêmico e objetivo. Limite a resenha a aproximadamente 150-20
                     'authors': author_str,
                     'source': f"arXiv",
                     'url': link,
-                    'download_url': link.replace('abs', 'pdf') if 'abs' in link else link + '.pdf',
+                    'download_url': link.replace('abs', 'pdf') if link and 'abs' in link else (link + '.pdf' if link else 'N/A'),
                     'year': published,
                     'journal': 'arXiv preprint',
                     'abstract': entry.find('summary').text.strip()[:500] + '...' if entry.find('summary') else 'Abstract not available',
