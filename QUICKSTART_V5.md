@@ -120,7 +120,7 @@ O navegador abrirá automaticamente em `http://localhost:8501`
 2. **Configurar**
    ```
    Provedor: gemini (ou groq)
-   Modelo: gemini-pro (ou mixtral-8x7b-32768)
+   Modelo: gemini-1.0-pro (ou mixtral-8x7b-32768)
    API Key: [cole sua API key]
    ```
 

@@ -2012,7 +2012,7 @@ def main():
                     
                     with col2:
                         if api_provider == 'gemini':
-                            model_options = ['gemini-pro', 'gemini-1.5-pro', 'gemini-1.5-flash']
+                            model_options = ['gemini-1.0-pro', 'gemini-1.5-pro', 'gemini-1.5-flash']
                         else:
                             model_options = ['mixtral-8x7b-32768', 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant']
                         
