@@ -28,11 +28,7 @@ try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True
 except ImportError:
-    try:
-        import google.genai as genai
-        GEMINI_AVAILABLE = True
-    except ImportError:
-        GEMINI_AVAILABLE = False
+    GEMINI_AVAILABLE = False
 
 try:
     from groq import Groq
@@ -48,6 +44,9 @@ class AcademicReferenceFetcher:
     Enhanced academic reference fetcher with comprehensive platform support
     Provides full citation metadata, reasoning, and audit trails
     """
+    
+    # Class constants
+    RATE_LIMIT_DELAY = 0.5  # Delay between API calls to avoid rate limiting
     
     def __init__(self, ai_provider: Optional[str] = None, ai_api_key: Optional[str] = None, ai_model: Optional[str] = None):
         self.pubmed_base_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
@@ -238,7 +237,7 @@ Mantenha um tom acadêmico e objetivo. Limite a resenha a aproximadamente 150-20
             enriched.append(ref)
             
             # Small delay to avoid rate limiting
-            time.sleep(0.5)
+            time.sleep(self.RATE_LIMIT_DELAY)
         
         return enriched
     

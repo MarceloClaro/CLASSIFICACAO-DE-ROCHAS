@@ -330,6 +330,21 @@ class GeneticDiagnosticInterpreter:
         
         return interpretation
     
+    def _truncate_abstract(self, abstract: str, max_length: int = 200) -> str:
+        """
+        Helper method to truncate abstract to specified length
+        
+        Args:
+            abstract: Abstract text to truncate
+            max_length: Maximum length before truncation
+        
+        Returns:
+            Truncated abstract with ellipsis if needed
+        """
+        if not abstract or len(abstract) <= max_length:
+            return abstract
+        return abstract[:max_length] + "..."
+    
     def generate_multi_angle_report(
         self,
         predicted_class: str,
@@ -389,11 +404,11 @@ class GeneticDiagnosticInterpreter:
                 report += f"Segundo {ref.get('authors', 'N/A').split(',')[0]} et al. ({ref.get('year', 'N/A')}), "
                 if ref.get('abstract_pt'):
                     # Use Portuguese abstract summary
-                    abstract_summary = ref['abstract_pt'][:200] + "..." if len(ref.get('abstract_pt', '')) > 200 else ref.get('abstract_pt', '')
+                    abstract_summary = self._truncate_abstract(ref.get('abstract_pt', ''), 200)
                     report += f"estudos indicam que: \"{abstract_summary}\"\n"
                 elif ref.get('abstract'):
                     # Use original abstract summary
-                    abstract_summary = ref['abstract'][:200] + "..." if len(ref.get('abstract', '')) > 200 else ref.get('abstract', '')
+                    abstract_summary = self._truncate_abstract(ref.get('abstract', ''), 200)
                     report += f"pesquisas demonstram que: \"{abstract_summary}\"\n"
                 else:
                     report += f"este é um tema relevante na literatura científica atual.\n"
