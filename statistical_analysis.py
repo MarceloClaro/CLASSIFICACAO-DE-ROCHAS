@@ -564,23 +564,21 @@ def evaluate_image_with_statistics(model, image, classes, device, n_bootstrap=10
     }
 
 
-def format_statistical_report(analysis_results, classes=None):
+def format_statistical_report(analysis_results, classes):
     """
     Formata os resultados da análise estatística em um relatório markdown.
     
     Args:
         analysis_results: Dict com resultados da análise
-        classes: Lista de nomes de classes (opcional, para otimização)
+        classes: Lista de nomes de classes (requerido para indexação correta)
     
     Returns:
         String com relatório formatado em markdown
     """
     report = []
     
-    # Create class name to index mapping if classes provided
-    class_to_idx = {}
-    if classes:
-        class_to_idx = {class_name: idx for idx, class_name in enumerate(classes)}
+    # Create class name to index mapping
+    class_to_idx = {class_name: idx for idx, class_name in enumerate(classes)}
     
     # Cabeçalho
     report.append("# 📊 Relatório de Análise Estatística Completa\n")
@@ -619,12 +617,7 @@ def format_statistical_report(analysis_results, classes=None):
     report.append("**Estatísticas de Variação:**\n")
     for diag in analysis_results['differential_diagnoses'][:3]:
         class_name = diag['class']
-        # Use class_to_idx mapping if available, otherwise try to get from differential diagnosis
-        if class_to_idx:
-            idx = class_to_idx[class_name]
-        else:
-            # Fallback: this may not be accurate if differential diagnoses are reordered
-            idx = diag['rank'] - 1
+        idx = class_to_idx[class_name]
         std = analysis_results['bootstrap_results']['std_probabilities'][idx]
         report.append(f"  - {class_name}: Desvio padrão = {std:.4f}\n")
     report.append("\n")

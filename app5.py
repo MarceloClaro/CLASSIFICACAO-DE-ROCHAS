@@ -2515,7 +2515,6 @@ def main():
                                                 
                                             except Exception as e:
                                                 st.error(f"Erro ao gerar análise multi-agente: {str(e)}")
-                                                
                                                 st.code(traceback.format_exc())
                                     
                                     # ========== GENETIC ALGORITHM MULTI-ANGLE INTERPRETATION ==========
@@ -2554,7 +2553,6 @@ def main():
                                                 
                                             except Exception as e:
                                                 st.error(f"Erro ao gerar análise multi-angular: {str(e)}")
-                                                
                                                 st.code(traceback.format_exc())
                                     
                                 except Exception as e:
