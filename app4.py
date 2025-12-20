@@ -22,6 +22,7 @@ import streamlit as st
 import gc
 import logging
 import base64
+import io
 # Importações adicionais para Grad-CAM
 from torchcam.methods import SmoothGradCAMpp, GradCAM, GradCAMpp, LayerCAM
 from torchvision.transforms.functional import normalize, resize, to_pil_image
@@ -32,6 +33,20 @@ try:
     ADVANCED_OPTIMIZERS_AVAILABLE = True
 except ImportError:
     ADVANCED_OPTIMIZERS_AVAILABLE = False
+
+# Importar APIs com suporte de visão
+try:
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+
+try:
+    from groq import Groq
+    GROQ_AVAILABLE = True
+except ImportError:
+    GROQ_AVAILABLE = False
+
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -306,7 +321,7 @@ def calculate_dataset_statistics(dataset, classes):
     df_stats = pd.DataFrame(stats_data)
     
     st.write("#### Distribuição de Classes:")
-    st.dataframe(df_stats, use_container_width=True)
+    st.dataframe(df_stats, width=None)
     
     # Estatísticas gerais
     st.write("#### Estatísticas Gerais:")
@@ -384,22 +399,40 @@ def visualize_pca_features(features, labels, classes, n_components=2):
 
 def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
     """
-    Retorna o modelo pré-treinado selecionado.
+    Retorna o modelo pré-treinado selecionado, incluindo CNNs e Vision Transformers.
+    
+    Args:
+        model_name: Nome do modelo (ResNet18, ResNet50, DenseNet121, ViT-B/16, ViT-B/32, ViT-L/16)
+        num_classes: Número de classes
+        dropout_p: Taxa de dropout
+        fine_tune: Se deve fazer fine-tuning completo
+    
+    Returns:
+        model: Modelo PyTorch configurado
     """
+    # CNNs Tradicionais
     if model_name == 'ResNet18':
         model = models.resnet18(weights='DEFAULT')
     elif model_name == 'ResNet50':
         model = models.resnet50(weights='DEFAULT')
     elif model_name == 'DenseNet121':
         model = models.densenet121(weights='DEFAULT')
+    # Vision Transformers
+    elif model_name == 'ViT-B/16':
+        model = models.vit_b_16(weights='DEFAULT')
+    elif model_name == 'ViT-B/32':
+        model = models.vit_b_32(weights='DEFAULT')
+    elif model_name == 'ViT-L/16':
+        model = models.vit_l_16(weights='DEFAULT')
     else:
-        st.error("Modelo não suportado.")
+        st.error(f"Modelo '{model_name}' não suportado.")
         return None
 
     if not fine_tune:
         for param in model.parameters():
             param.requires_grad = False
 
+    # Configurar camada de saída baseada no tipo de modelo
     if model_name.startswith('ResNet'):
         num_ftrs = model.fc.in_features
         model.fc = nn.Sequential(
@@ -418,8 +451,18 @@ def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
         # Ensure final layer requires grad
         for param in model.classifier.parameters():
             param.requires_grad = True
+    elif model_name.startswith('ViT'):
+        # Vision Transformers usam 'heads' ao invés de 'fc' ou 'classifier'
+        num_ftrs = model.heads.head.in_features
+        model.heads.head = nn.Sequential(
+            nn.Dropout(p=dropout_p),
+            nn.Linear(num_ftrs, num_classes)
+        )
+        # Ensure final layer requires grad
+        for param in model.heads.head.parameters():
+            param.requires_grad = True
     else:
-        st.error("Modelo não suportado.")
+        st.error("Tipo de modelo não suportado para configuração.")
         return None
 
     model = model.to(device)
@@ -722,8 +765,17 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     # Liberar memória
     del train_loader, valid_loader
     gc.collect()
+    
+    # Preparar histórico de treinamento para exportação
+    training_history = {
+        'epoch': list(range(1, len(train_losses) + 1)),
+        'train_loss': train_losses,
+        'valid_loss': valid_losses,
+        'train_accuracy': train_accuracies,
+        'valid_accuracy': valid_accuracies
+    }
 
-    return model, full_dataset.classes
+    return model, full_dataset.classes, training_history
 
 def plot_metrics(epochs, train_losses, valid_losses, train_accuracies, valid_accuracies):
     """
@@ -846,6 +898,268 @@ def error_analysis(model, dataloader, classes):
         st.pyplot(fig)
     else:
         st.write("Nenhuma imagem mal classificada encontrada.")
+
+def create_export_csv(training_history, classification_results=None, clustering_results=None):
+    """
+    Cria um DataFrame consolidado com todos os resultados para exportação CSV.
+    
+    Args:
+        training_history: Dict com histórico de treinamento (epoch, losses, accuracies)
+        classification_results: Dict opcional com resultados de classificação de imagens
+        clustering_results: Dict opcional com resultados de clustering
+    
+    Returns:
+        pd.DataFrame: DataFrame consolidado para exportação
+    """
+    # Criar DataFrame do histórico de treinamento
+    df_training = pd.DataFrame(training_history)
+    
+    # Se houver resultados de classificação, adicionar
+    if classification_results:
+        df_classification = pd.DataFrame([classification_results])
+        # Adicionar colunas vazias de treinamento para manter consistência
+        for col in df_training.columns:
+            if col not in df_classification.columns:
+                df_classification[col] = None
+        df_combined = pd.concat([df_training, df_classification], ignore_index=True)
+    else:
+        df_combined = df_training
+    
+    # Se houver resultados de clustering, adicionar
+    if clustering_results:
+        df_clustering = pd.DataFrame([clustering_results])
+        for col in df_combined.columns:
+            if col not in df_clustering.columns:
+                df_clustering[col] = None
+        df_combined = pd.concat([df_combined, df_clustering], ignore_index=True)
+    
+    return df_combined
+
+def export_to_csv(df, filename="resultados_treinamento.csv"):
+    """
+    Converte DataFrame para CSV e retorna para download.
+    
+    Args:
+        df: DataFrame para exportar
+        filename: Nome do arquivo CSV
+    
+    Returns:
+        str: CSV em formato de string
+    """
+    return df.to_csv(index=False).encode('utf-8')
+
+def encode_image_to_base64(image):
+    """
+    Codifica uma imagem PIL para base64.
+    
+    Args:
+        image: PIL Image
+    
+    Returns:
+        str: Imagem codificada em base64
+    """
+    buffered = io.BytesIO()
+    image.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence, gradcam_description=""):
+    """
+    Analisa uma imagem usando Google Gemini com visão computacional.
+    
+    Args:
+        image: PIL Image
+        api_key: Chave API do Gemini
+        model_name: Nome do modelo Gemini
+        class_name: Classe predita pelo modelo
+        confidence: Confiança da predição
+        gradcam_description: Descrição do Grad-CAM
+    
+    Returns:
+        str: Análise técnica e forense da imagem
+    """
+    if not GEMINI_AVAILABLE:
+        return "Google Generative AI não está disponível. Instale com: pip install google-generativeai"
+    
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(model_name)
+        
+        prompt = f"""
+        Você é um especialista em análise de imagens e interpretação técnica e forense.
+        
+        **Contexto da Classificação:**
+        - Classe Predita: {class_name}
+        - Confiança: {confidence:.4f} ({confidence*100:.2f}%)
+        - Análise Grad-CAM: {gradcam_description if gradcam_description else 'Não disponível'}
+        
+        Por favor, realize uma análise COMPLETA e DETALHADA da imagem fornecida, incluindo:
+        
+        1. **Descrição Visual Detalhada:**
+           - Descreva todos os elementos visuais presentes na imagem
+           - Identifique padrões, texturas, cores e formas relevantes
+           - Analise a qualidade e características da imagem
+        
+        2. **Interpretação Técnica:**
+           - Avalie se a classificação como "{class_name}" é compatível com o que você observa
+           - Identifique características específicas que suportam ou contradizem a classificação
+           - Analise a confiança de {confidence*100:.2f}% em relação aos padrões visuais
+        
+        3. **Análise Forense:**
+           - Identifique possíveis artefatos ou anomalias na imagem
+           - Avalie a integridade e autenticidade da imagem
+           - Destaque áreas de interesse ou preocupação
+        
+        4. **Recomendações:**
+           - Sugira se a classificação deve ser aceita ou revista
+           - Recomende análises adicionais se necessário
+           - Forneça orientações para melhorar a confiança na classificação
+        
+        Seja detalhado, técnico e preciso na sua análise.
+        """
+        
+        response = model.generate_content([prompt, image])
+        return response.text
+    
+    except Exception as e:
+        return f"Erro ao analisar com Gemini: {str(e)}"
+
+def analyze_image_with_groq_vision(image, api_key, model_name, class_name, confidence, gradcam_description=""):
+    """
+    Analisa uma imagem usando Groq com visão computacional.
+    Nota: Groq pode ter limitações de visão dependendo do modelo.
+    
+    Args:
+        image: PIL Image
+        api_key: Chave API do Groq
+        model_name: Nome do modelo Groq
+        class_name: Classe predita pelo modelo
+        confidence: Confiança da predição
+        gradcam_description: Descrição do Grad-CAM
+    
+    Returns:
+        str: Análise técnica e forense da imagem
+    """
+    if not GROQ_AVAILABLE:
+        return "Groq não está disponível. Instale com: pip install groq"
+    
+    try:
+        # Codificar imagem para base64
+        image_base64 = encode_image_to_base64(image)
+        
+        client = Groq(api_key=api_key)
+        
+        prompt = f"""
+        Você é um especialista em análise de imagens e interpretação técnica e forense.
+        
+        **Contexto da Classificação:**
+        - Classe Predita: {class_name}
+        - Confiança: {confidence:.4f} ({confidence*100:.2f}%)
+        - Análise Grad-CAM: {gradcam_description if gradcam_description else 'Não disponível'}
+        
+        IMPORTANTE: Com base nas informações fornecidas e na descrição visual que você pode inferir,
+        realize uma análise COMPLETA e DETALHADA, incluindo:
+        
+        1. **Interpretação Técnica:**
+           - Avalie se a classificação como "{class_name}" parece apropriada
+           - Identifique características que você esperaria ver nesta classe
+           - Analise a confiança de {confidence*100:.2f}%
+        
+        2. **Análise Forense:**
+           - Discuta possíveis pontos de atenção na classificação
+           - Sugira áreas que podem precisar de verificação adicional
+        
+        3. **Recomendações:**
+           - Sugira se a classificação deve ser aceita ou revista
+           - Recomende análises adicionais se necessário
+           - Forneça orientações para melhorar a confiança
+        
+        Nota: Se o modelo não suporta visão direta, forneça análise baseada no contexto fornecido.
+        """
+        
+        # Tentar com suporte de imagem (alguns modelos Groq podem não suportar)
+        try:
+            chat_completion = client.chat.completions.create(
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{image_base64}",
+                                },
+                            },
+                        ],
+                    }
+                ],
+                model=model_name,
+            )
+        except:
+            # Fallback: análise apenas com texto se visão não é suportada
+            chat_completion = client.chat.completions.create(
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt + "\n\n[NOTA: Análise baseada apenas em contexto textual, pois o modelo pode não suportar visão direta]"
+                    }
+                ],
+                model=model_name,
+            )
+        
+        return chat_completion.choices[0].message.content
+    
+    except Exception as e:
+        return f"Erro ao analisar com Groq: {str(e)}"
+
+def generate_gradcam_description(activation_map):
+    """
+    Gera uma descrição textual do mapa de ativação Grad-CAM.
+    
+    Args:
+        activation_map: Mapa de ativação numpy array
+    
+    Returns:
+        str: Descrição das regiões ativadas
+    """
+    if activation_map is None:
+        return "Grad-CAM não disponível"
+    
+    # Calcular estatísticas do mapa de ativação
+    mean_activation = np.mean(activation_map)
+    max_activation = np.max(activation_map)
+    
+    # Encontrar regiões de alta ativação (acima de 70% do máximo)
+    threshold = 0.7 * max_activation
+    high_activation_regions = activation_map > threshold
+    num_high_regions = np.sum(high_activation_regions)
+    total_pixels = activation_map.size
+    percentage_high = (num_high_regions / total_pixels) * 100
+    
+    description = f"""
+    O mapa Grad-CAM mostra:
+    - Ativação média: {mean_activation:.3f}
+    - Ativação máxima: {max_activation:.3f}
+    - Regiões de alta ativação: {percentage_high:.1f}% da imagem
+    - O modelo focou em {num_high_regions} pixels específicos para tomar sua decisão
+    """
+    
+    # Analisar distribuição espacial
+    height, width = activation_map.shape
+    center_activation = activation_map[height//4:3*height//4, width//4:3*width//4].mean()
+    border_activation = (activation_map[:height//4, :].mean() + 
+                        activation_map[3*height//4:, :].mean() + 
+                        activation_map[:, :width//4].mean() + 
+                        activation_map[:, 3*width//4:].mean()) / 4
+    
+    if center_activation > border_activation * 1.5:
+        description += "\n    - O modelo focou principalmente no CENTRO da imagem"
+    elif border_activation > center_activation * 1.5:
+        description += "\n    - O modelo focou principalmente nas BORDAS da imagem"
+    else:
+        description += "\n    - O modelo analisou a imagem de forma DISTRIBUÍDA"
+    
+    return description
 
 def extract_features(dataset, model, batch_size):
     """
@@ -975,9 +1289,21 @@ def visualize_activations(model, image, class_names, gradcam_type='SmoothGradCAM
             target_layer = model.layer4[-1]
         elif 'DenseNet' in model_type:
             target_layer = model.features.denseblock4.denselayer16
+        elif 'VisionTransformer' in model_type:
+            # Para ViT, usar a última camada do encoder
+            target_layer = model.encoder.layers[-1].ln_1
         else:
-            st.error("Modelo não suportado para Grad-CAM.")
-            return
+            st.warning(f"Modelo {model_type} pode não ter suporte completo para Grad-CAM. Tentando com camada padrão...")
+            # Tentar usar a última camada disponível
+            try:
+                if hasattr(model, 'encoder'):
+                    target_layer = model.encoder.layers[-1]
+                else:
+                    st.error("Não foi possível determinar camada para Grad-CAM.")
+                    return None
+            except:
+                st.error("Modelo não suportado para Grad-CAM.")
+                return None
         
         # Criar o objeto CAM usando torchcam
         if gradcam_type == 'GradCAM':
@@ -1336,7 +1662,40 @@ def main():
             - Zhang, B., Wang, C., Shen, Y., & Liu, Y. (2018). Fully connected conditional random fields for high-resolution remote sensing land use/land cover classification with convolutional neural networks. *Remote Sensing*, 10(12), 1889. https://doi.org/10.3390/rs10121889
             """)
 
-    model_name = st.sidebar.selectbox("Modelo Pré-treinado:", options=['ResNet18', 'ResNet50', 'DenseNet121'])
+    # Seleção de Tipo de Arquitetura
+    st.sidebar.write("---")
+    st.sidebar.subheader("🏗️ Arquitetura do Modelo")
+    
+    architecture_type = st.sidebar.radio(
+        "Tipo de Arquitetura:",
+        options=["CNN (Convolucional)", "Transformer (ViT)"],
+        help="CNN: Redes Neurais Convolucionais tradicionais | Transformer: Vision Transformers modernos"
+    )
+    
+    if architecture_type == "CNN (Convolucional)":
+        model_options = ['ResNet18', 'ResNet50', 'DenseNet121']
+        st.sidebar.info("🔷 **CNNs** são excelentes para capturar padrões locais e hierárquicos em imagens através de convoluções.")
+    else:
+        model_options = ['ViT-B/16', 'ViT-B/32', 'ViT-L/16']
+        st.sidebar.info("🔶 **Vision Transformers** usam mecanismos de atenção para capturar relações globais na imagem. Requerem mais dados mas podem ter melhor desempenho.")
+        st.sidebar.warning("⚠️ ViT requer mais memória GPU. Use batch size menor se necessário.")
+    
+    model_name = st.sidebar.selectbox("Modelo Pré-treinado:", options=model_options)
+    
+    # Explicação sobre o modelo selecionado
+    with st.sidebar.expander(f"ℹ️ Sobre {model_name}"):
+        if model_name == 'ResNet18':
+            st.write("**ResNet18:** 18 camadas, ~11M parâmetros. Rápido e eficiente para datasets menores.")
+        elif model_name == 'ResNet50':
+            st.write("**ResNet50:** 50 camadas, ~25M parâmetros. Melhor precisão, requer mais recursos.")
+        elif model_name == 'DenseNet121':
+            st.write("**DenseNet121:** Conexões densas entre camadas, ~8M parâmetros. Eficiente e preciso.")
+        elif model_name == 'ViT-B/16':
+            st.write("**ViT-B/16:** Base model, patches 16x16, ~86M parâmetros. Melhor performance geral.")
+        elif model_name == 'ViT-B/32':
+            st.write("**ViT-B/32:** Base model, patches 32x32, ~88M parâmetros. Mais rápido, menos preciso.")
+        elif model_name == 'ViT-L/16':
+            st.write("**ViT-L/16:** Large model, patches 16x16, ~307M parâmetros. Máxima precisão, requer muitos recursos.")
 
     #________________________________________________________________________________________
     # Fine-Tuning Completo em Redes Neurais Profundas
@@ -1762,6 +2121,55 @@ def main():
             """)
 
     use_weighted_loss = st.sidebar.checkbox("Usar Perda Ponderada para Classes Desbalanceadas", value=False)
+    
+    #________________________________________________________________________________________
+    # API Configuration Section for AI Analysis
+    st.sidebar.write("---")
+    st.sidebar.subheader("🔑 Configuração de API para Análise IA")
+    
+    with st.sidebar.expander("Configurar API (Gemini/Groq)", expanded=False):
+        st.write("Configure sua API para análise diagnóstica com IA")
+        
+        api_provider_sidebar = st.selectbox(
+            "Provedor de API:",
+            options=['Nenhum', 'Gemini', 'Groq'],
+            key='api_provider_sidebar',
+            help="Escolha entre Google Gemini ou Groq para análise com IA"
+        )
+        
+        if api_provider_sidebar != 'Nenhum':
+            if api_provider_sidebar == 'Gemini':
+                model_options_sidebar = ['gemini-pro', 'gemini-1.5-pro', 'gemini-1.5-flash']
+            else:  # Groq
+                model_options_sidebar = ['mixtral-8x7b-32768', 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant']
+            
+            ai_model_sidebar = st.selectbox(
+                "Modelo:",
+                options=model_options_sidebar,
+                key='ai_model_sidebar',
+                help="Escolha o modelo de IA para análise"
+            )
+            
+            api_key_sidebar = st.text_input(
+                "API Key:",
+                type="password",
+                key='api_key_sidebar',
+                help="Insira sua chave API (será usada durante a avaliação de imagens)"
+            )
+            
+            if api_key_sidebar:
+                st.success("✅ API Key configurada!")
+                st.session_state['api_configured'] = True
+                st.session_state['api_provider'] = api_provider_sidebar
+                st.session_state['api_model'] = ai_model_sidebar
+                st.session_state['api_key'] = api_key_sidebar
+            else:
+                st.session_state['api_configured'] = False
+        else:
+            st.session_state['api_configured'] = False
+            api_key_sidebar = None
+            ai_model_sidebar = None
+    
     st.sidebar.image("eu.ico", width=80)
    
     st.sidebar.write("""
@@ -1884,8 +2292,21 @@ def main():
             shutil.rmtree(temp_dir)
             return
 
-        model, classes = model_data
+        model, classes, training_history = model_data
         st.success("Treinamento concluído!")
+        
+        # Adicionar botão de download do CSV com histórico de treinamento
+        st.write("---")
+        st.write("## 📊 Exportar Resultados de Treinamento")
+        df_training_export = pd.DataFrame(training_history)
+        csv_training = export_to_csv(df_training_export, "historico_treinamento.csv")
+        st.download_button(
+            label="📥 Baixar CSV - Histórico de Treinamento",
+            data=csv_training,
+            file_name=f"historico_treinamento_{model_name}.csv",
+            mime="text/csv",
+            help="Download do histórico completo de treinamento (loss e accuracy por época)"
+        )
 
         # Extrair características usando o modelo pré-treinado (sem a camada final)
         st.write("Extraindo características para clustering...")
@@ -1895,6 +2316,33 @@ def main():
         elif model_name.startswith('DenseNet'):
             feature_extractor = nn.Sequential(*list(model.features))
             feature_extractor.add_module('global_pool', nn.AdaptiveAvgPool2d((1,1)))
+        elif model_name.startswith('ViT'):
+            # Para Vision Transformers, remover apenas a camada head
+            # Mantemos o encoder completo
+            class ViTFeatureExtractor(nn.Module):
+                def __init__(self, vit_model):
+                    super().__init__()
+                    self.conv_proj = vit_model.conv_proj
+                    self.encoder = vit_model.encoder
+                    self.class_token = vit_model.class_token
+                    
+                def forward(self, x):
+                    # Reshape and permute the input tensor
+                    x = self.conv_proj(x)
+                    x = x.flatten(2).transpose(1, 2)
+                    
+                    # Add class token
+                    batch_size = x.shape[0]
+                    class_tokens = self.class_token.expand(batch_size, -1, -1)
+                    x = torch.cat([class_tokens, x], dim=1)
+                    
+                    # Pass through encoder
+                    x = self.encoder(x)
+                    
+                    # Return the class token output
+                    return x[:, 0]
+            
+            feature_extractor = ViTFeatureExtractor(model)
         else:
             st.error("Modelo não suportado para extração de características.")
             return
@@ -1918,6 +2366,43 @@ def main():
 
         # Visualizar clusters
         visualize_clusters(features_reshaped, labels, hierarchical_labels, kmeans_labels, classes)
+        
+        # Exportar resultados de clustering para CSV
+        st.write("---")
+        st.write("## 📊 Exportar Resultados de Clustering")
+        ari_hierarchical = adjusted_rand_score(labels, hierarchical_labels)
+        nmi_hierarchical = normalized_mutual_info_score(labels, hierarchical_labels)
+        ari_kmeans = adjusted_rand_score(labels, kmeans_labels)
+        nmi_kmeans = normalized_mutual_info_score(labels, kmeans_labels)
+        
+        clustering_results = {
+            'sample_id': list(range(len(labels))),
+            'true_label': labels,
+            'true_class_name': [classes[label] for label in labels],
+            'hierarchical_cluster': hierarchical_labels,
+            'kmeans_cluster': kmeans_labels
+        }
+        df_clustering = pd.DataFrame(clustering_results)
+        
+        # Adicionar métricas de avaliação como linhas de resumo
+        summary_data = {
+            'sample_id': ['MÉTRICAS', 'MÉTRICAS'],
+            'true_label': ['Hierarchical ARI', 'K-Means ARI'],
+            'true_class_name': [f'{ari_hierarchical:.4f}', f'{ari_kmeans:.4f}'],
+            'hierarchical_cluster': [f'NMI: {nmi_hierarchical:.4f}', ''],
+            'kmeans_cluster': ['', f'NMI: {nmi_kmeans:.4f}']
+        }
+        df_summary = pd.DataFrame(summary_data)
+        df_clustering_export = pd.concat([df_clustering, df_summary], ignore_index=True)
+        
+        csv_clustering = export_to_csv(df_clustering_export, "resultados_clustering.csv")
+        st.download_button(
+            label="📥 Baixar CSV - Resultados de Clustering",
+            data=csv_clustering,
+            file_name=f"clustering_{model_name}.csv",
+            mime="text/csv",
+            help="Download dos resultados completos de clustering"
+        )
         
         # ========== OPÇÃO DE VISUALIZAÇÃO PCA ==========
         st.write("---")
@@ -1959,7 +2444,124 @@ def main():
                 st.write(f"**Confiança:** {confidence:.4f}")
 
                 # Visualizar ativações com o tipo de Grad-CAM selecionado
-                visualize_activations(model, eval_image, classes, gradcam_type)
+                activation_map = visualize_activations(model, eval_image, classes, gradcam_type)
+                
+                # Preparar dados para exportação CSV
+                classification_result = {
+                    'imagem': eval_image_file.name,
+                    'classe_predita': class_name,
+                    'confianca': confidence,
+                    'modelo': model_name,
+                    'tipo_gradcam': gradcam_type,
+                    'epocas_treinamento': epochs,
+                    'taxa_aprendizagem': learning_rate,
+                    'batch_size': batch_size,
+                    'augmentation_type': augmentation_type,
+                    'optimizer': optimizer_name
+                }
+                
+                # Criar DataFrame de classificação
+                df_classification = pd.DataFrame([classification_result])
+                
+                # Botão para exportar resultado da classificação
+                st.write("---")
+                st.write("## 📊 Exportar Resultado da Classificação")
+                csv_classification = export_to_csv(df_classification, "resultado_classificacao.csv")
+                st.download_button(
+                    label="📥 Baixar CSV - Resultado da Classificação",
+                    data=csv_classification,
+                    file_name=f"classificacao_{eval_image_file.name.split('.')[0]}.csv",
+                    mime="text/csv",
+                    help="Download do resultado da classificação desta imagem"
+                )
+                
+                # Opção para análise com IA se API configurada
+                if 'api_configured' in st.session_state and st.session_state['api_configured']:
+                    st.write("---")
+                    st.write("## 🤖 Análise Diagnóstica com IA (Visão Computacional)")
+                    st.write(f"**API Configurada:** {st.session_state['api_provider']} - {st.session_state['api_model']}")
+                    
+                    if st.button("🔬 Gerar Análise Completa com IA + Visão"):
+                        with st.spinner("🔍 Analisando imagem com IA (visão computacional)..."):
+                            # Gerar descrição do Grad-CAM
+                            gradcam_desc = generate_gradcam_description(activation_map) if activation_map is not None else ""
+                            
+                            # Executar análise com IA apropriada
+                            if st.session_state['api_provider'] == 'Gemini':
+                                if not GEMINI_AVAILABLE:
+                                    st.error("❌ Google Generative AI não está instalado. Execute: pip install google-generativeai")
+                                    ai_analysis_text = "Erro: Biblioteca não disponível"
+                                else:
+                                    ai_analysis_text = analyze_image_with_gemini(
+                                        eval_image,
+                                        st.session_state['api_key'],
+                                        st.session_state['api_model'],
+                                        class_name,
+                                        confidence,
+                                        gradcam_desc
+                                    )
+                            else:  # Groq
+                                if not GROQ_AVAILABLE:
+                                    st.error("❌ Groq não está instalado. Execute: pip install groq")
+                                    ai_analysis_text = "Erro: Biblioteca não disponível"
+                                else:
+                                    ai_analysis_text = analyze_image_with_groq_vision(
+                                        eval_image,
+                                        st.session_state['api_key'],
+                                        st.session_state['api_model'],
+                                        class_name,
+                                        confidence,
+                                        gradcam_desc
+                                    )
+                            
+                            # Exibir análise
+                            st.success("✅ Análise Completa Gerada!")
+                            st.write("### 📋 Relatório de Análise com IA")
+                            st.markdown(ai_analysis_text)
+                            
+                            # Preparar dados para exportação
+                            ai_analysis_result = {
+                                'imagem': eval_image_file.name,
+                                'classe_predita': class_name,
+                                'confianca': confidence,
+                                'api_provider': st.session_state['api_provider'],
+                                'api_model': st.session_state['api_model'],
+                                'gradcam_description': gradcam_desc,
+                                'analise_completa': ai_analysis_text,
+                                'modelo_classificacao': model_name,
+                                'epocas': epochs,
+                                'batch_size': batch_size,
+                                'learning_rate': learning_rate
+                            }
+                            
+                            # Exportar análise IA para CSV
+                            df_ai_analysis = pd.DataFrame([ai_analysis_result])
+                            csv_ai = export_to_csv(df_ai_analysis, "analise_ia_visao.csv")
+                            
+                            st.write("---")
+                            st.download_button(
+                                label="📥 Baixar CSV - Análise Completa com IA",
+                                data=csv_ai,
+                                file_name=f"analise_ia_visao_{eval_image_file.name.split('.')[0]}.csv",
+                                mime="text/csv",
+                                help="Download da análise completa com IA incluindo visão computacional"
+                            )
+                else:
+                    st.info("""
+                    💡 **Análise com IA Disponível**
+                    
+                    Configure uma API (Gemini ou Groq) na barra lateral para ativar a análise 
+                    diagnóstica com IA que inclui:
+                    - ✅ Visão Computacional (a IA pode "ver" e analisar a imagem)
+                    - ✅ Interpretação técnica detalhada
+                    - ✅ Análise forense da imagem
+                    - ✅ Recomendações baseadas em análise visual
+                    - ✅ Exportação completa para CSV
+                    
+                    **Modelos com Suporte de Visão:**
+                    - Gemini: gemini-pro, gemini-1.5-pro, gemini-1.5-flash
+                    - Groq: Suporte limitado dependendo do modelo
+                    """)
 
         # Limpar o diretório temporário
         shutil.rmtree(temp_dir)
