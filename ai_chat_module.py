@@ -282,11 +282,17 @@ IMPORTANTE:
                     "   Para Groq: https://console.groq.com/\n"
                 )
             elif "quota" in error_type or "rate limit" in error_type or "429" in str(e):
-                error_msg += "⏱️ Limite de requisições atingido. Aguarde alguns minutos antes de tentar novamente.\n"
+                error_msg += (
+                    "⏱️ Limite de requisições atingido. Aguarde alguns minutos antes de tentar novamente.\n"
+                )
             elif "resource" in error_type and "exhausted" in error_type:
-                error_msg += "💳 Recursos/créditos esgotados. Verifique sua conta na plataforma.\n"
+                error_msg += (
+                    "💳 Recursos/créditos esgotados. Verifique sua conta na plataforma.\n"
+                )
             else:
-                error_msg += "📖 Consulte o guia de configuração: API_SETUP_GUIDE.md\n"
+                error_msg += (
+                    "📖 Consulte o guia de configuração: API_SETUP_GUIDE.md\n"
+                )
             
             return error_msg
     

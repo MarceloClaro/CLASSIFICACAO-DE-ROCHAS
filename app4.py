@@ -1912,26 +1912,39 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
     
     except Exception as e:
         error_msg = f"Erro ao analisar com Gemini: {str(e)}\n\n"
+        error_type = str(e).lower()
         
         # Provide helpful guidance based on error type
-        if "configure" in str(e).lower():
-            error_msg += "💡 Dica: Parece que há um problema de configuração da API.\n"
-            error_msg += "   Certifique-se de usar: pip install google-generativeai\n"
-        elif "404" in str(e) and "not found" in str(e).lower():
-            error_msg += "🔍 Modelo não encontrado ou não suportado para este tipo de requisição.\n"
-            error_msg += "   Modelos recomendados com suporte a visão:\n"
-            error_msg += "   - gemini-1.5-flash (rápido, suporta visão)\n"
-            error_msg += "   - gemini-1.5-pro (avançado, suporta visão)\n"
-            error_msg += "   - gemini-pro-vision (especializado em visão)\n"
-        elif "api key" in str(e).lower() or "401" in str(e) or "403" in str(e):
-            error_msg += "🔑 Verifique se a API key está correta e ativa.\n"
-            error_msg += "   Obtenha sua API key em: https://ai.google.dev/\n"
-        elif "quota" in str(e).lower() or "rate limit" in str(e).lower() or "429" in str(e):
-            error_msg += "⏱️ Limite de requisições atingido. Aguarde alguns minutos.\n"
-        elif "resource" in str(e).lower() and "exhausted" in str(e).lower():
-            error_msg += "💳 Recursos/créditos esgotados. Verifique sua conta.\n"
+        if "configure" in error_type:
+            error_msg += (
+                "💡 Dica: Parece que há um problema de configuração da API.\n"
+                "   Certifique-se de usar: pip install google-generativeai\n"
+            )
+        elif "404" in str(e) and "not found" in error_type:
+            error_msg += (
+                "🔍 Modelo não encontrado ou não suportado para este tipo de requisição.\n"
+                "   Modelos recomendados com suporte a visão:\n"
+                "   - gemini-1.5-flash (rápido, suporta visão)\n"
+                "   - gemini-1.5-pro (avançado, suporta visão)\n"
+                "   - gemini-pro-vision (especializado em visão)\n"
+            )
+        elif "api key" in error_type or "401" in str(e) or "403" in str(e):
+            error_msg += (
+                "🔑 Verifique se a API key está correta e ativa.\n"
+                "   Obtenha sua API key em: https://ai.google.dev/\n"
+            )
+        elif "quota" in error_type or "rate limit" in error_type or "429" in str(e):
+            error_msg += (
+                "⏱️ Limite de requisições atingido. Aguarde alguns minutos.\n"
+            )
+        elif "resource" in error_type and "exhausted" in error_type:
+            error_msg += (
+                "💳 Recursos/créditos esgotados. Verifique sua conta.\n"
+            )
         else:
-            error_msg += "📖 Consulte o guia: API_SETUP_GUIDE.md para mais detalhes.\n"
+            error_msg += (
+                "📖 Consulte o guia: API_SETUP_GUIDE.md para mais detalhes.\n"
+            )
         
         return error_msg
 
