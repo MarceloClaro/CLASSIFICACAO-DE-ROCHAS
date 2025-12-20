@@ -348,7 +348,7 @@ pode afetar o resultado da análise.
 
 
 class LiteratureAgent(SpecializedAgent):
-    """Agente especializado em referências bibliográficas"""
+    """Agente especializado em referências bibliográficas com busca ativa"""
     
     def __init__(self):
         super().__init__(
@@ -356,6 +356,14 @@ class LiteratureAgent(SpecializedAgent):
             specialty="Revisão de Literatura e Evidências",
             expertise_areas=["literatura", "evidências", "estudos", "publicações"]
         )
+        # Import academic references module
+        try:
+            from academic_references import AcademicReferenceFetcher
+            self.ref_fetcher = AcademicReferenceFetcher()
+            self.fetcher_available = True
+        except ImportError:
+            self.ref_fetcher = None
+            self.fetcher_available = False
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
@@ -368,10 +376,45 @@ que apoiam os critérios utilizados nesta análise.
 de acordo com o conhecimento científico atual publicado em estudos e pesquisas.
 """
         
+        # If fetcher is available, attempt to fetch relevant articles
+        if self.fetcher_available and self.ref_fetcher:
+            try:
+                references, reasoning = self.ref_fetcher.get_references_for_classification(
+                    class_name=predicted_class,
+                    domain="image classification",
+                    max_per_source=2,
+                    include_reasoning=True
+                )
+                
+                if references:
+                    analysis += f"\n\n**📚 Artigos Científicos Encontrados:** {len(references)} referências relevantes\n\n"
+                    analysis += "**Metodologia de Busca:**\n"
+                    if reasoning:
+                        for platform in reasoning.get('platforms_searched', []):
+                            count = reasoning.get('results_by_platform', {}).get(platform, 0)
+                            analysis += f"- {platform}: {count} artigo(s)\n"
+                    
+                    analysis += "\n**Principais Referências:**\n"
+                    for i, ref in enumerate(references[:3], 1):
+                        analysis += f"{i}. {ref.get('title', 'N/A')} ({ref.get('year', 'N/A')})\n"
+                        analysis += f"   - Autores: {ref.get('authors', 'N/A')}\n"
+                        analysis += f"   - Fonte: {ref.get('platform', 'N/A')}\n"
+                        if ref.get('citation_count') and ref['citation_count'] != 'N/A':
+                            analysis += f"   - Citações: {ref.get('citation_count')}\n"
+                        analysis += f"   - [Acessar]({ref.get('url', '#')})\n"
+                    
+                    # Store references in context for later use
+                    context['literature_references'] = references
+                    context['literature_reasoning'] = reasoning
+                    
+            except Exception as e:
+                analysis += f"\n\n⚠️ Não foi possível buscar referências automaticamente: {str(e)}\n"
+        
         recommendations = [
             "Consultar estudos científicos recentes sobre o tema",
             "Revisar pesquisas e análises similares já publicadas",
-            "Verificar se há consenso científico atual sobre este tipo de classificação"
+            "Verificar se há consenso científico atual sobre este tipo de classificação",
+            "Validar resultados com literatura peer-reviewed"
         ]
         
         return AgentResponse(
@@ -380,7 +423,7 @@ de acordo com o conhecimento científico atual publicado em estudos e pesquisas.
             confidence=confidence * 0.93,
             analysis=analysis,
             recommendations=recommendations,
-            priority=3
+            priority=4
         )
 
 
@@ -693,7 +736,8 @@ class ManagerAgent:
             confidence,
             aggregated_confidence,
             responses,
-            crewai_insights
+            crewai_insights,
+            context
         )
         
         return report
@@ -732,13 +776,21 @@ class ManagerAgent:
             for i, resp in enumerate(responses[:max_agents_summary], 1):
                 agents_summary += f"{i}. {resp.agent_name} ({resp.specialty}): confiança {resp.confidence:.2%}\n"
             
+            # Extract literature references if available
+            literature_refs = ""
+            if context.get('literature_references'):
+                literature_refs = "\n\nReferências da Literatura Encontradas:\n"
+                for i, ref in enumerate(context['literature_references'][:3], 1):
+                    literature_refs += f"{i}. {ref.get('title', 'N/A')} ({ref.get('year', 'N/A')}) - {ref.get('platform', 'N/A')}\n"
+            
             # Criar agente CrewAI especializado em análise diagnóstica avançada
             diagnostic_expert = Agent(
-                role='Especialista em Análise Diagnóstica Avançada',
-                goal=f'Fornecer insights profundos e contextualização científica sobre a classificação "{predicted_class}"',
-                backstory='''Você é um especialista de nível PhD com vasta experiência em análise diagnóstica 
-                e classificação. Sua missão é revisar as análises de múltiplos especialistas e fornecer 
-                insights adicionais, correlações com literatura científica, e recomendações avançadas.''',
+                role='Especialista em Análise Diagnóstica Avançada e Revisão de Literatura',
+                goal=f'Fornecer insights profundos, contextualização científica e validação com literatura sobre a classificação "{predicted_class}"',
+                backstory='''Você é um especialista de nível PhD com vasta experiência em análise diagnóstica, 
+                classificação e revisão sistemática de literatura científica. Sua missão é revisar as análises 
+                de múltiplos especialistas, validar com a literatura científica atual, e fornecer insights 
+                adicionais, correlações com estudos publicados, e recomendações avançadas baseadas em evidências.''',
                 verbose=verbose_mode,
                 allow_delegation=False
             )
@@ -748,20 +800,25 @@ class ManagerAgent:
                 description=f'''
                 Com base nas seguintes informações:
                 {agents_summary}
+                {literature_refs}
                 
                 Contexto adicional: {context.get('gradcam_description', 'Não disponível')}
                 
                 Forneça uma análise avançada que inclua:
-                1. Validação científica da classificação "{predicted_class}"
-                2. Possíveis correlações com padrões conhecidos na literatura
-                3. Fatores de risco ou limitações desta classificação
-                4. Recomendações para aumentar a confiabilidade do resultado
-                5. Comparação com casos similares ou diferenciais importantes
+                1. Validação científica da classificação "{predicted_class}" baseada na literatura atual
+                2. Correlações com padrões conhecidos em estudos publicados (cite os artigos mencionados acima se relevantes)
+                3. Avaliação crítica da força das evidências científicas disponíveis
+                4. Fatores de risco, limitações e incertezas desta classificação
+                5. Recomendações específicas para aumentar a confiabilidade do resultado
+                6. Comparação com casos similares ou diferenciais importantes reportados na literatura
+                7. Lacunas no conhecimento atual que possam afetar a interpretação
                 
-                Sua análise deve ser técnica mas compreensível, focada em agregar valor às análises existentes.
+                Sua análise deve ser técnica mas compreensível, focada em agregar valor às análises existentes
+                e em fornecer contexto científico robusto. Sempre que possível, referencie estudos específicos
+                mencionados acima para fundamentar suas conclusões.
                 ''',
                 agent=diagnostic_expert,
-                expected_output='Análise avançada detalhada com insights científicos e recomendações práticas'
+                expected_output='Análise avançada detalhada com insights científicos, validação com literatura, e recomendações práticas baseadas em evidências'
             )
             
             # Executar crew
@@ -788,9 +845,13 @@ class ManagerAgent:
         original_confidence: float,
         aggregated_confidence: float,
         responses: List[AgentResponse],
-        crewai_insights: Optional[str] = None
+        crewai_insights: Optional[str] = None,
+        context: Optional[Dict] = None
     ) -> str:
         """Gera relatório integrado com análises de todos os agentes em linguagem acessível"""
+        
+        if context is None:
+            context = {}
         
         report = "# 🎯 RELATÓRIO COMPLETO DE ANÁLISE MULTI-ESPECIALISTA\n\n"
         report += "## 📋 O que é este relatório?\n\n"
@@ -897,6 +958,20 @@ class ManagerAgent:
             report += "### Insights Aprofundados de Inteligência Artificial:\n\n"
             report += crewai_insights
             report += "\n\n---\n\n"
+        
+        # Adicionar seção de referências da literatura se disponível
+        if context and context.get('literature_references'):
+            report += "## 📚 REFERÊNCIAS DA LITERATURA CIENTÍFICA\n\n"
+            report += "### Artigos Científicos Relevantes Encontrados:\n\n"
+            
+            from academic_references import format_references_for_display
+            literature_reasoning = context.get('literature_reasoning', {})
+            refs_formatted = format_references_for_display(
+                context['literature_references'],
+                literature_reasoning
+            )
+            report += refs_formatted
+            report += "\n---\n\n"
         
         report += "## ✅ CONCLUSÃO FINAL DO GERENTE COORDENADOR\n\n"
         report += f"### Resumo da Análise Multi-Especialista:\n\n"

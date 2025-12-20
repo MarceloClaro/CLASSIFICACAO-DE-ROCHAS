@@ -351,7 +351,7 @@ def calculate_dataset_statistics(dataset, classes):
     df_stats = pd.DataFrame(stats_data)
     
     st.write("#### Distribuição de Classes:")
-    st.dataframe(df_stats, use_container_width=True)
+    st.dataframe(df_stats, width='stretch')
     
     # Estatísticas gerais
     st.write("#### Estatísticas Gerais:")
@@ -2134,7 +2134,7 @@ def main():
                 st.write("### 📊 Visualização PCA 3D Interativa")
                 try:
                     fig_3d = visualize_pca_3d(features_reshaped, labels, classes)
-                    st.plotly_chart(fig_3d, use_container_width=True)
+                    st.plotly_chart(fig_3d, width='stretch')
                 except Exception as e:
                     st.error(f"Erro ao gerar visualização 3D: {str(e)}")
                     st.info("Mostrando visualização 2D como alternativa")
@@ -2168,7 +2168,7 @@ def main():
                     if show_3d_gradcam:
                         try:
                             fig_gradcam_3d = visualize_activation_heatmap_3d(activation_map)
-                            st.plotly_chart(fig_gradcam_3d, use_container_width=True)
+                            st.plotly_chart(fig_gradcam_3d, width='stretch')
                         except Exception as e:
                             st.error(f"Erro ao gerar visualização 3D do Grad-CAM: {str(e)}")
                 
