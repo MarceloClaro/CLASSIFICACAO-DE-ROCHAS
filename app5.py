@@ -2192,9 +2192,22 @@ def main():
                     
                     with col2:
                         if api_provider == 'gemini':
-                            model_options = ['gemini-1.0-pro', 'gemini-1.5-pro', 'gemini-1.5-flash']
+                            model_options = [
+                                'gemini-1.5-pro-latest',
+                                'gemini-1.5-flash-latest',
+                                'gemini-1.0-pro-latest',
+                                'gemini-pro',
+                                'gemini-pro-vision',
+                                'gemini-1.0-pro-vision-latest'
+                            ]
                         else:
-                            model_options = ['mixtral-8x7b-32768', 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant']
+                            model_options = [
+                                'meta-llama/llama-4-scout-17b-16e-instruct',
+                                'meta-llama/llama-4-maverick-17b-128e-instruct',
+                                'mixtral-8x7b-32768',
+                                'llama-3.1-70b-versatile',
+                                'llama-3.1-8b-instant'
+                            ]
                         
                         ai_model = st.selectbox(
                             "Modelo:",
@@ -2373,16 +2386,19 @@ def main():
                                     if '404' in error_msg and 'not found' in error_msg:
                                         st.error("🔍 Modelo não encontrado. Verifique se:")
                                         st.markdown("""
-                                        1. O nome do modelo está correto (gemini-1.0-pro, gemini-1.5-pro, gemini-1.5-flash)
+                                        1. O nome do modelo está correto (gemini-1.5-pro-latest, gemini-1.5-flash-latest, gemini-1.0-pro-latest, gemini-pro)
                                         2. O modelo está disponível na sua região
                                         3. Você tem acesso ao modelo com sua API key
                                         """)
                                         st.info("💡 Recomendação: Use o pacote estável e modelos disponíveis: pip install google-generativeai")
                                         st.markdown("""
-                                        **Modelos recomendados:**
-                                        - gemini-1.5-flash (rápido e eficiente)
-                                        - gemini-1.5-pro (mais avançado)
-                                        - gemini-pro (estável)
+                                        **Modelos disponíveis (API v1beta):**
+                                        - gemini-1.5-pro-latest ⭐ RECOMENDADO (mais recente, avançado)
+                                        - gemini-1.5-flash-latest (rápido e eficiente)
+                                        - gemini-1.0-pro-latest (estável)
+                                        - gemini-pro (uso geral)
+                                        - gemini-pro-vision (com suporte a visão)
+                                        - gemini-1.0-pro-vision-latest (visão mais recente)
                                         """)
                                     else:
                                         st.info("Verifique se a API key está correta e se você tem créditos disponíveis.")

@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-Test script to demonstrate the Google GenAI API compatibility fix.
+Test script to verify Google Gemini API compatibility and supported models.
 This script shows how the code automatically detects and uses the correct API.
+
+Updated for v1beta API with new model names.
 """
 
 import sys
 
 print("=" * 70)
-print("Google GenAI API Compatibility Test")
+print("Google Gemini API Compatibility Test (v1beta)")
 print("=" * 70)
 print()
 
@@ -41,7 +43,7 @@ if genai is not None:
     print("-" * 70)
     
     print(f"Package name: {genai.__name__}")
-    print(f"API Type: {'NEW' if GEMINI_NEW_API else 'OLD'}")
+    print(f"API Type: {'BETA' if GEMINI_NEW_API else 'STABLE (RECOMMENDED)'}")
     
     # Check for methods
     has_configure = hasattr(genai, 'configure')
@@ -58,32 +60,46 @@ if genai is not None:
     print("-" * 70)
     
     if GEMINI_NEW_API:
-        print("✓ Should use NEW API:")
+        print("✓ Should use BETA API (google-genai):")
         print("  client = genai.Client(api_key=api_key)")
         print("  # Note: Model name must include 'models/' prefix")
         print("  model_path = f'models/{model_name}' if not model_name.startswith('models/') else model_name")
         print("  response = client.models.generate_content(model=model_path, contents=prompt)")
     else:
-        print("✓ Should use OLD API:")
+        print("✓ Should use STABLE API - RECOMMENDED (google-generativeai):")
         print("  genai.configure(api_key=api_key)")
         print("  model = genai.GenerativeModel(model_name)")
         print("  response = model.generate_content(prompt)")
     print()
     
-    # Test 4: Verification
-    print("Test 4: Verification")
+    # Test 4: Supported Models (v1beta)
+    print("Test 4: Supported Models (v1beta API)")
+    print("-" * 70)
+    print("✅ SUPPORTED MODELS:")
+    print("  • gemini-2.5-flash ⭐ RECOMMENDED (newest, fast, efficient)")
+    print("  • gemini-1.5-flash (stable alternative)")
+    print("  • gemini-2.5-pro (advanced reasoning)")
+    print("  • gemini-pro (general purpose)")
+    print()
+    print("❌ DEPRECATED MODELS (NOT SUPPORTED):")
+    print("  • gemini-1.0-pro (use gemini-pro instead)")
+    print("  • gemini-1.5-pro (use gemini-2.5-pro or gemini-2.5-flash instead)")
+    print()
+    
+    # Test 5: Verification
+    print("Test 5: Verification")
     print("-" * 70)
     
     if GEMINI_NEW_API and has_client:
-        print("✅ NEW API detected and Client class is available")
+        print("✅ BETA API detected and Client class is available")
     elif not GEMINI_NEW_API and has_configure:
-        print("✅ OLD API detected and configure method is available")
+        print("✅ STABLE API detected and configure method is available")
     else:
         print("⚠️ Warning: API detection may have issues")
     print()
     
 else:
-    print("\nTest 2-4: SKIPPED (No Google GenAI package installed)")
+    print("\nTest 2-5: SKIPPED (No Google GenAI package installed)")
     print()
     print("To install the recommended package, run:")
     print("  pip install google-generativeai")
@@ -96,8 +112,13 @@ print("=" * 70)
 
 if genai is not None:
     print("✅ Google GenAI package is installed and detected correctly")
-    print(f"   API Type: {'NEW (google-genai)' if GEMINI_NEW_API else 'OLD (google-generativeai)'}")
+    print(f"   API Type: {'BETA (google-genai)' if GEMINI_NEW_API else 'STABLE (google-generativeai) - RECOMMENDED'}")
     print("   The code will automatically use the correct initialization method")
+    print()
+    print("📋 Quick Start:")
+    print("   1. Get API key from: https://ai.google.dev/")
+    print("   2. Use model: gemini-2.5-flash (recommended)")
+    print("   3. Configure in app sidebar")
 else:
     print("⚠️ No Google GenAI package is installed")
     print("   Install with: pip install google-generativeai")

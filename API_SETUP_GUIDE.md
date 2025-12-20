@@ -58,10 +58,15 @@ O sistema detecta automaticamente qual pacote está instalado:
 3. Crie um novo projeto ou selecione um existente
 4. Copie a API Key gerada
 
-**Modelos Disponíveis:**
-- `gemini-1.0-pro` - Modelo base
-- `gemini-1.5-pro` - Modelo avançado com contexto maior
-- `gemini-1.5-flash` - Modelo rápido e eficiente
+**Modelos Disponíveis (API v1beta):**
+- `gemini-1.5-pro-latest` - ⭐ **RECOMENDADO** - Modelo mais avançado e recente
+- `gemini-1.5-flash-latest` - Modelo rápido e eficiente
+- `gemini-1.0-pro-latest` - Modelo estável
+- `gemini-pro` - Modelo para uso geral
+- `gemini-pro-vision` - Modelo com suporte a análise de imagens
+- `gemini-1.0-pro-vision-latest` - Visão mais recente
+
+**Nota:** Os modelos com sufixo `-latest` são atualizados automaticamente para a versão mais recente disponível.
 
 ### Groq
 
@@ -71,6 +76,12 @@ O sistema detecta automaticamente qual pacote está instalado:
 4. Gere uma nova API Key
 
 **Modelos Disponíveis:**
+
+**Modelos Multimodais (com suporte a visão):**
+- `meta-llama/llama-4-scout-17b-16e-instruct` - ⭐ **RECOMENDADO** - Scout Llama 4 (multimodal, 128K contexto)
+- `meta-llama/llama-4-maverick-17b-128e-instruct` - Llama 4 Maverick (multimodal, 128K contexto)
+
+**Modelos Apenas Texto:**
 - `mixtral-8x7b-32768` - Modelo Mixtral com 32K tokens de contexto
 - `llama-3.1-70b-versatile` - LLama 3.1 70B
 - `llama-3.1-8b-instant` - LLama 3.1 8B (mais rápido)
@@ -163,19 +174,27 @@ pip install google-generativeai
 
 ### Erro: "404 models/gemini-1.5-pro is not found for API version v1beta"
 
-**Causa:** O pacote `google-genai` (novo) pode ter problemas de compatibilidade com alguns modelos ou versões da API.
+**Causa:** Uso de nomes de modelo incorretos ou sem o sufixo `-latest` recomendado.
 
-**Solução:** ✅ JÁ CORRIGIDO! O código agora adiciona automaticamente o prefixo 'models/' quando necessário.
+**Solução:** ✅ JÁ CORRIGIDO! O código agora usa os modelos corretos disponíveis na API v1beta:
+- `gemini-1.5-pro-latest` ⭐ (recomendado)
+- `gemini-1.5-flash-latest`
+- `gemini-1.0-pro-latest`
+- `gemini-pro`
+- `gemini-pro-vision`
+- `gemini-1.0-pro-vision-latest`
+
+**Importante:** Use sempre os modelos com `-latest` quando disponível para garantir acesso à versão mais recente.
 
 Se ainda tiver problemas:
 
 ```bash
-# Opção 1: Use o pacote estável (recomendado)
+# Atualize o pacote google-generativeai
+pip install --upgrade google-generativeai
+
+# Ou, se estiver usando o pacote beta, migre para o estável:
 pip uninstall google-genai -y
 pip install google-generativeai
-
-# Opção 2: Aguarde atualização do pacote google-genai
-pip install --upgrade google-genai
 ```
 
 **Nota:** O pacote `google-generativeai` é mais estável e recomendado para uso em produção.
@@ -184,13 +203,16 @@ pip install --upgrade google-genai
 
 ### Escolha do Modelo
 
-**Para análises detalhadas:**
-- Gemini: Use `gemini-1.5-pro`
+**Para análises detalhadas e raciocínio complexo:**
+- Gemini: Use `gemini-1.5-pro-latest` ⭐ **RECOMENDADO**
 - Groq: Use `mixtral-8x7b-32768` ou `llama-3.1-70b-versatile`
 
-**Para análises rápidas:**
-- Gemini: Use `gemini-1.5-flash`
+**Para análises rápidas e eficientes:**
+- Gemini: Use `gemini-1.5-flash-latest` ⭐ **RECOMENDADO**
 - Groq: Use `llama-3.1-8b-instant`
+
+**Para análise de imagens:**
+- Gemini: Use `gemini-pro-vision` ou `gemini-1.0-pro-vision-latest`
 
 ### Segurança da API Key
 
