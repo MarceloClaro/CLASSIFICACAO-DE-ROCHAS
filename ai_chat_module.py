@@ -11,15 +11,16 @@ from io import BytesIO
 import numpy as np
 
 try:
-    import google.genai as genai
+    # Prioritize stable google-generativeai package (recommended)
+    import google.generativeai as genai
     GEMINI_AVAILABLE = True
-    GEMINI_NEW_API = True  # New google-genai package
+    GEMINI_NEW_API = False  # Stable google-generativeai package
 except ImportError:
-    # Fallback to old package if new one not available
+    # Fallback to new beta package if stable not available
     try:
-        import google.generativeai as genai
+        import google.genai as genai
         GEMINI_AVAILABLE = True
-        GEMINI_NEW_API = False  # Old google-generativeai package
+        GEMINI_NEW_API = True  # Beta google-genai package
     except ImportError:
         GEMINI_AVAILABLE = False
         GEMINI_NEW_API = False
@@ -31,22 +32,28 @@ except ImportError:
     GROQ_AVAILABLE = False
 
 
-def get_gemini_model_path(model_name: str) -> str:
+def get_gemini_model_path(model_name: str, use_new_api: bool = False) -> str:
     """
     Get the correct model path for Gemini API calls.
     
-    For the new google-genai package, model names must include the 'models/' prefix.
-    This function ensures the prefix is added if not already present.
+    For the new beta google-genai package, model names must include the 'models/' prefix.
+    For the stable google-generativeai package, use the model name directly.
     
     Args:
         model_name: Model name (e.g., 'gemini-1.5-pro' or 'models/gemini-1.5-pro')
+        use_new_api: Whether using the new beta API (google-genai)
     
     Returns:
-        Model path with 'models/' prefix (e.g., 'models/gemini-1.5-pro')
+        Model path formatted correctly for the API version
     """
-    if not model_name.startswith('models/'):
-        return f'models/{model_name}'
-    return model_name
+    # Remove 'models/' prefix if present
+    clean_name = model_name.replace('models/', '')
+    
+    # Add prefix only for new beta API
+    if use_new_api:
+        return f'models/{clean_name}'
+    else:
+        return clean_name
 
 
 class AIAnalyzer:
@@ -67,14 +74,15 @@ class AIAnalyzer:
         self.api_provider = api_provider.lower()
         self.api_key = api_key
         self.model_name = model_name
+        self.use_new_api = GEMINI_NEW_API
         
         if self.api_provider == 'gemini' and GEMINI_AVAILABLE:
             if GEMINI_NEW_API:
-                # New google-genai package API
+                # New beta google-genai package API
                 self.client = genai.Client(api_key=api_key)
                 self.model = None  # Will be set when generating content
             else:
-                # Old google-generativeai package API
+                # Stable google-generativeai package API (recommended)
                 genai.configure(api_key=api_key)
                 self.model = genai.GenerativeModel(model_name)
         elif self.api_provider == 'groq' and GROQ_AVAILABLE:
@@ -211,16 +219,15 @@ IMPORTANTE:
         try:
             if self.api_provider == 'gemini':
                 if GEMINI_NEW_API:
-                    # New google-genai package API
-                    # The new API requires the 'models/' prefix
-                    model_path = get_gemini_model_path(self.model_name)
+                    # New beta google-genai package API
+                    model_path = get_gemini_model_path(self.model_name, use_new_api=True)
                     response = self.client.models.generate_content(
                         model=model_path,
                         contents=prompt
                     )
                     return response.text
                 else:
-                    # Old google-generativeai package API
+                    # Stable google-generativeai package API (recommended)
                     response = self.model.generate_content(prompt)
                     return response.text
             elif self.api_provider == 'groq':
@@ -243,28 +250,49 @@ IMPORTANTE:
             else:
                 return "Provider not supported"
         except Exception as e:
+            # Build error message with helpful guidance
+            error_type = str(e).lower()
             error_msg = f"Erro ao gerar análise com IA: {str(e)}\n\n"
             
             # Provide helpful guidance based on error type
-            if "configure" in str(e).lower():
-                error_msg += "💡 Dica: Parece que há um problema de configuração da API.\n"
-                error_msg += "   Tente reinstalar o pacote: pip install --upgrade google-generativeai\n"
-            elif "404" in str(e) and "not found" in str(e).lower():
-                error_msg += "🔍 Modelo não encontrado. Verifique se:\n"
-                error_msg += "   1. O nome do modelo está correto (gemini-1.0-pro, gemini-1.5-pro, gemini-1.5-flash)\n"
-                error_msg += "   2. O modelo está disponível na sua região\n"
-                error_msg += "   3. Você tem acesso ao modelo com sua API key\n"
-                error_msg += "   Para usar o pacote estável, execute:\n"
-                error_msg += "     pip uninstall google-genai -y\n"
-                error_msg += "     pip install google-generativeai\n"
-            elif "api key" in str(e).lower() or "401" in str(e):
-                error_msg += "🔑 Verifique se a API key está correta e se você tem créditos disponíveis.\n"
-                error_msg += "   Para Gemini: https://ai.google.dev/\n"
-                error_msg += "   Para Groq: https://console.groq.com/\n"
-            elif "quota" in str(e).lower() or "rate limit" in str(e).lower():
-                error_msg += "⏱️ Limite de requisições atingido. Aguarde alguns minutos antes de tentar novamente.\n"
+            if "configure" in error_type:
+                error_msg += (
+                    "💡 Dica: Parece que há um problema de configuração da API.\n"
+                    "   Certifique-se de usar: pip install google-generativeai\n"
+                )
+            elif "404" in str(e) and "not found" in error_type:
+                error_msg += (
+                    "🔍 Modelo não encontrado. Verifique se:\n"
+                    "   1. O nome do modelo está correto (gemini-1.0-pro, gemini-1.5-pro, gemini-1.5-flash)\n"
+                    "   2. O modelo está disponível na sua região\n"
+                    "   3. Você tem acesso ao modelo com sua API key\n"
+                    "   \n"
+                    "   💡 Recomendação: Use o pacote estável e modelos disponíveis:\n"
+                    "   pip install google-generativeai\n"
+                    "   \n"
+                    "   Modelos recomendados:\n"
+                    "   - gemini-1.5-flash (rápido e eficiente)\n"
+                    "   - gemini-1.5-pro (mais avançado)\n"
+                    "   - gemini-pro (estável)\n"
+                )
+            elif "api key" in error_type or "401" in str(e) or "403" in str(e):
+                error_msg += (
+                    "🔑 Verifique se a API key está correta e ativa.\n"
+                    "   Para Gemini: https://ai.google.dev/\n"
+                    "   Para Groq: https://console.groq.com/\n"
+                )
+            elif "quota" in error_type or "rate limit" in error_type or "429" in str(e):
+                error_msg += (
+                    "⏱️ Limite de requisições atingido. Aguarde alguns minutos antes de tentar novamente.\n"
+                )
+            elif "resource" in error_type and "exhausted" in error_type:
+                error_msg += (
+                    "💳 Recursos/créditos esgotados. Verifique sua conta na plataforma.\n"
+                )
             else:
-                error_msg += "📖 Consulte o guia de configuração: API_SETUP_GUIDE.md\n"
+                error_msg += (
+                    "📖 Consulte o guia de configuração: API_SETUP_GUIDE.md\n"
+                )
             
             return error_msg
     

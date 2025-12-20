@@ -228,7 +228,9 @@ class AcademicReferenceFetcher:
                 time.sleep(1)  # Rate limiting
         
         except Exception as e:
-            print(f"Error searching Google Scholar: {str(e)}")
+            # Silently skip Google Scholar if blocked or unavailable
+            # This is expected when Google Scholar blocks automated access
+            pass
         
         return references
     
@@ -402,7 +404,7 @@ class AcademicReferenceFetcher:
             if len(semantic_refs) > 0:
                 break
         
-        # Search Google Scholar if available (optional, can be slow)
+        # Search Google Scholar if available (optional, can be slow and may be blocked)
         if SCHOLARLY_AVAILABLE:
             reasoning['platforms_searched'].append('Google Scholar')
             reasoning['search_strategy']['Google Scholar'] = 'Comprehensive academic search - includes citations and diverse sources'
@@ -412,8 +414,9 @@ class AcademicReferenceFetcher:
                     all_references.extend(scholar_refs)
                     if len(scholar_refs) > 0:
                         break
-                except Exception as e:
-                    print(f"Google Scholar search skipped: {str(e)}")
+                except Exception:
+                    # Silently skip Google Scholar if blocked or unavailable
+                    pass
         
         # Remove duplicates based on title
         seen_titles = set()

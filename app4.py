@@ -56,15 +56,16 @@ except ImportError:
 
 # Importar APIs com suporte de visão
 try:
-    import google.genai as genai
+    # Prioritize stable google-generativeai package (recommended)
+    import google.generativeai as genai
     GEMINI_AVAILABLE = True
-    GEMINI_NEW_API = True  # New google-genai package
+    GEMINI_NEW_API = False  # Stable google-generativeai package
 except ImportError:
-    # Fallback to old package if new one not available
+    # Fallback to new beta package if stable not available
     try:
-        import google.generativeai as genai
+        import google.genai as genai
         GEMINI_AVAILABLE = True
-        GEMINI_NEW_API = False  # Old google-generativeai package
+        GEMINI_NEW_API = True  # Beta google-genai package
     except ImportError:
         GEMINI_AVAILABLE = False
         GEMINI_NEW_API = False
@@ -84,34 +85,55 @@ except ImportError:
 
 # Import new advanced modules from app5
 try:
+    import sys
+    # Force module reload to avoid Streamlit caching issues
+    # Note: This is necessary because Streamlit's module system can cache imports
+    # incorrectly, leading to KeyError exceptions. This is different from function
+    # caching and cannot be solved with @st.cache decorators.
+    if 'visualization_3d' in sys.modules:
+        del sys.modules['visualization_3d']
     from visualization_3d import visualize_pca_3d, visualize_activation_heatmap_3d, create_interactive_3d_visualization
     VISUALIZATION_3D_AVAILABLE = True
-except ImportError:
+except (ImportError, KeyError, ModuleNotFoundError) as e:
     VISUALIZATION_3D_AVAILABLE = False
+    # print(f"Warning: visualization_3d not available: {e}")
 
 try:
+    # Force module reload to avoid Streamlit caching issues
+    if 'ai_chat_module' in sys.modules:
+        del sys.modules['ai_chat_module']
     from ai_chat_module import AIAnalyzer, describe_gradcam_regions, get_gemini_model_path
     AI_CHAT_AVAILABLE = True
-except ImportError:
+except (ImportError, KeyError, ModuleNotFoundError) as e:
     AI_CHAT_AVAILABLE = False
+    # print(f"Warning: ai_chat_module not available: {e}")
     # Define fallback function if module not available
-    def get_gemini_model_path(model_name: str) -> str:
+    def get_gemini_model_path(model_name: str, use_new_api: bool = False) -> str:
         """Fallback: Get the correct model path for Gemini API calls."""
-        if not model_name.startswith('models/'):
-            return f'models/{model_name}'
-        return model_name
+        clean_name = model_name.replace('models/', '')
+        if use_new_api:
+            return f'models/{clean_name}'
+        else:
+            return clean_name
 
 try:
+    # Force module reload to avoid Streamlit caching issues
+    if 'academic_references' in sys.modules:
+        del sys.modules['academic_references']
     from academic_references import AcademicReferenceFetcher, format_references_for_display
     ACADEMIC_REF_AVAILABLE = True
-except ImportError:
+except (ImportError, KeyError, ModuleNotFoundError) as e:
     ACADEMIC_REF_AVAILABLE = False
+    # print(f"Warning: academic_references not available: {e}")
 
 try:
     from genetic_interpreter import GeneticDiagnosticInterpreter
     GENETIC_INTERP_AVAILABLE = True
 except ImportError:
     GENETIC_INTERP_AVAILABLE = False
+
+# Constants
+CONVERGENCE_CHECK_EPOCHS = 5  # Number of recent epochs to check for convergence stability
 
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -1828,113 +1850,101 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
         str: Análise técnica e forense da imagem
     """
     if not GEMINI_AVAILABLE:
-        return "Google Generative AI não está disponível. Instale com: pip install google-genai"
+        return "Google Generative AI não está disponível. Instale com: pip install google-generativeai"
     
     try:
+        prompt = f"""
+    Você é um especialista em análise de imagens e interpretação técnica e forense.
+    
+    **Contexto da Classificação:**
+    - Classe Predita: {class_name}
+    - Confiança: {confidence:.4f} ({confidence*100:.2f}%)
+    - Análise Grad-CAM: {gradcam_description if gradcam_description else 'Não disponível'}
+    
+    Por favor, realize uma análise COMPLETA e DETALHADA da imagem fornecida, incluindo:
+    
+    1. **Descrição Visual Detalhada:**
+       - Descreva todos os elementos visuais presentes na imagem
+       - Identifique padrões, texturas, cores e formas relevantes
+       - Analise a qualidade e características da imagem
+    
+    2. **Interpretação Técnica:**
+       - Avalie se a classificação como "{class_name}" é compatível com o que você observa
+       - Identifique características específicas que suportam ou contradizem a classificação
+       - Analise a confiança de {confidence*100:.2f}% em relação aos padrões visuais
+    
+    3. **Análise Forense:**
+       - Identifique possíveis artefatos ou anomalias na imagem
+       - Avalie a integridade e autenticidade da imagem
+       - Destaque áreas de interesse ou preocupação
+    
+    4. **Recomendações:**
+       - Sugira se a classificação deve ser aceita ou revista
+       - Recomende análises adicionais se necessário
+       - Forneça orientações para melhorar a confiança na classificação
+    
+    Seja detalhado, técnico e preciso na sua análise.
+    """
+        
         if GEMINI_NEW_API:
-            # New google-genai package API
+            # New beta google-genai package API
             client = genai.Client(api_key=api_key)
-            
-            prompt = f"""
-        Você é um especialista em análise de imagens e interpretação técnica e forense.
-        
-        **Contexto da Classificação:**
-        - Classe Predita: {class_name}
-        - Confiança: {confidence:.4f} ({confidence*100:.2f}%)
-        - Análise Grad-CAM: {gradcam_description if gradcam_description else 'Não disponível'}
-        
-        Por favor, realize uma análise COMPLETA e DETALHADA da imagem fornecida, incluindo:
-        
-        1. **Descrição Visual Detalhada:**
-           - Descreva todos os elementos visuais presentes na imagem
-           - Identifique padrões, texturas, cores e formas relevantes
-           - Analise a qualidade e características da imagem
-        
-        2. **Interpretação Técnica:**
-           - Avalie se a classificação como "{class_name}" é compatível com o que você observa
-           - Identifique características específicas que suportam ou contradizem a classificação
-           - Analise a confiança de {confidence*100:.2f}% em relação aos padrões visuais
-        
-        3. **Análise Forense:**
-           - Identifique possíveis artefatos ou anomalias na imagem
-           - Avalie a integridade e autenticidade da imagem
-           - Destaque áreas de interesse ou preocupação
-        
-        4. **Recomendações:**
-           - Sugira se a classificação deve ser aceita ou revista
-           - Recomende análises adicionais se necessário
-           - Forneça orientações para melhorar a confiança na classificação
-        
-        Seja detalhado, técnico e preciso na sua análise.
-        """
             
             # Convert PIL image to bytes
             img_byte_arr = io.BytesIO()
             image.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
             
-            # The new API requires the 'models/' prefix
-            model_path = get_gemini_model_path(model_name)
+            # Get correct model path for beta API
+            model_path = get_gemini_model_path(model_name, use_new_api=True)
             response = client.models.generate_content(
                 model=model_path,
                 contents=[prompt, {"mime_type": "image/png", "data": img_byte_arr}]
             )
             return response.text
         else:
-            # Old google-generativeai package API
+            # Stable google-generativeai package API (recommended)
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel(model_name)
-            
-            prompt = f"""
-        Você é um especialista em análise de imagens e interpretação técnica e forense.
-        
-        **Contexto da Classificação:**
-        - Classe Predita: {class_name}
-        - Confiança: {confidence:.4f} ({confidence*100:.2f}%)
-        - Análise Grad-CAM: {gradcam_description if gradcam_description else 'Não disponível'}
-        
-        Por favor, realize uma análise COMPLETA e DETALHADA da imagem fornecida, incluindo:
-        
-        1. **Descrição Visual Detalhada:**
-           - Descreva todos os elementos visuais presentes na imagem
-           - Identifique padrões, texturas, cores e formas relevantes
-           - Analise a qualidade e características da imagem
-        
-        2. **Interpretação Técnica:**
-           - Avalie se a classificação como "{class_name}" é compatível com o que você observa
-           - Identifique características específicas que suportam ou contradizem a classificação
-           - Analise a confiança de {confidence*100:.2f}% em relação aos padrões visuais
-        
-        3. **Análise Forense:**
-           - Identifique possíveis artefatos ou anomalias na imagem
-           - Avalie a integridade e autenticidade da imagem
-           - Destaque áreas de interesse ou preocupação
-        
-        4. **Recomendações:**
-           - Sugira se a classificação deve ser aceita ou revista
-           - Recomende análises adicionais se necessário
-           - Forneça orientações para melhorar a confiança na classificação
-        
-        Seja detalhado, técnico e preciso na sua análise.
-        """
             
             response = model.generate_content([prompt, image])
             return response.text
     
     except Exception as e:
         error_msg = f"Erro ao analisar com Gemini: {str(e)}\n\n"
+        error_type = str(e).lower()
         
         # Provide helpful guidance based on error type
-        if "configure" in str(e).lower():
-            error_msg += "💡 Dica: Parece que há um problema de configuração da API.\n"
-            error_msg += "   Este erro foi corrigido! Tente reinstalar: pip install --upgrade google-generativeai\n"
-        elif "api key" in str(e).lower() or "401" in str(e):
-            error_msg += "🔑 Verifique se a API key está correta e se você tem créditos disponíveis.\n"
-            error_msg += "   Obtenha sua API key em: https://ai.google.dev/\n"
-        elif "quota" in str(e).lower() or "rate limit" in str(e).lower():
-            error_msg += "⏱️ Limite de requisições atingido. Aguarde alguns minutos.\n"
+        if "configure" in error_type:
+            error_msg += (
+                "💡 Dica: Parece que há um problema de configuração da API.\n"
+                "   Certifique-se de usar: pip install google-generativeai\n"
+            )
+        elif "404" in str(e) and "not found" in error_type:
+            error_msg += (
+                "🔍 Modelo não encontrado ou não suportado para este tipo de requisição.\n"
+                "   Modelos recomendados com suporte a visão:\n"
+                "   - gemini-1.5-flash (rápido, suporta visão)\n"
+                "   - gemini-1.5-pro (avançado, suporta visão)\n"
+                "   - gemini-pro-vision (especializado em visão)\n"
+            )
+        elif "api key" in error_type or "401" in str(e) or "403" in str(e):
+            error_msg += (
+                "🔑 Verifique se a API key está correta e ativa.\n"
+                "   Obtenha sua API key em: https://ai.google.dev/\n"
+            )
+        elif "quota" in error_type or "rate limit" in error_type or "429" in str(e):
+            error_msg += (
+                "⏱️ Limite de requisições atingido. Aguarde alguns minutos.\n"
+            )
+        elif "resource" in error_type and "exhausted" in error_type:
+            error_msg += (
+                "💳 Recursos/créditos esgotados. Verifique sua conta.\n"
+            )
         else:
-            error_msg += "📖 Consulte o guia: API_SETUP_GUIDE.md para mais detalhes.\n"
+            error_msg += (
+                "📖 Consulte o guia: API_SETUP_GUIDE.md para mais detalhes.\n"
+            )
         
         return error_msg
 
@@ -3837,6 +3847,18 @@ def main():
         model, classes, training_history = model_data
         st.success("Treinamento concluído!")
         
+        # Store training history in session state for later use in AI analysis
+        st.session_state['training_history'] = training_history
+        st.session_state['trained_model_name'] = model_name
+        st.session_state['training_config'] = {
+            'epochs': epochs,
+            'learning_rate': learning_rate,
+            'batch_size': batch_size,
+            'optimizer': optimizer_name,
+            'scheduler': scheduler_name,
+            'augmentation': augmentation_type
+        }
+        
         # Adicionar botão de download do CSV com histórico de treinamento
         st.write("---")
         st.write("## 📊 Exportar Resultados de Treinamento")
@@ -4071,6 +4093,22 @@ def main():
                 st.write("---")
                 st.write("## 🤖 Análise Diagnóstica Avançada com IA")
                 
+                st.info("""
+                **💡 Sobre a Análise Diagnóstica com IA:**
+                
+                Esta análise utiliza modelos de linguagem avançados para fornecer:
+                - 📊 Interpretação detalhada dos resultados de classificação
+                - 📚 Correlação com referências acadêmicas (PubMed, arXiv, Semantic Scholar)
+                - 🔬 Análise multi-perspectiva baseada em algoritmos genéticos
+                - 🎯 Recomendações e diagnósticos diferenciais
+                
+                **Fluxo de Análise:**
+                1. Configuração da API (Gemini ou Groq)
+                2. Busca de referências acadêmicas automáticas
+                3. Geração de análise diagnóstica completa
+                4. (Opcional) Análise multi-perspectiva com algoritmos genéticos
+                """)
+                
                 enable_ai_analysis = st.checkbox(
                     "Ativar Análise Diagnóstica Completa com IA", 
                     value=False,
@@ -4110,44 +4148,81 @@ def main():
                         if st.button("🔬 Gerar Análise Diagnóstica Completa"):
                             with st.spinner("Gerando análise diagnóstica aprofundada..."):
                                 try:
-                                    # Fetch academic references
-                                    st.write("📚 Buscando referências acadêmicas...")
-                                    references = []
-                                    if ACADEMIC_REF_AVAILABLE:
-                                        try:
-                                            ref_fetcher = AcademicReferenceFetcher()
-                                            references = ref_fetcher.get_references_for_classification(
-                                                class_name=class_name,
-                                                domain="image classification",
-                                                max_per_source=3
-                                            )
-                                            
-                                            if references:
-                                                with st.expander("📚 Referências Acadêmicas Encontradas"):
-                                                    st.markdown(format_references_for_display(references))
-                                        except Exception as e:
-                                            st.warning(f"⚠️ Não foi possível buscar referências: {str(e)}")
+                                    # Fetch academic references with improved status
+                                    with st.status("📚 Buscando referências acadêmicas...", expanded=True) as status:
+                                        references = []
+                                        if ACADEMIC_REF_AVAILABLE:
+                                            try:
+                                                st.write("🔍 Consultando bases de dados científicas...")
+                                                ref_fetcher = AcademicReferenceFetcher()
+                                                references = ref_fetcher.get_references_for_classification(
+                                                    class_name=class_name,
+                                                    domain="image classification",
+                                                    max_per_source=3
+                                                )
+                                                
+                                                if references:
+                                                    status.update(label=f"📚 {len(references)} referências encontradas!", state="complete")
+                                                    with st.expander("📚 Referências Acadêmicas Encontradas", expanded=True):
+                                                        st.markdown(format_references_for_display(references))
+                                                else:
+                                                    status.update(label="📚 Nenhuma referência encontrada", state="complete")
+                                                    st.info("ℹ️ Continuando análise sem referências acadêmicas externas")
+                                            except Exception as e:
+                                                status.update(label="⚠️ Erro ao buscar referências", state="error")
+                                                st.warning(f"⚠️ Não foi possível buscar referências: {str(e)}")
+                                        else:
+                                            status.update(label="⚠️ Módulo de referências não disponível", state="complete")
+                                            st.info("ℹ️ Continuando análise sem referências acadêmicas externas")
                                     
                                     # Generate Grad-CAM description
                                     gradcam_desc = ""
                                     if activation_map is not None:
                                         gradcam_desc = describe_gradcam_regions(activation_map)
                                     
-                                    # Collect training statistics
+                                    # Collect training statistics with more details
                                     training_stats = {
                                         "Épocas Treinadas": epochs,
                                         "Taxa de Aprendizagem": learning_rate,
                                         "Batch Size": batch_size,
                                         "Modelo": model_name,
                                         "Tipo de Augmentação": augmentation_type,
-                                        "Otimizador": optimizer_name
+                                        "Otimizador": optimizer_name,
+                                        "Scheduler": scheduler_name if scheduler_name != 'None' else 'Não utilizado'
                                     }
                                     
-                                    # Collect statistical results
+                                    # Collect statistical results from training history if available
                                     statistical_results = {
-                                        "Informação": "Métricas baseadas no treinamento realizado",
-                                        "Nota": "Para análise completa, avalie em conjunto de teste separado"
+                                        "Tipo de Análise": "Métricas baseadas no treinamento realizado"
                                     }
+                                    
+                                    if 'training_history' in st.session_state:
+                                        hist = st.session_state['training_history']
+                                        # Calculate final and best metrics
+                                        if 'valid_accuracy' in hist and len(hist['valid_accuracy']) > 0:
+                                            statistical_results["Acurácia Final (Validação)"] = f"{hist['valid_accuracy'][-1]:.4f}"
+                                            statistical_results["Melhor Acurácia (Validação)"] = f"{max(hist['valid_accuracy']):.4f}"
+                                        if 'train_accuracy' in hist and len(hist['train_accuracy']) > 0:
+                                            statistical_results["Acurácia Final (Treino)"] = f"{hist['train_accuracy'][-1]:.4f}"
+                                        if 'valid_loss' in hist and len(hist['valid_loss']) > 0:
+                                            statistical_results["Loss Final (Validação)"] = f"{hist['valid_loss'][-1]:.4f}"
+                                            statistical_results["Melhor Loss (Validação)"] = f"{min(hist['valid_loss']):.4f}"
+                                        if 'train_loss' in hist and len(hist['train_loss']) > 0:
+                                            statistical_results["Loss Final (Treino)"] = f"{hist['train_loss'][-1]:.4f}"
+                                        
+                                        # Calculate convergence metrics
+                                        if 'valid_accuracy' in hist and len(hist['valid_accuracy']) > 1:
+                                            # Take last N epochs (up to CONVERGENCE_CHECK_EPOCHS) for convergence analysis
+                                            n_epochs_to_check = min(CONVERGENCE_CHECK_EPOCHS, len(hist['valid_accuracy']))
+                                            last_n_acc = hist['valid_accuracy'][-n_epochs_to_check:]
+                                            acc_variance = np.var(last_n_acc) if len(last_n_acc) > 1 else 0
+                                            statistical_results["Estabilidade da Convergência"] = "Alta" if acc_variance < 0.001 else "Média" if acc_variance < 0.01 else "Baixa"
+                                    else:
+                                        statistical_results["Nota"] = "Para análise completa, avalie em conjunto de teste separado"
+                                    
+                                    # Add confidence-specific metrics
+                                    statistical_results["Confiança da Predição Atual"] = f"{confidence:.4f} ({confidence*100:.2f}%)"
+                                    statistical_results["Nível de Certeza"] = "Alto" if confidence > 0.9 else "Médio" if confidence > 0.7 else "Baixo"
                                     
                                     # Initialize AI analyzer
                                     ai_analyzer = AIAnalyzer(
