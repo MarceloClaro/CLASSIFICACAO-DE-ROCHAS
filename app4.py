@@ -1,4 +1,8 @@
 import os
+
+# Disable CrewAI telemetry to avoid signal handler errors in non-main threads (Streamlit)
+os.environ['CREWAI_DISABLE_TELEMETRY'] = 'true'
+
 import zipfile
 import shutil
 import tempfile
@@ -52,10 +56,15 @@ except ImportError:
 
 # Importar APIs com suporte de visão
 try:
-    import google.generativeai as genai
+    import google.genai as genai
     GEMINI_AVAILABLE = True
 except ImportError:
-    GEMINI_AVAILABLE = False
+    # Fallback to old package if new one not available
+    try:
+        import google.generativeai as genai
+        GEMINI_AVAILABLE = True
+    except ImportError:
+        GEMINI_AVAILABLE = False
 
 try:
     from groq import Groq
@@ -1785,7 +1794,7 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
         str: Análise técnica e forense da imagem
     """
     if not GEMINI_AVAILABLE:
-        return "Google Generative AI não está disponível. Instale com: pip install google-generativeai"
+        return "Google Generative AI não está disponível. Instale com: pip install google-genai"
     
     try:
         genai.configure(api_key=api_key)
@@ -2629,13 +2638,20 @@ def visualize_activations(model, image, class_names, gradcam_type='SmoothGradCAM
         activation_map_resized: Mapa de ativação normalizado ou None em caso de erro
     """
     cam_extractor = None
+    original_training_mode = model.training
     try:
-        # Ensure model is in eval mode
+        # Set model to eval mode but enable gradient computation
         model.eval()
         
-        # Prepare input tensor
-        # Note: torchcam handles gradient requirements internally
+        # Enable gradients for all model parameters temporarily
+        # This is needed for hook registration in torchcam
+        for param in model.parameters():
+            param.requires_grad = True
+        
+        # Prepare input tensor with gradient enabled
+        # torchcam requires gradients to be enabled for hook registration
         input_tensor = test_transforms(image).unsqueeze(0).to(device)
+        input_tensor.requires_grad = True
         
         # Verificar se o modelo é suportado
         model_type = type(model).__name__
@@ -2738,6 +2754,12 @@ def visualize_activations(model, image, class_names, gradcam_type='SmoothGradCAM
             except Exception as e:
                 # If hook removal fails, log it but continue
                 st.warning(f"Aviso: Não foi possível remover hooks: {e}")
+        
+        # Restore original training mode
+        if original_training_mode:
+            model.train()
+        else:
+            model.eval()
 
 
 
@@ -3972,9 +3994,23 @@ def main():
                                 use_multiagent = st.checkbox("Ativar Análise com Sistema Multi-Agente (15 Especialistas)", value=True)
                                 
                                 if use_multiagent:
-                                    with st.spinner("Coordenando análise de 15 agentes especializados + 1 gerente..."):
+                                    # Opção para usar CrewAI com o sistema multi-agente
+                                    use_crewai_multiagent = False
+                                    if CREWAI_AVAILABLE:
+                                        use_crewai_multiagent = st.checkbox(
+                                            "🚀 Ativar Análise Avançada com CrewAI",
+                                            value=False,
+                                            help="Adiciona análise avançada usando CrewAI para insights ainda mais profundos. EXPERIMENTAL."
+                                        )
+                                    
+                                    spinner_text = "Coordenando análise de 15 agentes especializados + 1 gerente"
+                                    if use_crewai_multiagent:
+                                        spinner_text += " + análise avançada CrewAI"
+                                    spinner_text += "..."
+                                    
+                                    with st.spinner(spinner_text):
                                         try:
-                                            manager = ManagerAgent()
+                                            manager = ManagerAgent(use_crewai=use_crewai_multiagent)
                                             
                                             # Preparar contexto
                                             agent_context = {
@@ -3989,7 +4025,10 @@ def main():
                                             )
                                             
                                             st.markdown(multi_agent_report)
-                                            st.success("✅ Análise Multi-Agente Concluída! 15 especialistas + 1 gerente coordenador")
+                                            success_msg = "✅ Análise Multi-Agente Concluída! 15 especialistas + 1 gerente coordenador"
+                                            if use_crewai_multiagent:
+                                                success_msg += " + análise avançada CrewAI"
+                                            st.success(success_msg)
                                             
                                         except Exception as e:
                                             st.error(f"Erro ao gerar análise multi-agente: {str(e)}")

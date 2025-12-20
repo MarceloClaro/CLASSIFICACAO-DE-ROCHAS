@@ -1,12 +1,20 @@
 """
 Multi-Agent System for Enhanced Diagnostic Analysis
 Sistema com 15 agentes especializados + 1 gerente para melhorar a entrega de respostas
+Integração com CrewAI para análises ainda mais profundas
 """
 
 import random
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 import numpy as np
+
+# Importar CrewAI para análise avançada
+try:
+    from crewai import Agent, Task, Crew, Process
+    CREWAI_AVAILABLE = True
+except ImportError:
+    CREWAI_AVAILABLE = False
 
 
 @dataclass
@@ -604,10 +612,12 @@ class ManagerAgent:
     """
     Agente Gerente que coordena os 15 agentes especializados
     e sintetiza suas análises em uma resposta integrada
+    Com integração CrewAI opcional para análises ainda mais profundas
     """
     
-    def __init__(self):
+    def __init__(self, use_crewai=False):
         self.name = "Gerente de Análise Diagnóstica"
+        self.use_crewai = use_crewai and CREWAI_AVAILABLE
         self.agents = [
             MorphologyAgent(),
             TextureAgent(),
@@ -637,6 +647,7 @@ class ManagerAgent:
     ) -> str:
         """
         Coordena a análise de todos os agentes e sintetiza a resposta
+        Com opção de análise avançada usando CrewAI
         
         Args:
             predicted_class: Classe predita
@@ -666,22 +677,118 @@ class ManagerAgent:
         total_weight = sum(r.priority for r in responses)
         aggregated_confidence = sum(weighted_confidences) / total_weight if total_weight > 0 else confidence
         
+        # Se CrewAI está habilitado, adicionar análise avançada
+        crewai_insights = None
+        if self.use_crewai:
+            crewai_insights = self._enhance_with_crewai(
+                predicted_class, 
+                confidence, 
+                responses,
+                context
+            )
+        
         # Gerar relatório integrado
         report = self._generate_integrated_report(
             predicted_class,
             confidence,
             aggregated_confidence,
-            responses
+            responses,
+            crewai_insights
         )
         
         return report
+    
+    def _enhance_with_crewai(
+        self,
+        predicted_class: str,
+        confidence: float,
+        responses: List[AgentResponse],
+        context: Dict
+    ) -> Optional[str]:
+        """
+        Usa CrewAI para análise avançada e insights adicionais
+        
+        Args:
+            predicted_class: Classe predita
+            confidence: Confiança da predição
+            responses: Respostas dos 15 agentes especializados
+            context: Contexto adicional
+        
+        Returns:
+            Insights do CrewAI ou None em caso de erro
+        """
+        if not CREWAI_AVAILABLE:
+            return None
+        
+        try:
+            # Preparar resumo das análises dos 15 agentes
+            # Configuração de verbosidade (False para produção)
+            verbose_mode = False
+            
+            # Preparar resumo das análises dos 15 agentes (top prioridade)
+            max_agents_summary = 5  # Número de agentes a incluir no resumo
+            agents_summary = f"Classe predita: {predicted_class} (confiança: {confidence:.2%})\n\n"
+            agents_summary += "Resumo das análises dos 15 especialistas:\n"
+            for i, resp in enumerate(responses[:max_agents_summary], 1):
+                agents_summary += f"{i}. {resp.agent_name} ({resp.specialty}): confiança {resp.confidence:.2%}\n"
+            
+            # Criar agente CrewAI especializado em análise diagnóstica avançada
+            diagnostic_expert = Agent(
+                role='Especialista em Análise Diagnóstica Avançada',
+                goal=f'Fornecer insights profundos e contextualização científica sobre a classificação "{predicted_class}"',
+                backstory='''Você é um especialista de nível PhD com vasta experiência em análise diagnóstica 
+                e classificação. Sua missão é revisar as análises de múltiplos especialistas e fornecer 
+                insights adicionais, correlações com literatura científica, e recomendações avançadas.''',
+                verbose=verbose_mode,
+                allow_delegation=False
+            )
+            
+            # Criar tarefa de análise avançada
+            analysis_task = Task(
+                description=f'''
+                Com base nas seguintes informações:
+                {agents_summary}
+                
+                Contexto adicional: {context.get('gradcam_description', 'Não disponível')}
+                
+                Forneça uma análise avançada que inclua:
+                1. Validação científica da classificação "{predicted_class}"
+                2. Possíveis correlações com padrões conhecidos na literatura
+                3. Fatores de risco ou limitações desta classificação
+                4. Recomendações para aumentar a confiabilidade do resultado
+                5. Comparação com casos similares ou diferenciais importantes
+                
+                Sua análise deve ser técnica mas compreensível, focada em agregar valor às análises existentes.
+                ''',
+                agent=diagnostic_expert,
+                expected_output='Análise avançada detalhada com insights científicos e recomendações práticas'
+            )
+            
+            # Executar crew
+            crew = Crew(
+                agents=[diagnostic_expert],
+                tasks=[analysis_task],
+                verbose=verbose_mode,
+                process=Process.sequential
+            )
+            
+            result = crew.kickoff()
+            
+            return str(result)
+            
+        except Exception as e:
+            # Usar print para compatibilidade, mas idealmente deveria usar logging
+            # TODO: Considerar migrar para logging.error() para melhor rastreabilidade
+            print(f"Erro na análise CrewAI: {e}")
+            return None
     
     def _generate_integrated_report(
         self,
         predicted_class: str,
         original_confidence: float,
         aggregated_confidence: float,
-        responses: List[AgentResponse]
+        responses: List[AgentResponse],
+        crewai_insights: Optional[str] = None
     ) -> str:
         """Gera relatório integrado com análises de todos os agentes em linguagem acessível"""
         
@@ -689,7 +796,11 @@ class ManagerAgent:
         report += "## 📋 O que é este relatório?\n\n"
         report += "Este relatório foi criado por um sistema com **15 especialistas virtuais**, cada um "
         report += "analisando a imagem de uma perspectiva diferente. Um **gerente coordenador** organizou "
-        report += "todas as análises e criou este resumo integrado.\n\n"
+        report += "todas as análises e criou este resumo integrado"
+        
+        if crewai_insights:
+            report += ", com **análise avançada CrewAI** para insights ainda mais profundos"
+        report += ".\n\n"
         report += "---\n\n"
         
         report += "## 📊 RESUMO GERAL DO RESULTADO\n\n"
@@ -779,6 +890,13 @@ class ManagerAgent:
             report += f"{i}. {rec}\n"
         
         report += "\n---\n\n"
+        
+        # Adicionar insights do CrewAI se disponível
+        if crewai_insights:
+            report += "## 🤖 ANÁLISE AVANÇADA COM CREWAI\n\n"
+            report += "### Insights Aprofundados de Inteligência Artificial:\n\n"
+            report += crewai_insights
+            report += "\n\n---\n\n"
         
         report += "## ✅ CONCLUSÃO FINAL DO GERENTE COORDENADOR\n\n"
         report += f"### Resumo da Análise Multi-Especialista:\n\n"
