@@ -839,18 +839,18 @@ class ManagerAgent:
             
             return str(result)
             
-        except ImportError as e:
-            # Handle missing API key or import errors
-            error_msg = str(e)
-            if 'OPENAI_API_KEY' in error_msg or 'api' in error_msg.lower():
-                print(f"⚠️ CrewAI requer OPENAI_API_KEY para funcionar. Configure a variável de ambiente OPENAI_API_KEY.")
-            else:
-                print(f"Erro de importação no CrewAI: {e}")
-            return None
         except Exception as e:
-            # Usar print para compatibilidade, mas idealmente deveria usar logging
-            # TODO: Considerar migrar para logging.error() para melhor rastreabilidade
-            print(f"Erro na análise CrewAI: {e}")
+            # Handle all errors gracefully
+            error_msg = str(e)
+            
+            # Provide helpful context based on error type
+            if 'OPENAI_API_KEY' in error_msg or 'api_key' in error_msg.lower():
+                print(f"⚠️ CrewAI requer OPENAI_API_KEY para funcionar. Configure a variável de ambiente OPENAI_API_KEY.")
+            elif 'import' in error_msg.lower() or 'module' in error_msg.lower():
+                print(f"⚠️ Erro ao importar módulos do CrewAI: {error_msg}")
+            else:
+                print(f"Erro na análise CrewAI: {error_msg}")
+            
             return None
     
     def _generate_integrated_report(

@@ -4591,19 +4591,23 @@ def main():
                                                 success_msg += " + análise avançada CrewAI"
                                             st.success(success_msg)
                                             
-                                        except ImportError as e:
-                                            error_msg = str(e)
-                                            if 'OPENAI_API_KEY' in error_msg or 'api' in error_msg.lower():
-                                                st.error("❌ CrewAI requer OPENAI_API_KEY para funcionar.")
-                                                st.info("Configure a variável de ambiente OPENAI_API_KEY com sua chave OpenAI antes de ativar o CrewAI.")
-                                            else:
-                                                st.error(f"Erro ao importar dependências do CrewAI: {str(e)}")
                                         except Exception as e:
-                                            st.error(f"Erro ao gerar análise multi-agente: {str(e)}")
-                                            # Show more detailed error in expander
-                                            with st.expander("Ver detalhes do erro"):
-                                                import traceback
-                                                st.code(traceback.format_exc())
+                                            error_msg = str(e)
+                                            st.error(f"Erro ao gerar análise multi-agente: {error_msg}")
+                                            
+                                            # Provide helpful context based on error type
+                                            if 'OPENAI_API_KEY' in error_msg or 'api_key' in error_msg.lower():
+                                                st.info("💡 Dica: CrewAI requer a variável de ambiente OPENAI_API_KEY configurada.")
+                                            elif 'import' in error_msg.lower() or 'module' in error_msg.lower():
+                                                st.info("💡 Dica: Verifique se todas as dependências estão instaladas: pip install crewai crewai-tools")
+                                            
+                                            # Show limited error details in development
+                                            # Only show first and last line of traceback to avoid exposing sensitive info
+                                            import os
+                                            if os.environ.get('STREAMLIT_ENV') == 'development':
+                                                with st.expander("Ver detalhes do erro (modo desenvolvimento)"):
+                                                    import traceback
+                                                    st.code(traceback.format_exc())
                             
                             # Preparar dados para exportação
                             ai_analysis_result = {
