@@ -4156,7 +4156,7 @@ def main():
                                         training_stats=training_stats,
                                         statistical_results=statistical_results,
                                         gradcam_description=gradcam_desc,
-                                        references=references
+                                        academic_references=references
                                     )
                                     
                                     # Display analysis
