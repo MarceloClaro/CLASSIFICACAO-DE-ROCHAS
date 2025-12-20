@@ -1,0 +1,83 @@
+# DiagnostiCAI - Docker Compose Configuration
+version: '3.8'
+
+services:
+  # Main application service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: diagnosticai-app
+    ports:
+      - "8501:8501"
+    volumes:
+      # Mount data directories for persistence
+      - ./dataset:/app/dataset
+      - ./models:/app/models
+      - ./results:/app/results
+    environment:
+      # GPU support (requires nvidia-docker)
+      - CUDA_VISIBLE_DEVICES=0
+      - STREAMLIT_SERVER_HEADLESS=true
+      - STREAMLIT_SERVER_FILE_WATCHER_TYPE=none
+      # Choose which app to run (app4.py or app5.py)
+      - APP_FILE=app5.py
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - diagnosticai-network
+
+  # Optional: Redis for caching (future use)
+  redis:
+    image: redis:7-alpine
+    container_name: diagnosticai-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - diagnosticai-network
+    profiles:
+      - with-redis
+
+  # Optional: PostgreSQL for metadata storage (future use)
+  postgres:
+    image: postgres:15-alpine
+    container_name: diagnosticai-postgres
+    environment:
+      POSTGRES_DB: diagnosticai
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_production}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - diagnosticai-network
+    profiles:
+      - with-database
+
+networks:
+  diagnosticai-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local

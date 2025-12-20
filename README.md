@@ -111,23 +111,41 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 
 ### Run the Application
 
-#### Option 1: Full-Featured App (app5.py) - **RECOMMENDED**
-```bash
-streamlit run app5.py
-```
-**Includes**: All features (3D viz, AI chat, academic refs, genetic interp)
-
-#### Option 2: Enhanced App (app4.py) - **NEW!**
+#### Option 1: Enhanced App with All Features (app4.py) - **RECOMMENDED FOR PRODUCTION**
 ```bash
 streamlit run app4.py
 ```
-**Now includes**: All app5 features integrated + statistical analysis + multi-agent system
+**Includes**: All advanced features integrated:
+- ✅ 3D Visualization (PCA, Grad-CAM with Plotly)
+- ✅ AI Diagnostic Analysis (Gemini, Groq LLMs)
+- ✅ Academic References (PubMed, arXiv)
+- ✅ Genetic Algorithm Multi-Perspective Analysis
+- ✅ Statistical Analysis with Bootstrap Validation
+- ✅ Multi-Agent System (15 specialists + 1 manager)
+- ✅ All core features (training, evaluation, Grad-CAM, clustering)
 
-#### Option 3: Standard App (app3.py)
+**Note**: app4.py now includes all app5.py features plus additional statistical analysis capabilities.
+
+#### Option 2: Streamlined App (app5.py) - **LIGHTWEIGHT ALTERNATIVE**
+```bash
+streamlit run app5.py
+```
+**Includes**: Core advanced features without heavy statistical modules
+- ✅ 3D Visualization (PCA, Grad-CAM)
+- ✅ AI Chat (Gemini, Groq)
+- ✅ Academic References
+- ✅ Genetic Interpreter
+- ✅ Basic training and evaluation
+
+#### Option 3: Standard App (app3.py) - **BASIC FEATURES**
 ```bash
 streamlit run app3.py
 ```
-**Includes**: Core features (training, evaluation, Grad-CAM, clustering)
+**Includes**: Essential features only
+- ✅ Training with advanced augmentation
+- ✅ Model evaluation
+- ✅ Grad-CAM visualization (2D)
+- ✅ Basic clustering
 
 ### Docker Deployment (Recommended for Production)
 
