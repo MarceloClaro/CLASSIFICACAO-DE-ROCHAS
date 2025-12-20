@@ -161,6 +161,25 @@ pip install google-generativeai
 - Considere upgrade do plano
 - Para Groq: Verifique seus limites em https://console.groq.com/
 
+### Erro: "404 models/gemini-1.5-pro is not found for API version v1beta"
+
+**Causa:** O pacote `google-genai` (novo) pode ter problemas de compatibilidade com alguns modelos ou versões da API.
+
+**Solução:** ✅ JÁ CORRIGIDO! O código agora adiciona automaticamente o prefixo 'models/' quando necessário.
+
+Se ainda tiver problemas:
+
+```bash
+# Opção 1: Use o pacote estável (recomendado)
+pip uninstall google-genai -y
+pip install google-generativeai
+
+# Opção 2: Aguarde atualização do pacote google-genai
+pip install --upgrade google-genai
+```
+
+**Nota:** O pacote `google-generativeai` é mais estável e recomendado para uso em produção.
+
 ## 💡 Dicas e Boas Práticas
 
 ### Escolha do Modelo

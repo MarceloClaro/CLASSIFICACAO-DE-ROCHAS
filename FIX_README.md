@@ -40,8 +40,10 @@ response = model.generate_content(prompt)
 #### API Nova (`google-genai`)
 ```python
 client = genai.Client(api_key=api_key)
+# Important: Model name must include 'models/' prefix
+model_path = f'models/{model_name}' if not model_name.startswith('models/') else model_name
 response = client.models.generate_content(
-    model=model_name,
+    model=model_path,
     contents=prompt
 )
 ```
