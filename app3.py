@@ -416,6 +416,9 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     use_cutmix = (augmentation_type == 'cutmix')
     mixup_alpha = 1.0
     cutmix_alpha = 1.0
+    
+    # Cache de parâmetros para regularização L1 (otimização)
+    trainable_params_list = list(filter(lambda p: p.requires_grad, model.parameters())) if l1_lambda > 0 else []
 
     # Treinamento
     for epoch in range(epochs):
@@ -445,9 +448,10 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
             # Calcular loss
             if use_mixup or use_cutmix:
                 loss = mixup_criterion(criterion, outputs, labels_a, labels_b, lam)
-                # Para acurácia com mixup/cutmix, usar o label com maior peso (lam)
+                # Para acurácia com mixup/cutmix, usar o label dominante (aproximação simplificada)
+                # Nota: Acurácia exata com labels misturados não é bem definida,
+                # então usamos labels_a que tem maior peso (lam) como aproximação
                 _, preds = torch.max(outputs, 1)
-                # Aproximar acurácia usando o label dominante
                 running_corrects += (preds == labels_a).sum().float()
             else:
                 _, preds = torch.max(outputs, 1)
@@ -456,7 +460,7 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
             
             # Adicionar regularização L1 se especificado
             if l1_lambda > 0:
-                l1_reg = sum(torch.norm(param, 1) for param in model.parameters() if param.requires_grad)
+                l1_reg = sum(torch.norm(param, 1) for param in trainable_params_list)
                 loss = loss + l1_lambda * l1_reg
             
             loss.backward()
