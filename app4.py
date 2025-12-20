@@ -3994,9 +3994,23 @@ def main():
                                 use_multiagent = st.checkbox("Ativar Análise com Sistema Multi-Agente (15 Especialistas)", value=True)
                                 
                                 if use_multiagent:
-                                    with st.spinner("Coordenando análise de 15 agentes especializados + 1 gerente..."):
+                                    # Opção para usar CrewAI com o sistema multi-agente
+                                    use_crewai_multiagent = False
+                                    if CREWAI_AVAILABLE:
+                                        use_crewai_multiagent = st.checkbox(
+                                            "🚀 Ativar Análise Avançada com CrewAI",
+                                            value=False,
+                                            help="Adiciona análise avançada usando CrewAI para insights ainda mais profundos. EXPERIMENTAL."
+                                        )
+                                    
+                                    spinner_text = "Coordenando análise de 15 agentes especializados + 1 gerente"
+                                    if use_crewai_multiagent:
+                                        spinner_text += " + análise avançada CrewAI"
+                                    spinner_text += "..."
+                                    
+                                    with st.spinner(spinner_text):
                                         try:
-                                            manager = ManagerAgent()
+                                            manager = ManagerAgent(use_crewai=use_crewai_multiagent)
                                             
                                             # Preparar contexto
                                             agent_context = {
@@ -4011,7 +4025,10 @@ def main():
                                             )
                                             
                                             st.markdown(multi_agent_report)
-                                            st.success("✅ Análise Multi-Agente Concluída! 15 especialistas + 1 gerente coordenador")
+                                            success_msg = "✅ Análise Multi-Agente Concluída! 15 especialistas + 1 gerente coordenador"
+                                            if use_crewai_multiagent:
+                                                success_msg += " + análise avançada CrewAI"
+                                            st.success(success_msg)
                                             
                                         except Exception as e:
                                             st.error(f"Erro ao gerar análise multi-agente: {str(e)}")
