@@ -2031,7 +2031,11 @@ def visualize_activations(model, image, class_names, gradcam_type='SmoothGradCAM
         image: Imagem PIL
         class_names: Lista de nomes das classes
         gradcam_type: Tipo de Grad-CAM ('GradCAM', 'GradCAMpp', 'SmoothGradCAMpp', 'LayerCAM')
+    
+    Returns:
+        activation_map_resized: Mapa de ativação normalizado ou None em caso de erro
     """
+    cam_extractor = None
     try:
         # Ensure model is in eval mode and enable gradients for Grad-CAM
         model.eval()
@@ -2076,7 +2080,7 @@ def visualize_activations(model, image, class_names, gradcam_type='SmoothGradCAM
             cam_extractor = LayerCAM(model, target_layer=target_layer)
         else:
             st.error(f"Tipo de Grad-CAM não suportado: {gradcam_type}")
-            return
+            return None
         
         # Habilitar gradientes explicitamente
         with torch.set_grad_enabled(True):
@@ -2124,9 +2128,16 @@ def visualize_activations(model, image, class_names, gradcam_type='SmoothGradCAM
         st.pyplot(fig)
         plt.close(fig)
         
+        return activation_map_resized
+        
     except Exception as e:
         st.error(f"Erro ao gerar Grad-CAM: {str(e)}")
         st.info("Visualização Grad-CAM não disponível para este modelo/configuração.")
+        return None
+    finally:
+        # CRITICAL: Remove hooks to prevent interference with subsequent model calls
+        if cam_extractor is not None:
+            cam_extractor.remove_hooks()
 
 
 
