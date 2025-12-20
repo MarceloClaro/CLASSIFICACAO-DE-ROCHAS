@@ -4531,7 +4531,12 @@ def main():
                                     )
                             
                             # Exibir análise
-                            st.success("✅ Análise Completa Gerada!")
+                            # Check if it's an error message
+                            is_error = ai_analysis_text.startswith("Erro ao analisar")
+                            
+                            if not is_error:
+                                st.success("✅ Análise Completa Gerada!")
+                            
                             st.write("### 📋 Relatório de Análise com IA")
                             st.markdown(ai_analysis_text)
                             
@@ -4549,8 +4554,15 @@ def main():
                                         use_crewai_multiagent = st.checkbox(
                                             "🚀 Ativar Análise Avançada com CrewAI",
                                             value=False,
-                                            help="Adiciona análise avançada usando CrewAI para insights ainda mais profundos. EXPERIMENTAL."
+                                            help="Adiciona análise avançada usando CrewAI para insights ainda mais profundos. EXPERIMENTAL. Requer OPENAI_API_KEY como variável de ambiente."
                                         )
+                                        
+                                        if use_crewai_multiagent:
+                                            import os
+                                            if not os.environ.get('OPENAI_API_KEY'):
+                                                st.warning("⚠️ CrewAI requer a variável de ambiente OPENAI_API_KEY. Configure-a para usar esta funcionalidade.")
+                                                st.info("Para configurar: `export OPENAI_API_KEY='sua-chave-aqui'` no terminal antes de executar o app.")
+                                                use_crewai_multiagent = False
                                     
                                     spinner_text = "Coordenando análise de 15 agentes especializados + 1 gerente"
                                     if use_crewai_multiagent:
@@ -4579,8 +4591,19 @@ def main():
                                                 success_msg += " + análise avançada CrewAI"
                                             st.success(success_msg)
                                             
+                                        except ImportError as e:
+                                            error_msg = str(e)
+                                            if 'OPENAI_API_KEY' in error_msg or 'api' in error_msg.lower():
+                                                st.error("❌ CrewAI requer OPENAI_API_KEY para funcionar.")
+                                                st.info("Configure a variável de ambiente OPENAI_API_KEY com sua chave OpenAI antes de ativar o CrewAI.")
+                                            else:
+                                                st.error(f"Erro ao importar dependências do CrewAI: {str(e)}")
                                         except Exception as e:
                                             st.error(f"Erro ao gerar análise multi-agente: {str(e)}")
+                                            # Show more detailed error in expander
+                                            with st.expander("Ver detalhes do erro"):
+                                                import traceback
+                                                st.code(traceback.format_exc())
                             
                             # Preparar dados para exportação
                             ai_analysis_result = {
