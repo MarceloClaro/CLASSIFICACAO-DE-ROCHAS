@@ -1919,6 +1919,7 @@ def optimize_image_for_api(image, max_size=(1024, 1024), quality=85):
 def retry_api_call(func, max_retries=3, initial_delay=2.0, backoff_factor=2.0):
     """
     Wrapper para tentar chamar uma função de API com retry exponencial.
+    Tenta extrair o retry_delay sugerido pela API quando disponível.
     
     Args:
         func: Função a ser executada (deve retornar tupla (sucesso, resultado))
@@ -1929,6 +1930,7 @@ def retry_api_call(func, max_retries=3, initial_delay=2.0, backoff_factor=2.0):
     Returns:
         Resultado da função ou mensagem de erro
     """
+    import re
     delay = initial_delay
     last_error = None
     
@@ -1943,10 +1945,35 @@ def retry_api_call(func, max_retries=3, initial_delay=2.0, backoff_factor=2.0):
             last_error = e
             error_str = str(e).lower()
             
-            # Se for erro de quota/rate limit, fazer retry
+            # Se for erro de quota/rate limit, tentar fazer retry
             if "429" in str(e) or "quota" in error_str or "rate limit" in error_str:
                 if attempt < max_retries - 1:
-                    time.sleep(delay)
+                    # Tentar extrair o retry_delay sugerido pela API
+                    suggested_delay = None
+                    try:
+                        # Procurar por "retry in XXs" ou "retry_delay { seconds: XX }"
+                        match = re.search(r'retry in (\d+(?:\.\d+)?)s', str(e))
+                        if match:
+                            suggested_delay = float(match.group(1))
+                        else:
+                            match = re.search(r'seconds:\s*(\d+)', str(e))
+                            if match:
+                                suggested_delay = float(match.group(1))
+                    except:
+                        pass
+                    
+                    # Usar o delay sugerido se for razoável (< 120s), senão usar exponencial backoff
+                    if suggested_delay and suggested_delay < 120:
+                        actual_delay = min(suggested_delay, 60)  # Cap at 60s for user experience
+                    else:
+                        actual_delay = delay
+                    
+                    # Se o delay sugerido for muito longo, não vale a pena retry
+                    if suggested_delay and suggested_delay > 60:
+                        # Não fazer retry, deixar o erro ser tratado pelo caller
+                        raise e
+                    
+                    time.sleep(actual_delay)
                     delay *= backoff_factor
                     continue
             # Para outros erros, não fazer retry
@@ -2114,8 +2141,31 @@ Seja detalhado, técnico e preciso na sua análise.
     try:
         return retry_api_call(make_api_call, max_retries=max_retries, initial_delay=2.0, backoff_factor=2.0)
     except Exception as e:
+        import re
         error_msg = f"Erro ao analisar com Gemini: {str(e)}\n\n"
         error_type = str(e).lower()
+        error_full = str(e)
+        
+        # Extract specific information from quota errors
+        quota_info = {
+            'retry_delay': None,
+            'quota_metric': None,
+            'model': model_name
+        }
+        
+        # Try to parse retry delay
+        match = re.search(r'retry in (\d+(?:\.\d+)?)s', error_full)
+        if match:
+            quota_info['retry_delay'] = float(match.group(1))
+        else:
+            match = re.search(r'seconds:\s*(\d+)', error_full)
+            if match:
+                quota_info['retry_delay'] = float(match.group(1))
+        
+        # Try to parse quota metric
+        match = re.search(r'quota_metric:\s*"([^"]+)"', error_full)
+        if match:
+            quota_info['quota_metric'] = match.group(1)
         
         # Provide helpful guidance based on error type
         if "configure" in error_type:
@@ -2141,14 +2191,56 @@ Seja detalhado, técnico e preciso na sua análise.
                 "   Obtenha sua API key em: https://ai.google.dev/\n"
             )
         elif "quota" in error_type or "rate limit" in error_type or "429" in str(e):
-            error_msg += (
-                "⏱️ Limite de requisições atingido. Aguarde alguns minutos.\n"
-                f"   Tentativas realizadas: {max_retries}\n"
-                "   💡 Sugestões:\n"
-                "   - Aguarde 1-2 minutos antes de tentar novamente\n"
-                "   - Verifique seu limite em: https://ai.google.dev/\n"
-                "   - Use a análise Multi-Agente como alternativa (não requer API externa)\n"
-            )
+            error_msg += "⏱️ **Limite de Quota Atingido**\n\n"
+            
+            # Specific information about the quota
+            if "free_tier" in error_full:
+                error_msg += "📊 **Tipo de Quota:** Free Tier (Gratuito)\n"
+            
+            if quota_info['quota_metric']:
+                metric_name = quota_info['quota_metric'].split('/')[-1]
+                error_msg += f"📈 **Métrica Excedida:** {metric_name}\n"
+            
+            error_msg += f"🔢 **Modelo Usado:** {quota_info['model']}\n"
+            
+            if quota_info['retry_delay']:
+                minutes = int(quota_info['retry_delay'] / 60)
+                seconds = int(quota_info['retry_delay'] % 60)
+                if minutes > 0:
+                    error_msg += f"⏳ **Tempo Sugerido de Espera:** {minutes}min {seconds}s\n"
+                else:
+                    error_msg += f"⏳ **Tempo Sugerido de Espera:** {seconds}s\n"
+            
+            error_msg += f"\n🔄 **Tentativas Realizadas:** {max_retries}\n"
+            error_msg += "\n💡 **Soluções Recomendadas:**\n\n"
+            error_msg += "**Opção 1 - Usar Análise Multi-Agente (RECOMENDADO)** ✨\n"
+            error_msg += "   - Não requer API externa\n"
+            error_msg += "   - Sistema com 15 especialistas virtuais\n"
+            error_msg += "   - Análise completa e detalhada\n"
+            error_msg += "   - Role para baixo e clique em 'Gerar Análise Multi-Especialista'\n\n"
+            
+            error_msg += "**Opção 2 - Mudar de Modelo Gemini**\n"
+            if "gemini-2.5-pro" in model_name or "gemini-1.5-pro" in model_name:
+                error_msg += "   - Tente usar 'gemini-1.5-flash' (mais leve, quota maior)\n"
+                error_msg += "   - Ou 'gemini-2.0-flash-exp' (versão experimental gratuita)\n"
+            else:
+                error_msg += "   - Verifique modelos alternativos disponíveis\n"
+            error_msg += "   - Reconfigure na barra lateral\n\n"
+            
+            error_msg += "**Opção 3 - Aguardar e Tentar Novamente**\n"
+            if quota_info['retry_delay']:
+                if quota_info['retry_delay'] < 120:
+                    error_msg += f"   - Aguarde ~{int(quota_info['retry_delay'])}s e tente novamente\n"
+                else:
+                    error_msg += "   - Aguarde alguns minutos (quota diária pode estar esgotada)\n"
+            else:
+                error_msg += "   - Aguarde 1-2 minutos e tente novamente\n"
+            error_msg += "   - Verifique sua quota em: https://ai.google.dev/\n\n"
+            
+            error_msg += "**Opção 4 - Upgrade do Plano**\n"
+            error_msg += "   - Considere upgrade para aumentar limites\n"
+            error_msg += "   - Veja detalhes em: https://ai.google.dev/pricing\n"
+            
         elif "resource" in error_type and "exhausted" in error_type:
             error_msg += (
                 "💳 Recursos/créditos esgotados. Verifique sua conta.\n"
