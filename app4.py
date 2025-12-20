@@ -56,15 +56,16 @@ except ImportError:
 
 # Importar APIs com suporte de visão
 try:
-    import google.genai as genai
+    # Prioritize stable google-generativeai package (recommended)
+    import google.generativeai as genai
     GEMINI_AVAILABLE = True
-    GEMINI_NEW_API = True  # New google-genai package
+    GEMINI_NEW_API = False  # Stable google-generativeai package
 except ImportError:
-    # Fallback to old package if new one not available
+    # Fallback to new beta package if stable not available
     try:
-        import google.generativeai as genai
+        import google.genai as genai
         GEMINI_AVAILABLE = True
-        GEMINI_NEW_API = False  # Old google-generativeai package
+        GEMINI_NEW_API = True  # Beta google-genai package
     except ImportError:
         GEMINI_AVAILABLE = False
         GEMINI_NEW_API = False
@@ -86,6 +87,9 @@ except ImportError:
 try:
     import sys
     # Force module reload to avoid Streamlit caching issues
+    # Note: This is necessary because Streamlit's module system can cache imports
+    # incorrectly, leading to KeyError exceptions. This is different from function
+    # caching and cannot be solved with @st.cache decorators.
     if 'visualization_3d' in sys.modules:
         del sys.modules['visualization_3d']
     from visualization_3d import visualize_pca_3d, visualize_activation_heatmap_3d, create_interactive_3d_visualization
@@ -4192,8 +4196,10 @@ def main():
                                         
                                         # Calculate convergence metrics
                                         if 'valid_accuracy' in hist and len(hist['valid_accuracy']) > 1:
-                                            last_5_acc = hist['valid_accuracy'][-5:]
-                                            acc_variance = np.var(last_5_acc) if len(last_5_acc) > 1 else 0
+                                            # Take last N epochs (up to 5) for convergence analysis
+                                            n_epochs_to_check = min(5, len(hist['valid_accuracy']))
+                                            last_n_acc = hist['valid_accuracy'][-n_epochs_to_check:]
+                                            acc_variance = np.var(last_n_acc) if len(last_n_acc) > 1 else 0
                                             statistical_results["Estabilidade da Convergência"] = "Alta" if acc_variance < 0.001 else "Média" if acc_variance < 0.01 else "Baixa"
                                     else:
                                         statistical_results["Nota"] = "Para análise completa, avalie em conjunto de teste separado"

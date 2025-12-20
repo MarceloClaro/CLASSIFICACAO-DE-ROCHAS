@@ -250,32 +250,37 @@ IMPORTANTE:
             else:
                 return "Provider not supported"
         except Exception as e:
+            # Build error message with helpful guidance
+            error_type = str(e).lower()
             error_msg = f"Erro ao gerar análise com IA: {str(e)}\n\n"
             
             # Provide helpful guidance based on error type
-            if "configure" in str(e).lower():
-                error_msg += "💡 Dica: Parece que há um problema de configuração da API.\n"
-                error_msg += "   Certifique-se de usar: pip install google-generativeai\n"
-            elif "404" in str(e) and "not found" in str(e).lower():
-                error_msg += "🔍 Modelo não encontrado. Verifique se:\n"
-                error_msg += "   1. O nome do modelo está correto (gemini-1.0-pro, gemini-1.5-pro, gemini-1.5-flash)\n"
-                error_msg += "   2. O modelo está disponível na sua região\n"
-                error_msg += "   3. Você tem acesso ao modelo com sua API key\n"
-                error_msg += "   \n"
-                error_msg += "   💡 Recomendação: Use o pacote estável e modelos disponíveis:\n"
-                error_msg += "   pip install google-generativeai\n"
-                error_msg += "   \n"
-                error_msg += "   Modelos recomendados:\n"
-                error_msg += "   - gemini-1.5-flash (rápido e eficiente)\n"
-                error_msg += "   - gemini-1.5-pro (mais avançado)\n"
-                error_msg += "   - gemini-pro (estável)\n"
-            elif "api key" in str(e).lower() or "401" in str(e) or "403" in str(e):
-                error_msg += "🔑 Verifique se a API key está correta e ativa.\n"
-                error_msg += "   Para Gemini: https://ai.google.dev/\n"
-                error_msg += "   Para Groq: https://console.groq.com/\n"
-            elif "quota" in str(e).lower() or "rate limit" in str(e).lower() or "429" in str(e):
+            if "configure" in error_type:
+                error_msg += """💡 Dica: Parece que há um problema de configuração da API.
+   Certifique-se de usar: pip install google-generativeai
+"""
+            elif "404" in str(e) and "not found" in error_type:
+                error_msg += """🔍 Modelo não encontrado. Verifique se:
+   1. O nome do modelo está correto (gemini-1.0-pro, gemini-1.5-pro, gemini-1.5-flash)
+   2. O modelo está disponível na sua região
+   3. Você tem acesso ao modelo com sua API key
+   
+   💡 Recomendação: Use o pacote estável e modelos disponíveis:
+   pip install google-generativeai
+   
+   Modelos recomendados:
+   - gemini-1.5-flash (rápido e eficiente)
+   - gemini-1.5-pro (mais avançado)
+   - gemini-pro (estável)
+"""
+            elif "api key" in error_type or "401" in str(e) or "403" in str(e):
+                error_msg += """🔑 Verifique se a API key está correta e ativa.
+   Para Gemini: https://ai.google.dev/
+   Para Groq: https://console.groq.com/
+"""
+            elif "quota" in error_type or "rate limit" in error_type or "429" in str(e):
                 error_msg += "⏱️ Limite de requisições atingido. Aguarde alguns minutos antes de tentar novamente.\n"
-            elif "resource" in str(e).lower() and "exhausted" in str(e).lower():
+            elif "resource" in error_type and "exhausted" in error_type:
                 error_msg += "💳 Recursos/créditos esgotados. Verifique sua conta na plataforma.\n"
             else:
                 error_msg += "📖 Consulte o guia de configuração: API_SETUP_GUIDE.md\n"
