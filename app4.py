@@ -84,28 +84,43 @@ except ImportError:
 
 # Import new advanced modules from app5
 try:
+    import sys
+    # Force module reload to avoid Streamlit caching issues
+    if 'visualization_3d' in sys.modules:
+        del sys.modules['visualization_3d']
     from visualization_3d import visualize_pca_3d, visualize_activation_heatmap_3d, create_interactive_3d_visualization
     VISUALIZATION_3D_AVAILABLE = True
-except ImportError:
+except (ImportError, KeyError, ModuleNotFoundError) as e:
     VISUALIZATION_3D_AVAILABLE = False
+    # print(f"Warning: visualization_3d not available: {e}")
 
 try:
+    # Force module reload to avoid Streamlit caching issues
+    if 'ai_chat_module' in sys.modules:
+        del sys.modules['ai_chat_module']
     from ai_chat_module import AIAnalyzer, describe_gradcam_regions, get_gemini_model_path
     AI_CHAT_AVAILABLE = True
-except ImportError:
+except (ImportError, KeyError, ModuleNotFoundError) as e:
     AI_CHAT_AVAILABLE = False
+    # print(f"Warning: ai_chat_module not available: {e}")
     # Define fallback function if module not available
-    def get_gemini_model_path(model_name: str) -> str:
+    def get_gemini_model_path(model_name: str, use_new_api: bool = False) -> str:
         """Fallback: Get the correct model path for Gemini API calls."""
-        if not model_name.startswith('models/'):
-            return f'models/{model_name}'
-        return model_name
+        clean_name = model_name.replace('models/', '')
+        if use_new_api:
+            return f'models/{clean_name}'
+        else:
+            return clean_name
 
 try:
+    # Force module reload to avoid Streamlit caching issues
+    if 'academic_references' in sys.modules:
+        del sys.modules['academic_references']
     from academic_references import AcademicReferenceFetcher, format_references_for_display
     ACADEMIC_REF_AVAILABLE = True
-except ImportError:
+except (ImportError, KeyError, ModuleNotFoundError) as e:
     ACADEMIC_REF_AVAILABLE = False
+    # print(f"Warning: academic_references not available: {e}")
 
 try:
     from genetic_interpreter import GeneticDiagnosticInterpreter
@@ -1828,95 +1843,62 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
         str: Análise técnica e forense da imagem
     """
     if not GEMINI_AVAILABLE:
-        return "Google Generative AI não está disponível. Instale com: pip install google-genai"
+        return "Google Generative AI não está disponível. Instale com: pip install google-generativeai"
     
     try:
+        prompt = f"""
+    Você é um especialista em análise de imagens e interpretação técnica e forense.
+    
+    **Contexto da Classificação:**
+    - Classe Predita: {class_name}
+    - Confiança: {confidence:.4f} ({confidence*100:.2f}%)
+    - Análise Grad-CAM: {gradcam_description if gradcam_description else 'Não disponível'}
+    
+    Por favor, realize uma análise COMPLETA e DETALHADA da imagem fornecida, incluindo:
+    
+    1. **Descrição Visual Detalhada:**
+       - Descreva todos os elementos visuais presentes na imagem
+       - Identifique padrões, texturas, cores e formas relevantes
+       - Analise a qualidade e características da imagem
+    
+    2. **Interpretação Técnica:**
+       - Avalie se a classificação como "{class_name}" é compatível com o que você observa
+       - Identifique características específicas que suportam ou contradizem a classificação
+       - Analise a confiança de {confidence*100:.2f}% em relação aos padrões visuais
+    
+    3. **Análise Forense:**
+       - Identifique possíveis artefatos ou anomalias na imagem
+       - Avalie a integridade e autenticidade da imagem
+       - Destaque áreas de interesse ou preocupação
+    
+    4. **Recomendações:**
+       - Sugira se a classificação deve ser aceita ou revista
+       - Recomende análises adicionais se necessário
+       - Forneça orientações para melhorar a confiança na classificação
+    
+    Seja detalhado, técnico e preciso na sua análise.
+    """
+        
         if GEMINI_NEW_API:
-            # New google-genai package API
+            # New beta google-genai package API
             client = genai.Client(api_key=api_key)
-            
-            prompt = f"""
-        Você é um especialista em análise de imagens e interpretação técnica e forense.
-        
-        **Contexto da Classificação:**
-        - Classe Predita: {class_name}
-        - Confiança: {confidence:.4f} ({confidence*100:.2f}%)
-        - Análise Grad-CAM: {gradcam_description if gradcam_description else 'Não disponível'}
-        
-        Por favor, realize uma análise COMPLETA e DETALHADA da imagem fornecida, incluindo:
-        
-        1. **Descrição Visual Detalhada:**
-           - Descreva todos os elementos visuais presentes na imagem
-           - Identifique padrões, texturas, cores e formas relevantes
-           - Analise a qualidade e características da imagem
-        
-        2. **Interpretação Técnica:**
-           - Avalie se a classificação como "{class_name}" é compatível com o que você observa
-           - Identifique características específicas que suportam ou contradizem a classificação
-           - Analise a confiança de {confidence*100:.2f}% em relação aos padrões visuais
-        
-        3. **Análise Forense:**
-           - Identifique possíveis artefatos ou anomalias na imagem
-           - Avalie a integridade e autenticidade da imagem
-           - Destaque áreas de interesse ou preocupação
-        
-        4. **Recomendações:**
-           - Sugira se a classificação deve ser aceita ou revista
-           - Recomende análises adicionais se necessário
-           - Forneça orientações para melhorar a confiança na classificação
-        
-        Seja detalhado, técnico e preciso na sua análise.
-        """
             
             # Convert PIL image to bytes
             img_byte_arr = io.BytesIO()
             image.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
             
-            # The new API requires the 'models/' prefix
-            model_path = get_gemini_model_path(model_name)
+            # Get correct model path for beta API
+            model_path = get_gemini_model_path(model_name, use_new_api=True)
             response = client.models.generate_content(
                 model=model_path,
                 contents=[prompt, {"mime_type": "image/png", "data": img_byte_arr}]
             )
             return response.text
         else:
-            # Old google-generativeai package API
+            # Stable google-generativeai package API (recommended)
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel(model_name)
-            
-            prompt = f"""
-        Você é um especialista em análise de imagens e interpretação técnica e forense.
-        
-        **Contexto da Classificação:**
-        - Classe Predita: {class_name}
-        - Confiança: {confidence:.4f} ({confidence*100:.2f}%)
-        - Análise Grad-CAM: {gradcam_description if gradcam_description else 'Não disponível'}
-        
-        Por favor, realize uma análise COMPLETA e DETALHADA da imagem fornecida, incluindo:
-        
-        1. **Descrição Visual Detalhada:**
-           - Descreva todos os elementos visuais presentes na imagem
-           - Identifique padrões, texturas, cores e formas relevantes
-           - Analise a qualidade e características da imagem
-        
-        2. **Interpretação Técnica:**
-           - Avalie se a classificação como "{class_name}" é compatível com o que você observa
-           - Identifique características específicas que suportam ou contradizem a classificação
-           - Analise a confiança de {confidence*100:.2f}% em relação aos padrões visuais
-        
-        3. **Análise Forense:**
-           - Identifique possíveis artefatos ou anomalias na imagem
-           - Avalie a integridade e autenticidade da imagem
-           - Destaque áreas de interesse ou preocupação
-        
-        4. **Recomendações:**
-           - Sugira se a classificação deve ser aceita ou revista
-           - Recomende análises adicionais se necessário
-           - Forneça orientações para melhorar a confiança na classificação
-        
-        Seja detalhado, técnico e preciso na sua análise.
-        """
             
             response = model.generate_content([prompt, image])
             return response.text
@@ -1927,12 +1909,20 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
         # Provide helpful guidance based on error type
         if "configure" in str(e).lower():
             error_msg += "💡 Dica: Parece que há um problema de configuração da API.\n"
-            error_msg += "   Este erro foi corrigido! Tente reinstalar: pip install --upgrade google-generativeai\n"
-        elif "api key" in str(e).lower() or "401" in str(e):
-            error_msg += "🔑 Verifique se a API key está correta e se você tem créditos disponíveis.\n"
+            error_msg += "   Certifique-se de usar: pip install google-generativeai\n"
+        elif "404" in str(e) and "not found" in str(e).lower():
+            error_msg += "🔍 Modelo não encontrado ou não suportado para este tipo de requisição.\n"
+            error_msg += "   Modelos recomendados com suporte a visão:\n"
+            error_msg += "   - gemini-1.5-flash (rápido, suporta visão)\n"
+            error_msg += "   - gemini-1.5-pro (avançado, suporta visão)\n"
+            error_msg += "   - gemini-pro-vision (especializado em visão)\n"
+        elif "api key" in str(e).lower() or "401" in str(e) or "403" in str(e):
+            error_msg += "🔑 Verifique se a API key está correta e ativa.\n"
             error_msg += "   Obtenha sua API key em: https://ai.google.dev/\n"
-        elif "quota" in str(e).lower() or "rate limit" in str(e).lower():
+        elif "quota" in str(e).lower() or "rate limit" in str(e).lower() or "429" in str(e):
             error_msg += "⏱️ Limite de requisições atingido. Aguarde alguns minutos.\n"
+        elif "resource" in str(e).lower() and "exhausted" in str(e).lower():
+            error_msg += "💳 Recursos/créditos esgotados. Verifique sua conta.\n"
         else:
             error_msg += "📖 Consulte o guia: API_SETUP_GUIDE.md para mais detalhes.\n"
         
