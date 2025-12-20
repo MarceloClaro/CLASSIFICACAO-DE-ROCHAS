@@ -4484,21 +4484,14 @@ def main():
                                             try:
                                                 st.write("🔍 Consultando bases de dados científicas...")
                                                 
-                                                # Get API configuration if available
-                                                ai_provider = None
-                                                ai_api_key = None
-                                                ai_model = None
-                                                if 'api_configured' in st.session_state and st.session_state['api_configured']:
-                                                    ai_provider = st.session_state.get('api_provider')
-                                                    ai_api_key = st.session_state.get('api_key')
-                                                    ai_model_raw = st.session_state.get('api_model')
-                                                    # Validate and sanitize model name
-                                                    ai_model = validate_model_name(ai_model_raw, ai_provider)
+                                                # Use the API configuration from the current section (not sidebar)
+                                                # This ensures we use the provider and model selected by the user in this dialog
+                                                # Variables api_provider, api_key, and ai_model are already defined above from user input
                                                 
-                                                # Initialize fetcher with AI capabilities
+                                                # Initialize fetcher with AI capabilities using current section config
                                                 ref_fetcher = AcademicReferenceFetcher(
-                                                    ai_provider=ai_provider,
-                                                    ai_api_key=ai_api_key,
+                                                    ai_provider=api_provider,
+                                                    ai_api_key=api_key,
                                                     ai_model=ai_model
                                                 )
                                                 
@@ -4512,7 +4505,7 @@ def main():
                                                     status.update(label=f"📚 {len(references)} referências encontradas!", state="running")
                                                     
                                                     # Enrich references with translations and critical reviews
-                                                    if ai_provider and ai_api_key:
+                                                    if api_provider and api_key:
                                                         st.write("🌐 Traduzindo resumos e gerando resenhas críticas...")
                                                         references = ref_fetcher.enrich_references_with_analysis(references)
                                                         status.update(label=f"📚 {len(references)} referências processadas com traduções e resenhas!", state="complete")
