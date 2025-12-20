@@ -117,7 +117,7 @@ def plot_class_distribution(dataset, classes):
     
     # Plotar o gráfico com as contagens
     fig, ax = plt.subplots(figsize=(10, 6))
-    sns.countplot(x=labels, ax=ax, palette="Set2")
+    sns.countplot(x=labels, hue=labels, ax=ax, palette="Set2", legend=False)
     
     # Adicionar os nomes das classes no eixo X
     ax.set_xticks(range(len(classes)))
@@ -383,7 +383,7 @@ def compute_metrics(model, dataloader, classes):
             all_probs.extend(probabilities.cpu().numpy())
 
     # Relatório de Classificação
-    report = classification_report(all_labels, all_preds, target_names=classes, output_dict=True)
+    report = classification_report(all_labels, all_preds, target_names=classes, output_dict=True, zero_division=0)
     st.text("Relatório de Classificação:")
     st.write(pd.DataFrame(report).transpose())
 
