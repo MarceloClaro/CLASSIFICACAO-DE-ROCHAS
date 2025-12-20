@@ -42,7 +42,7 @@ show_3d_gradcam = st.checkbox("Mostrar Grad-CAM em 3D")
 ### 2. 🤖 Chat com IA para Análise Diagnóstica
 
 #### Suporte para Múltiplos Provedores
-- **Google Gemini**: modelos gemini-1.5-pro-latest (recomendado), gemini-1.5-flash-latest, gemini-1.0-pro-latest, gemini-pro, gemini-pro-vision
+- **Google Gemini**: modelos gemini-1.5-pro-latest (recomendado), gemini-1.5-flash-latest, gemini-1.0-pro-latest, gemini-pro, gemini-1.0-pro-vision-latest
 - **Groq**: modelos mixtral-8x7b-32768, llama-3.1-70b-versatile, llama-3.1-8b-instant
 
 #### Análise Diagnóstica Completa

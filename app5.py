@@ -2197,7 +2197,6 @@ def main():
                                 'gemini-1.5-flash-latest',
                                 'gemini-1.0-pro-latest',
                                 'gemini-pro',
-                                'gemini-pro-vision',
                                 'gemini-1.0-pro-vision-latest'
                             ]
                         else:
@@ -2397,7 +2396,6 @@ def main():
                                         - gemini-1.5-flash-latest (rápido e eficiente)
                                         - gemini-1.0-pro-latest (estável)
                                         - gemini-pro (uso geral)
-                                        - gemini-pro-vision (com suporte a visão)
                                         - gemini-1.0-pro-vision-latest (visão mais recente)
                                         """)
                                     else:

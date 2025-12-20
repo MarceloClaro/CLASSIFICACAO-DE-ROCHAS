@@ -275,7 +275,7 @@ IMPORTANTE:
                     "   - gemini-1.5-flash-latest (rápido e eficiente)\n"
                     "   - gemini-1.0-pro-latest (estável)\n"
                     "   - gemini-pro (uso geral)\n"
-                    "   - gemini-pro-vision (com suporte a visão)\n"
+                    "   - gemini-1.0-pro-vision-latest (com suporte a visão)\n"
                 )
             elif "api key" in error_type or "401" in str(e) or "403" in str(e):
                 error_msg += (

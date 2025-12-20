@@ -1997,7 +1997,6 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
                 "   Modelos com suporte a visão (imagens):\n"
                 "   - gemini-1.5-pro-latest ⭐ RECOMENDADO (avançado com visão)\n"
                 "   - gemini-1.5-flash-latest (rápido com visão)\n"
-                "   - gemini-pro-vision (especializado em visão)\n"
                 "   - gemini-1.0-pro-vision-latest (visão com auto-update)\n"
                 "   \n"
                 "   Modelos SEM suporte a visão:\n"
@@ -3776,7 +3775,6 @@ def main():
                     'gemini-1.5-flash-latest', 
                     'gemini-1.0-pro-latest',
                     'gemini-pro',
-                    'gemini-pro-vision',
                     'gemini-1.0-pro-vision-latest'
                 ]
             else:  # Groq
@@ -4228,7 +4226,6 @@ def main():
                                 'gemini-1.5-flash-latest',
                                 'gemini-1.0-pro-latest',
                                 'gemini-pro',
-                                'gemini-pro-vision',
                                 'gemini-1.0-pro-vision-latest'
                             ]
                         else:
