@@ -1834,17 +1834,18 @@ def encode_image_to_base64(image):
     image.save(buffered, format="PNG")
     return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence, gradcam_description=""):
+def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence, gradcam_description="", gradcam_image=None):
     """
     Analisa uma imagem usando Google Gemini com visão computacional.
     
     Args:
-        image: PIL Image
+        image: PIL Image (imagem original)
         api_key: Chave API do Gemini
-        model_name: Nome do modelo Gemini
+        model_name: Nome do modelo Gemini (deve suportar visão)
         class_name: Classe predita pelo modelo
         confidence: Confiança da predição
-        gradcam_description: Descrição do Grad-CAM
+        gradcam_description: Descrição textual do Grad-CAM
+        gradcam_image: PIL Image com Grad-CAM sobreposto (opcional)
     
     Returns:
         str: Análise técnica e forense da imagem
@@ -1853,7 +1854,59 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
         return "Google Generative AI não está disponível. Instale com: pip install google-generativeai"
     
     try:
-        prompt = f"""
+        # Construir prompt baseado na disponibilidade de Grad-CAM
+        if gradcam_image is not None:
+            prompt = f"""
+    Você é um especialista em análise de imagens e interpretação técnica e forense.
+    
+    **Contexto da Classificação:**
+    - Classe Predita: {class_name}
+    - Confiança: {confidence:.4f} ({confidence*100:.2f}%)
+    - Análise Grad-CAM: {gradcam_description if gradcam_description else 'Veja a segunda imagem'}
+    
+    **IMPORTANTE:** Você receberá DUAS imagens:
+    1. **Primeira imagem**: A imagem ORIGINAL classificada
+    2. **Segunda imagem**: A mesma imagem com sobreposição de Grad-CAM (mapa de calor vermelho-amarelo)
+    
+    O Grad-CAM (Gradient-weighted Class Activation Mapping) mostra onde a rede neural focou sua "atenção" 
+    para fazer a classificação. Regiões em vermelho/amarelo indicam áreas de alta importância para a decisão.
+    
+    Por favor, realize uma análise COMPLETA e DETALHADA das DUAS imagens, incluindo:
+    
+    1. **Descrição Visual da Imagem Original:**
+       - Descreva todos os elementos visuais presentes na imagem original
+       - Identifique padrões, texturas, cores e formas relevantes
+       - Analise a qualidade e características da imagem
+    
+    2. **Análise do Grad-CAM (Segunda Imagem):**
+       - Identifique quais regiões da imagem têm maior ativação (vermelho/amarelo intenso)
+       - Descreva O QUE está presente nessas regiões de alta ativação
+       - Avalie se essas regiões fazem sentido para a classificação como "{class_name}"
+       - Compare: O modelo está focando nas características corretas?
+    
+    3. **Interpretação Técnica Integrada:**
+       - Avalie se a classificação como "{class_name}" é compatível com o que você observa
+       - Relacione as características visuais da imagem original com as regiões de ativação
+       - Analise se a confiança de {confidence*100:.2f}% é justificada pelas regiões focadas
+       - Identifique se há características importantes ignoradas pelo modelo
+    
+    4. **Análise Forense:**
+       - Identifique possíveis artefatos ou anomalias nas imagens
+       - Avalie a integridade e autenticidade da imagem
+       - Verifique se o Grad-CAM está focando em artefatos em vez de características reais
+       - Destaque áreas de interesse ou preocupação
+    
+    5. **Recomendações:**
+       - Sugira se a classificação deve ser aceita ou revista
+       - Baseie-se na correlação entre características visuais e regiões de ativação
+       - Recomende análises adicionais se necessário
+       - Forneça orientações para melhorar a confiança na classificação
+    
+    Seja detalhado, técnico e preciso na sua análise. Relacione SEMPRE os dois aspectos: 
+    o que você vê na imagem original e onde o modelo está focando no Grad-CAM.
+    """
+        else:
+            prompt = f"""
     Você é um especialista em análise de imagens e interpretação técnica e forense.
     
     **Contexto da Classificação:**
@@ -1890,16 +1943,27 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
             # New beta google-genai package API
             client = genai.Client(api_key=api_key)
             
-            # Convert PIL image to bytes
+            # Convert PIL images to bytes
             img_byte_arr = io.BytesIO()
             image.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
             
             # Get correct model path for beta API
             model_path = get_gemini_model_path(model_name, use_new_api=True)
+            
+            # Build content list
+            content_parts = [prompt, {"mime_type": "image/png", "data": img_byte_arr}]
+            
+            # Add Grad-CAM image if available
+            if gradcam_image is not None:
+                gradcam_byte_arr = io.BytesIO()
+                gradcam_image.save(gradcam_byte_arr, format='PNG')
+                gradcam_byte_arr = gradcam_byte_arr.getvalue()
+                content_parts.append({"mime_type": "image/png", "data": gradcam_byte_arr})
+            
             response = client.models.generate_content(
                 model=model_path,
-                contents=[prompt, {"mime_type": "image/png", "data": img_byte_arr}]
+                contents=content_parts
             )
             return response.text
         else:
@@ -1907,7 +1971,14 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel(model_name)
             
-            response = model.generate_content([prompt, image])
+            # Build content list
+            content_parts = [prompt, image]
+            
+            # Add Grad-CAM image if available
+            if gradcam_image is not None:
+                content_parts.append(gradcam_image)
+            
+            response = model.generate_content(content_parts)
             return response.text
     
     except Exception as e:
@@ -1922,11 +1993,16 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
             )
         elif "404" in str(e) and "not found" in error_type:
             error_msg += (
-                "🔍 Modelo não encontrado ou não suportado para este tipo de requisição.\n"
-                "   Modelos recomendados com suporte a visão:\n"
-                "   - gemini-1.5-flash (rápido, suporta visão)\n"
-                "   - gemini-1.5-pro (avançado, suporta visão)\n"
+                "🔍 Modelo não encontrado ou não suporta análise de imagens.\n"
+                "   Modelos com suporte a visão (imagens):\n"
+                "   - gemini-1.5-pro-latest ⭐ RECOMENDADO (avançado com visão)\n"
+                "   - gemini-1.5-flash-latest (rápido com visão)\n"
                 "   - gemini-pro-vision (especializado em visão)\n"
+                "   - gemini-1.0-pro-vision-latest (visão com auto-update)\n"
+                "   \n"
+                "   Modelos SEM suporte a visão:\n"
+                "   - gemini-1.0-pro-latest\n"
+                "   - gemini-pro\n"
             )
         elif "api key" in error_type or "401" in str(e) or "403" in str(e):
             error_msg += (
@@ -2744,7 +2820,9 @@ def visualize_activations(model, image, class_names, gradcam_type='SmoothGradCAM
         gradcam_type: Tipo de Grad-CAM ('GradCAM', 'GradCAMpp', 'SmoothGradCAMpp', 'LayerCAM')
     
     Returns:
-        activation_map_resized: Mapa de ativação normalizado ou None em caso de erro
+        tuple: (activation_map_resized, gradcam_image_pil) onde:
+            - activation_map_resized: Mapa de ativação normalizado ou None em caso de erro
+            - gradcam_image_pil: Imagem PIL com Grad-CAM sobreposto ou None
     """
     cam_extractor = None
     original_training_mode = model.training
@@ -2843,12 +2921,15 @@ def visualize_activations(model, image, class_names, gradcam_type='SmoothGradCAM
         st.pyplot(fig)
         plt.close(fig)
         
-        return activation_map_resized
+        # Converter superimposed_img para PIL Image para retornar
+        gradcam_image_pil = Image.fromarray(superimposed_img)
+        
+        return activation_map_resized, gradcam_image_pil
         
     except Exception as e:
         st.error(f"Erro ao gerar Grad-CAM: {str(e)}")
         st.info("Visualização Grad-CAM não disponível para este modelo/configuração.")
-        return None
+        return None, None
     finally:
         # CRITICAL: Remove hooks and reset model state to prevent interference with subsequent calls
         if cam_extractor is not None:
@@ -4033,7 +4114,7 @@ def main():
                 st.write(f"**Confiança:** {confidence:.4f}")
 
                 # Visualizar ativações com o tipo de Grad-CAM selecionado
-                activation_map = visualize_activations(model, eval_image, classes, gradcam_type)
+                activation_map, gradcam_image = visualize_activations(model, eval_image, classes, gradcam_type)
                 
                 # ========== VISUALIZAÇÃO 3D DO GRAD-CAM ==========
                 if activation_map is not None and VISUALIZATION_3D_AVAILABLE:
@@ -4334,6 +4415,19 @@ def main():
                     st.write("## 🤖 Análise Diagnóstica com IA (Visão Computacional)")
                     st.write(f"**API Configurada:** {st.session_state['api_provider']} - {st.session_state['api_model']}")
                     
+                    # Info about multi-image analysis
+                    if gradcam_image is not None:
+                        st.info("""
+                        💡 **Análise Multi-Imagem Ativada**
+                        
+                        A IA receberá e analisará **DUAS imagens**:
+                        1. 🖼️ **Imagem Original** - A imagem classificada
+                        2. 🔥 **Grad-CAM Overlay** - Mapa de calor mostrando onde o modelo focou
+                        
+                        Isso permite uma análise mais profunda correlacionando as características visuais 
+                        com as regiões de atenção da rede neural.
+                        """)
+                    
                     if st.button("🔬 Gerar Análise Completa com IA + Visão"):
                         with st.spinner("🔍 Analisando imagem com IA (visão computacional)..."):
                             # Gerar descrição do Grad-CAM
@@ -4351,7 +4445,8 @@ def main():
                                         st.session_state['api_model'],
                                         class_name,
                                         confidence,
-                                        gradcam_desc
+                                        gradcam_desc,
+                                        gradcam_image  # Pass the Grad-CAM overlay image
                                     )
                             else:  # Groq
                                 if not GROQ_AVAILABLE:
