@@ -43,7 +43,7 @@ if genai is not None:
     print("-" * 70)
     
     print(f"Package name: {genai.__name__}")
-    print(f"API Type: {'NEW' if GEMINI_NEW_API else 'OLD (RECOMMENDED)'}")
+    print(f"API Type: {'BETA' if GEMINI_NEW_API else 'STABLE (RECOMMENDED)'}")
     
     # Check for methods
     has_configure = hasattr(genai, 'configure')
@@ -60,13 +60,13 @@ if genai is not None:
     print("-" * 70)
     
     if GEMINI_NEW_API:
-        print("✓ Should use NEW API:")
+        print("✓ Should use BETA API (google-genai):")
         print("  client = genai.Client(api_key=api_key)")
         print("  # Note: Model name must include 'models/' prefix")
         print("  model_path = f'models/{model_name}' if not model_name.startswith('models/') else model_name")
         print("  response = client.models.generate_content(model=model_path, contents=prompt)")
     else:
-        print("✓ Should use OLD API (RECOMMENDED):")
+        print("✓ Should use STABLE API - RECOMMENDED (google-generativeai):")
         print("  genai.configure(api_key=api_key)")
         print("  model = genai.GenerativeModel(model_name)")
         print("  response = model.generate_content(prompt)")
@@ -91,9 +91,9 @@ if genai is not None:
     print("-" * 70)
     
     if GEMINI_NEW_API and has_client:
-        print("✅ NEW API detected and Client class is available")
+        print("✅ BETA API detected and Client class is available")
     elif not GEMINI_NEW_API and has_configure:
-        print("✅ OLD API detected and configure method is available")
+        print("✅ STABLE API detected and configure method is available")
     else:
         print("⚠️ Warning: API detection may have issues")
     print()
@@ -112,7 +112,7 @@ print("=" * 70)
 
 if genai is not None:
     print("✅ Google GenAI package is installed and detected correctly")
-    print(f"   API Type: {'NEW (google-genai)' if GEMINI_NEW_API else 'OLD (google-generativeai - RECOMMENDED)'}")
+    print(f"   API Type: {'BETA (google-genai)' if GEMINI_NEW_API else 'STABLE (google-generativeai) - RECOMMENDED'}")
     print("   The code will automatically use the correct initialization method")
     print()
     print("📋 Quick Start:")
