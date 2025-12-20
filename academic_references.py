@@ -84,10 +84,23 @@ class AcademicReferenceFetcher:
             if self.ai_provider == 'gemini' and GEMINI_AVAILABLE:
                 genai.configure(api_key=self.ai_api_key)
                 self.ai_model_obj = genai.GenerativeModel(self.ai_model)
+                # Test if model is accessible
+                try:
+                    # Make a simple test call to verify model works
+                    test_response = self.ai_model_obj.generate_content("Test")
+                    print(f"✅ Gemini model '{self.ai_model}' initialized successfully")
+                except Exception as model_error:
+                    print(f"❌ Error initializing Gemini model '{self.ai_model}': {str(model_error)}")
+                    self.ai_model_obj = None
+                    raise
             elif self.ai_provider == 'groq' and GROQ_AVAILABLE:
                 self.ai_client = Groq(api_key=self.ai_api_key)
+                print(f"✅ Groq client initialized successfully")
         except Exception as e:
-            print(f"Warning: Could not initialize AI: {str(e)}")
+            print(f"⚠️ Warning: Could not initialize AI: {str(e)}")
+            print(f"   Translation and critical reviews will not be available.")
+            self.ai_model_obj = None
+            self.ai_client = None
     
     def translate_abstract_to_portuguese(self, abstract: str, title: str = "") -> str:
         """
@@ -105,6 +118,10 @@ class AcademicReferenceFetcher:
         
         # If AI is not available, return original
         if not self.ai_provider or not self.ai_api_key or not AI_AVAILABLE:
+            return abstract
+        
+        # Check if AI model is properly initialized
+        if not self.ai_model_obj and not self.ai_client:
             return abstract
         
         try:
@@ -143,7 +160,7 @@ Forneça APENAS a tradução do resumo, sem adicionar comentários ou explicaç�
             else:
                 return abstract
         except Exception as e:
-            print(f"Error translating abstract: {str(e)}")
+            print(f"❌ Error translating abstract: {str(e)}")
             return abstract
     
     def generate_critical_review(self, reference: Dict) -> str:
@@ -158,6 +175,10 @@ Forneça APENAS a tradução do resumo, sem adicionar comentários ou explicaç�
         """
         if not self.ai_provider or not self.ai_api_key or not AI_AVAILABLE:
             return "Resenha crítica não disponível (requer configuração de API de IA)"
+        
+        # Check if AI model is properly initialized
+        if not self.ai_model_obj and not self.ai_client:
+            return "Resenha crítica não disponível (IA não inicializada corretamente)"
         
         try:
             # Sanitize inputs - limit length to prevent prompt injection
@@ -213,7 +234,7 @@ Mantenha um tom acadêmico e objetivo. Limite a resenha a aproximadamente 150-20
             else:
                 return "Resenha crítica não disponível"
         except Exception as e:
-            print(f"Error generating critical review: {str(e)}")
+            print(f"❌ Error generating critical review: {str(e)}")
             return f"Erro ao gerar resenha crítica: {str(e)}"
     
     def enrich_references_with_analysis(self, references: List[Dict]) -> List[Dict]:
@@ -226,16 +247,27 @@ Mantenha um tom acadêmico e objetivo. Limite a resenha a aproximadamente 150-20
         Returns:
             Enriched list of references with translations and reviews
         """
-        if not self.ai_provider or not self.ai_api_key or not AI_AVAILABLE:
-            # Return references as-is if AI not available
+        # Check if AI is properly initialized
+        ai_is_ready = (
+            self.ai_provider and 
+            self.ai_api_key and 
+            AI_AVAILABLE and
+            (self.ai_model_obj is not None or self.ai_client is not None)
+        )
+        
+        if not ai_is_ready:
+            # Return references as-is if AI not properly initialized
+            error_msg = "Tradução não disponível (IA não inicializada corretamente)"
             for ref in references:
-                ref['abstract_pt'] = "Tradução não disponível (requer configuração de API de IA)"
-                ref['critical_review'] = "Resenha crítica não disponível (requer configuração de API de IA)"
+                ref['abstract_pt'] = error_msg
+                ref['critical_review'] = "Resenha crítica não disponível (IA não inicializada corretamente)"
+            print(f"⚠️ AI not properly initialized. Translation and reviews will not be generated.")
             return references
         
+        print(f"✅ AI is ready. Processing {len(references)} references...")
         enriched = []
         for i, ref in enumerate(references):
-            print(f"Processando artigo {i+1}/{len(references)}: {ref.get('title', 'N/A')[:50]}...")
+            print(f"📄 Processando artigo {i+1}/{len(references)}: {ref.get('title', 'N/A')[:50]}...")
             
             # Translate abstract
             abstract = ref.get('abstract', '')
@@ -251,6 +283,7 @@ Mantenha um tom acadêmico e objetivo. Limite a resenha a aproximadamente 150-20
             if i < len(references) - 1:
                 time.sleep(self.RATE_LIMIT_DELAY)
         
+        print(f"✅ Processamento completo! {len(enriched)} referências enriquecidas.")
         return enriched
     
     def search_pubmed(self, query: str, max_results: int = 5) -> List[Dict]:

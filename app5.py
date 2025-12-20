@@ -2212,7 +2212,7 @@ def main():
                             with st.spinner("Gerando análise diagnóstica aprofundada..."):
                                 try:
                                     # Fetch academic references
-                                    st.write("📚 Buscando referências acadêmicas...")
+                                    st.write("🔍 Consultando bases de dados científicas...")
                                     
                                     # Initialize fetcher with AI capabilities
                                     ref_fetcher = AcademicReferenceFetcher(
@@ -2231,6 +2231,17 @@ def main():
                                         # Enrich references with translations and critical reviews
                                         st.write("🌐 Traduzindo resumos e gerando resenhas críticas...")
                                         references = ref_fetcher.enrich_references_with_analysis(references)
+                                        
+                                        # Count how many were successfully processed
+                                        translated_count = sum(1 for ref in references if ref.get('abstract_pt') and 
+                                                             ref.get('abstract_pt') != ref.get('abstract') and
+                                                             'não disponível' not in ref.get('abstract_pt', '').lower() and
+                                                             'não inicializada' not in ref.get('abstract_pt', '').lower())
+                                        
+                                        if translated_count > 0:
+                                            st.success(f"📚 {translated_count} referências processadas com traduções e resenhas!")
+                                        else:
+                                            st.warning(f"⚠️ {len(references)} referências encontradas, mas traduções/resenhas não disponíveis. Verifique a configuração da API.")
                                         
                                         with st.expander("📚 Referências Acadêmicas Encontradas"):
                                             st.markdown(format_references_for_display(references))
@@ -2319,7 +2330,18 @@ def main():
                                     st.write("---")
                                     st.write("## 🧬 Interpretação Multi-Angular com Algoritmos Genéticos")
                                     
-                                    use_genetic = st.checkbox("Gerar Análise Multi-Perspectiva", value=True)
+                                    # Use session state to preserve checkbox state
+                                    if 'use_genetic_analysis' not in st.session_state:
+                                        st.session_state.use_genetic_analysis = True
+                                    
+                                    use_genetic = st.checkbox(
+                                        "Gerar Análise Multi-Perspectiva", 
+                                        value=st.session_state.use_genetic_analysis,
+                                        key='genetic_checkbox'
+                                    )
+                                    
+                                    # Update session state when checkbox changes
+                                    st.session_state.use_genetic_analysis = use_genetic
                                     
                                     if use_genetic:
                                         with st.spinner("Aplicando algoritmos genéticos para interpretação multi-angular..."):
@@ -2336,13 +2358,34 @@ def main():
                                                 )
                                                 
                                                 st.markdown(multi_angle_report)
+                                                st.success("✅ Análise Multi-Perspectiva com Algoritmos Genéticos Concluída!")
                                                 
                                             except Exception as e:
                                                 st.error(f"Erro ao gerar análise multi-angular: {str(e)}")
+                                                import traceback
+                                                st.code(traceback.format_exc())
                                     
                                 except Exception as e:
-                                    st.error(f"Erro ao gerar análise: {str(e)}")
-                                    st.info("Verifique se a API key está correta e se você tem créditos disponíveis.")
+                                    st.error(f"Erro ao gerar análise com IA: {str(e)}")
+                                    
+                                    # Provide more specific guidance based on error
+                                    error_msg = str(e)
+                                    if '404' in error_msg and 'not found' in error_msg:
+                                        st.error("🔍 Modelo não encontrado. Verifique se:")
+                                        st.markdown("""
+                                        1. O nome do modelo está correto (gemini-1.0-pro, gemini-1.5-pro, gemini-1.5-flash)
+                                        2. O modelo está disponível na sua região
+                                        3. Você tem acesso ao modelo com sua API key
+                                        """)
+                                        st.info("💡 Recomendação: Use o pacote estável e modelos disponíveis: pip install google-generativeai")
+                                        st.markdown("""
+                                        **Modelos recomendados:**
+                                        - gemini-1.5-flash (rápido e eficiente)
+                                        - gemini-1.5-pro (mais avançado)
+                                        - gemini-pro (estável)
+                                        """)
+                                    else:
+                                        st.info("Verifique se a API key está correta e se você tem créditos disponíveis.")
                     else:
                         st.warning("⚠️ Por favor, insira sua API key para gerar a análise.")
 
