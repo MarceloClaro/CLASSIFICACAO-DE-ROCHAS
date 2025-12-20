@@ -4551,7 +4551,7 @@ def main():
                     - ✅ Exportação completa para CSV
                     
                     **Modelos com Suporte de Visão:**
-                    - Gemini: gemini-1.5-pro-latest, gemini-1.5-flash-latest, gemini-1.0-pro-latest, gemini-pro, gemini-pro-vision
+                    - Gemini: gemini-1.5-pro-latest, gemini-1.5-flash-latest, gemini-1.0-pro-vision-latest
                     - Groq: Suporte limitado dependendo do modelo
                     """)
 
