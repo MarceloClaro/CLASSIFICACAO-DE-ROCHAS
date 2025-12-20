@@ -2304,7 +2304,7 @@ def display_statistical_analysis(analysis_results):
         })
     
     if diff_data:
-        st.dataframe(pd.DataFrame(diff_data), use_container_width=True)
+        st.dataframe(pd.DataFrame(diff_data), width='stretch')
         st.caption("💡 A primeira linha é a classificação mais provável, as demais são alternativas em ordem decrescente de probabilidade")
     
     # Teste de significância
@@ -2572,7 +2572,7 @@ def display_statistical_analysis(analysis_results):
             'Probabilidade Média': [f"{p:.2%}" for p in boot['mean_probabilities']],
             'Desvio Padrão': [f"{s:.4f}" for s in boot['std_probabilities']]
         })
-        st.dataframe(prob_df.head(10), use_container_width=True)  # Mostrar top 10
+        st.dataframe(prob_df.head(10), width='stretch')  # Mostrar top 10
         st.caption("As 10 categorias com maiores probabilidades")
     
     # ========== RESUMO FINAL PARA LEIGOS ==========
@@ -3895,7 +3895,7 @@ def main():
                 if VISUALIZATION_3D_AVAILABLE:
                     try:
                         fig_3d = visualize_pca_3d(features_reshaped, labels, classes)
-                        st.plotly_chart(fig_3d, use_container_width=True)
+                        st.plotly_chart(fig_3d, width='stretch')
                         st.success("✅ Visualização 3D interativa gerada! Você pode rotacionar, fazer zoom e explorar.")
                     except Exception as e:
                         st.error(f"Erro ao gerar visualização 3D: {str(e)}")
@@ -3935,7 +3935,7 @@ def main():
                         try:
                             with st.spinner("🔄 Gerando visualização 3D do Grad-CAM..."):
                                 fig_gradcam_3d = visualize_activation_heatmap_3d(activation_map)
-                                st.plotly_chart(fig_gradcam_3d, use_container_width=True)
+                                st.plotly_chart(fig_gradcam_3d, width='stretch')
                                 st.success("✅ Visualização 3D gerada! Você pode rotacionar e fazer zoom no heatmap.")
                         except Exception as e:
                             st.error(f"Erro ao gerar visualização 3D do Grad-CAM: {str(e)}")
