@@ -55,16 +55,19 @@ class MorphologyAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Análise Morfológica Detalhada:**
-A estrutura morfológica observada em '{predicted_class}' apresenta características compatíveis
-com um nível de confiança de {confidence*100:.2f}%. Os padrões geométricos identificados
-demonstram conformidade com os padrões esperados para esta classificação.
+**Análise da Forma e Estrutura (Morfologia):**
+Observando a forma e estrutura geral da imagem classificada como '{predicted_class}', 
+identificamos características visuais que correspondem a esta categoria com {confidence*100:.2f}% de certeza.
+A geometria (formato) e o arranjo das estruturas estão de acordo com o esperado para este tipo de classificação.
+
+**Em termos simples:** Analisamos o "formato" e a "aparência geral" da imagem, como se 
+estivéssemos observando o contorno e a estrutura de um objeto.
 """
         
         recommendations = [
-            "Verificar simetria estrutural",
-            "Analisar proporções dimensionais",
-            "Comparar com atlas morfológico de referência"
+            "Observar se a forma está simétrica (equilibrada dos dois lados)",
+            "Verificar se as proporções (tamanhos relativos) fazem sentido",
+            "Comparar visualmente com exemplos conhecidos desta categoria"
         ]
         
         return AgentResponse(
@@ -89,16 +92,19 @@ class TextureAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Análise Textural Especializada:**
-Os padrões texturais identificados na classificação '{predicted_class}' revelam características
-distintivas. A granularidade e rugosidade observadas são consistentes com a categoria, 
-apresentando confiança de {confidence*100:.2f}%.
+**Análise da Textura (Superfície e Padrões):**
+A textura (superfície) observada na imagem classificada como '{predicted_class}' mostra 
+características marcantes. A rugosidade (se é liso ou áspero) e os pequenos detalhes da 
+superfície são típicos desta categoria, com {confidence*100:.2f}% de certeza.
+
+**Em termos simples:** Examinamos a "textura" da imagem, como se estivéssemos tocando 
+a superfície - é lisa, áspera, uniforme, ou tem variações?
 """
         
         recommendations = [
-            "Examinar micro-texturas",
-            "Avaliar homogeneidade textural",
-            "Comparar com banco de texturas padrão"
+            "Examinar os pequenos detalhes da superfície",
+            "Avaliar se a textura é uniforme (igual em toda parte) ou variada",
+            "Comparar com texturas típicas conhecidas desta categoria"
         ]
         
         return AgentResponse(
@@ -123,16 +129,19 @@ class ColorAnalysisAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Análise Cromática Profunda:**
-A distribuição cromática para '{predicted_class}' apresenta padrões característicos.
-A saturação, matiz e luminosidade observadas são compatíveis com a classificação,
-com confiança de {confidence*100:.2f}%.
+**Análise de Cores e Tonalidades:**
+As cores predominantes na imagem classificada como '{predicted_class}' apresentam padrões 
+característicos. A intensidade das cores, os tons (claro/escuro) e a vivacidade das cores 
+são compatíveis com esta classificação, com {confidence*100:.2f}% de certeza.
+
+**Em termos simples:** Analisamos as "cores" presentes na imagem - quais cores aparecem, 
+se são vivas ou pálidas, claras ou escuras.
 """
         
         recommendations = [
-            "Verificar consistência cromática",
-            "Analisar variações tonais",
-            "Comparar com espectro de referência"
+            "Verificar se as cores são consistentes (similares) em toda a imagem",
+            "Analisar variações de tonalidade (gradações de cor)",
+            "Comparar com o padrão de cores esperado para esta categoria"
         ]
         
         return AgentResponse(
@@ -157,16 +166,19 @@ class SpatialAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Análise de Distribuição Espacial:**
-O arranjo espacial identificado em '{predicted_class}' demonstra organização típica.
-A distribuição e localização de características chave são consistentes, 
-com confiança de {confidence*100:.2f}%.
+**Análise da Distribuição Espacial (Como as Coisas Estão Organizadas):**
+A forma como as características estão distribuídas e organizadas na imagem identificada 
+como '{predicted_class}' mostra um padrão típico. A localização e o arranjo dos elementos 
+são consistentes com esta categoria, com {confidence*100:.2f}% de certeza.
+
+**Em termos simples:** Verificamos "onde" as características importantes aparecem na 
+imagem e como estão organizadas no espaço.
 """
         
         recommendations = [
-            "Mapear distribuição de features",
-            "Avaliar concentrações regionais",
-            "Verificar continuidade espacial"
+            "Observar onde as características importantes estão localizadas",
+            "Avaliar se há concentrações (agrupamentos) em certas áreas",
+            "Verificar se a distribuição faz sentido para esta categoria"
         ]
         
         return AgentResponse(
@@ -191,15 +203,19 @@ class StatisticalAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Análise Estatística Rigorosa:**
-Os parâmetros estatísticos para '{predicted_class}' indicam significância robusta.
-As métricas calculadas confirmam a classificação com confiança de {confidence*100:.2f}%.
+**Análise Estatística (Números e Probabilidades):**
+Os cálculos estatísticos realizados para '{predicted_class}' indicam um resultado robusto 
+(sólido). Os números confirmam a classificação com {confidence*100:.2f}% de certeza, 
+o que é considerado estatisticamente válido.
+
+**Em termos simples:** Fizemos as contas matemáticas para verificar se o resultado é 
+confiável do ponto de vista numérico e probabilístico.
 """
         
         recommendations = [
-            "Calcular intervalos de confiança",
-            "Realizar testes de significância",
-            "Validar com análise bootstrap"
+            "Calcular faixas de confiança (margem de variação possível)",
+            "Realizar testes para verificar se a diferença entre opções é real ou por acaso",
+            "Validar o resultado através de múltiplas análises (bootstrap)"
         ]
         
         return AgentResponse(
@@ -224,16 +240,19 @@ class DifferentialDiagnosisAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Diagnóstico Diferencial:**
-Considerando '{predicted_class}' como diagnóstico primário ({confidence*100:.2f}% de confiança),
-é importante considerar diagnósticos alternativos e realizar exclusão sistemática de outras
-possibilidades.
+**Análise de Alternativas (Outras Possibilidades):**
+Considerando '{predicted_class}' como resultado principal ({confidence*100:.2f}% de certeza),
+também devemos considerar outras possíveis classificações. É importante avaliar 
+sistematicamente por que outras opções foram descartadas.
+
+**Em termos simples:** Verificamos "o que mais poderia ser" e por que as outras opções 
+foram eliminadas, garantindo que não perdemos nenhuma possibilidade importante.
 """
         
         recommendations = [
-            "Listar diagnósticos diferenciais principais",
-            "Aplicar critérios de exclusão",
-            "Identificar características distintivas"
+            "Listar as principais alternativas em ordem de probabilidade",
+            "Aplicar critérios de eliminação (descartar opções improváveis)",
+            "Identificar o que torna cada opção diferente da outra"
         ]
         
         return AgentResponse(
@@ -258,15 +277,19 @@ class QualityAssuranceAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Avaliação de Qualidade:**
-A qualidade da classificação '{predicted_class}' com {confidence*100:.2f}% de confiança
-foi avaliada. Os parâmetros de qualidade indicam resultado confiável.
+**Avaliação da Qualidade da Análise:**
+A qualidade geral da classificação '{predicted_class}' com {confidence*100:.2f}% de certeza
+foi avaliada cuidadosamente. Os indicadores de qualidade sugerem que o resultado é confiável 
+dentro dos parâmetros estabelecidos.
+
+**Em termos simples:** Verificamos se a análise foi feita corretamente e se podemos 
+confiar no processo que gerou este resultado.
 """
         
         recommendations = [
-            "Verificar qualidade da imagem de entrada",
-            "Validar consistência de resultados",
-            "Aplicar checklist de qualidade"
+            "Verificar se a imagem de entrada tem boa qualidade (não está borrada, muito escura, etc.)",
+            "Validar se os resultados são consistentes (repetir a análise daria o mesmo resultado?)",
+            "Aplicar uma lista de verificação de qualidade padrão"
         ]
         
         return AgentResponse(
@@ -291,15 +314,19 @@ class ContextualAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Análise Contextual:**
-O contexto da classificação '{predicted_class}' ({confidence*100:.2f}% confiança)
-deve ser considerado. Fatores ambientais e condicionais podem influenciar a interpretação.
+**Análise do Contexto e Ambiente:**
+O contexto em que a imagem classificada como '{predicted_class}' ({confidence*100:.2f}% de certeza)
+foi analisada é importante. Fatores como condições de iluminação, qualidade da captura, 
+e ambiente podem influenciar a interpretação do resultado.
+
+**Em termos simples:** Consideramos "em que situação" a imagem foi capturada e como isso 
+pode afetar o resultado da análise.
 """
         
         recommendations = [
-            "Considerar contexto de aquisição",
-            "Avaliar condições ambientais",
-            "Verificar fatores contextuais"
+            "Considerar as condições em que a imagem foi capturada (iluminação, ângulo, distância)",
+            "Avaliar se há fatores ambientais que possam ter influenciado",
+            "Verificar se o contexto é apropriado para este tipo de análise"
         ]
         
         return AgentResponse(
@@ -324,15 +351,19 @@ class LiteratureAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Revisão Bibliográfica:**
-A classificação '{predicted_class}' ({confidence*100:.2f}% confiança) encontra suporte
-na literatura científica. Estudos relevantes corroboram os critérios utilizados.
+**Revisão da Literatura Científica:**
+A classificação '{predicted_class}' ({confidence*100:.2f}% de certeza) encontra respaldo
+em estudos científicos e publicações especializadas. A literatura atual oferece evidências 
+que apoiam os critérios utilizados nesta análise.
+
+**Em termos simples:** Verificamos se o que a inteligência artificial está dizendo está 
+de acordo com o conhecimento científico atual publicado em estudos e pesquisas.
 """
         
         recommendations = [
-            "Consultar estudos recentes",
-            "Revisar meta-análises disponíveis",
-            "Verificar consenso científico atual"
+            "Consultar estudos científicos recentes sobre o tema",
+            "Revisar pesquisas e análises similares já publicadas",
+            "Verificar se há consenso científico atual sobre este tipo de classificação"
         ]
         
         return AgentResponse(
@@ -357,15 +388,19 @@ class MethodologyAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Avaliação Metodológica:**
-A metodologia aplicada para classificação '{predicted_class}' ({confidence*100:.2f}% confiança)
-segue protocolos estabelecidos e boas práticas metodológicas.
+**Avaliação da Metodologia Utilizada:**
+A metodologia aplicada para classificar a imagem como '{predicted_class}' ({confidence*100:.2f}% de certeza)
+segue procedimentos estabelecidos e boas práticas metodológicas. Os passos seguidos são 
+reconhecidos e validados pela comunidade científica.
+
+**Em termos simples:** Verificamos se o "jeito de fazer" a análise está correto e segue 
+regras e procedimentos apropriados.
 """
         
         recommendations = [
-            "Verificar aderência a protocolos",
-            "Validar técnicas utilizadas",
-            "Confirmar procedimentos padrão"
+            "Verificar se os procedimentos seguem protocolos estabelecidos",
+            "Validar se as técnicas utilizadas são apropriadas para este caso",
+            "Confirmar que os procedimentos padrão foram seguidos corretamente"
         ]
         
         return AgentResponse(
@@ -392,15 +427,19 @@ class RiskAssessmentAgent(SpecializedAgent):
         risk_level = "baixo" if confidence > 0.9 else "moderado" if confidence > 0.7 else "alto"
         
         analysis = f"""
-**Avaliação de Risco:**
-A classificação '{predicted_class}' apresenta nível de risco {risk_level} com base
-na confiança de {confidence*100:.2f}%. Incertezas devem ser consideradas.
+**Análise de Risco e Incertezas:**
+A classificação '{predicted_class}' apresenta nível de risco **{risk_level}** com base
+na certeza de {confidence*100:.2f}%. Sempre existem incertezas em qualquer análise, 
+e é importante estar ciente delas.
+
+**Em termos simples:** Avaliamos "quão arriscado" é confiar neste resultado e onde 
+podem estar as dúvidas ou pontos fracos da análise.
 """
         
         recommendations = [
-            "Quantificar fontes de incerteza",
-            "Avaliar impacto de possíveis erros",
-            "Estabelecer margem de segurança"
+            "Identificar de onde vem a incerteza (qualidade da imagem, similaridade entre categorias, etc.)",
+            "Avaliar o que aconteceria se o resultado estiver errado (gravidade do erro)",
+            "Estabelecer uma margem de segurança adequada antes de tomar decisões"
         ]
         
         return AgentResponse(
@@ -425,15 +464,19 @@ class ComparativeAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Análise Comparativa:**
-Comparando '{predicted_class}' ({confidence*100:.2f}% confiança) com padrões de referência
-e casos similares, observamos consistência com critérios estabelecidos.
+**Análise Comparativa com Referências:**
+Comparando a imagem classificada como '{predicted_class}' ({confidence*100:.2f}% de certeza) 
+com casos de referência (exemplos padrão) e situações similares anteriores, observamos 
+consistência com os critérios estabelecidos.
+
+**Em termos simples:** Comparamos este resultado com exemplos conhecidos e casos 
+semelhantes para ver se faz sentido e está alinhado com o esperado.
 """
         
         recommendations = [
-            "Comparar com casos de referência",
-            "Analisar desvios de padrões típicos",
-            "Avaliar similaridade com benchmarks"
+            "Comparar com casos de referência bem documentados",
+            "Analisar se há diferenças importantes em relação aos padrões típicos",
+            "Avaliar o grau de semelhança com exemplos de referência (benchmarks)"
         ]
         
         return AgentResponse(
@@ -458,15 +501,19 @@ class ClinicalRelevanceAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Relevância Clínica:**
-A classificação '{predicted_class}' ({confidence*100:.2f}% confiança) possui
-implicações clínicas/práticas significativas que devem ser consideradas.
+**Análise de Relevância Prática:**
+A classificação '{predicted_class}' ({confidence*100:.2f}% de certeza) possui
+importância prática significativa. É fundamental considerar as consequências reais 
+desta classificação e quais ações devem ser tomadas.
+
+**Em termos simples:** Avaliamos "o que fazer com este resultado" e quão importante 
+ou urgente é agir com base nesta informação.
 """
         
         recommendations = [
-            "Avaliar impacto clínico/prático",
-            "Considerar necessidade de ações adicionais",
-            "Verificar protocolos de seguimento"
+            "Avaliar o impacto prático e consequências do resultado",
+            "Considerar se são necessárias ações imediatas ou complementares",
+            "Verificar se há protocolos ou procedimentos a seguir para este caso"
         ]
         
         return AgentResponse(
@@ -491,15 +538,19 @@ class IntegrationAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Integração de Dados:**
-A integração multi-modal para '{predicted_class}' ({confidence*100:.2f}% confiança)
-considera múltiplas fontes de informação de forma sinérgica.
+**Integração de Múltiplas Fontes de Informação:**
+A integração de diferentes tipos de análise para '{predicted_class}' ({confidence*100:.2f}% de certeza)
+considera múltiplas fontes de informação de forma combinada e complementar. Cada tipo de 
+análise contribui com uma peça do quebra-cabeça.
+
+**Em termos simples:** Juntamos informações de diferentes tipos de análise (forma, cor, 
+textura, etc.) para formar uma visão completa e integrada.
 """
         
         recommendations = [
-            "Integrar múltiplas modalidades",
-            "Avaliar consistência entre fontes",
-            "Ponderar contribuições de cada modalidade"
+            "Integrar e combinar informações de múltiplas análises (visual, estatística, contextual)",
+            "Avaliar se todas as fontes de informação estão em acordo",
+            "Ponderar (dar peso adequado) à contribuição de cada tipo de análise"
         ]
         
         return AgentResponse(
@@ -524,15 +575,19 @@ class ValidationAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Validação Cruzada:**
-A validação da classificação '{predicted_class}' ({confidence*100:.2f}% confiança)
-através de múltiplos métodos confirma a robustez do resultado.
+**Validação Cruzada e Verificação:**
+A validação da classificação '{predicted_class}' ({confidence*100:.2f}% de certeza)
+através de múltiplos métodos de verificação confirma a robustez (solidez) do resultado.
+Testamos o resultado de várias formas diferentes para garantir que é confiável.
+
+**Em termos simples:** Conferimos o resultado usando diferentes métodos de checagem, 
+como fazer a mesma conta de formas diferentes para ter certeza que está certa.
 """
         
         recommendations = [
-            "Aplicar validação cruzada",
-            "Verificar reprodutibilidade",
-            "Confirmar com métodos alternativos"
+            "Aplicar validação cruzada (testar o resultado de formas diferentes)",
+            "Verificar se o resultado é reprodutível (obtemos o mesmo resultado ao repetir?)",
+            "Confirmar usando métodos alternativos de análise"
         ]
         
         return AgentResponse(
@@ -628,26 +683,34 @@ class ManagerAgent:
         aggregated_confidence: float,
         responses: List[AgentResponse]
     ) -> str:
-        """Gera relatório integrado com análises de todos os agentes"""
+        """Gera relatório integrado com análises de todos os agentes em linguagem acessível"""
         
-        report = "# 🎯 RELATÓRIO DIAGNÓSTICO MULTI-AGENTE INTEGRADO\n\n"
-        report += "## Sistema com 15 Agentes Especializados + 1 Gerente\n\n"
+        report = "# 🎯 RELATÓRIO COMPLETO DE ANÁLISE MULTI-ESPECIALISTA\n\n"
+        report += "## 📋 O que é este relatório?\n\n"
+        report += "Este relatório foi criado por um sistema com **15 especialistas virtuais**, cada um "
+        report += "analisando a imagem de uma perspectiva diferente. Um **gerente coordenador** organizou "
+        report += "todas as análises e criou este resumo integrado.\n\n"
         report += "---\n\n"
         
-        report += "## 📊 RESUMO EXECUTIVO\n\n"
-        report += f"**Classificação:** {predicted_class}\n\n"
-        report += f"**Confiança Original:** {original_confidence:.4f} ({original_confidence*100:.2f}%)\n\n"
-        report += f"**Confiança Agregada (15 Agentes):** {aggregated_confidence:.4f} ({aggregated_confidence*100:.2f}%)\n\n"
-        report += f"**Número de Agentes Consultados:** {len(responses)}\n\n"
+        report += "## 📊 RESUMO GERAL DO RESULTADO\n\n"
+        report += f"**Classificação Identificada:** {predicted_class}\n\n"
+        report += f"**Certeza Inicial (Sistema Principal):** {original_confidence:.4f} ({original_confidence*100:.2f}%)\n\n"
+        report += f"**Certeza Agregada (Após Consulta aos 15 Especialistas):** {aggregated_confidence:.4f} ({aggregated_confidence*100:.2f}%)\n\n"
+        report += f"**Número de Especialistas Consultados:** {len(responses)}\n\n"
         
         # Estatísticas de consenso
         high_conf_agents = sum(1 for r in responses if r.confidence > 0.9)
-        report += f"**Agentes com Alta Confiança (>90%):** {high_conf_agents}/{len(responses)}\n\n"
+        report += f"**Especialistas com Alta Certeza (acima de 90%):** {high_conf_agents} de {len(responses)}\n\n"
+        
+        # Explicação do que significa certeza agregada
+        report += "💡 **O que significa 'Certeza Agregada'?**\n"
+        report += "É uma média ponderada (balanceada) das opiniões de todos os especialistas, "
+        report += "dando mais peso aos especialistas que analisam aspectos mais críticos.\n\n"
         
         report += "---\n\n"
         
-        report += "## 🔬 ANÁLISES POR PRIORIDADE\n\n"
-        report += "*(Análises ordenadas por nível de prioridade)*\n\n"
+        report += "## 🔬 ANÁLISES DETALHADAS DOS ESPECIALISTAS\n\n"
+        report += "*As análises estão organizadas por prioridade - as mais importantes aparecem primeiro.*\n\n"
         
         # Agrupar por prioridade
         priority_groups = {}
@@ -656,25 +719,46 @@ class ManagerAgent:
                 priority_groups[response.priority] = []
             priority_groups[response.priority].append(response)
         
+        # Mapear prioridade para descrição textual
+        priority_desc = {
+            5: "Crítica - Aspectos fundamentais",
+            4: "Alta - Aspectos muito importantes", 
+            3: "Média - Aspectos complementares",
+            2: "Baixa - Aspectos de apoio",
+            1: "Informativa - Contexto adicional"
+        }
+        
         # Apresentar análises por prioridade
         for priority in sorted(priority_groups.keys(), reverse=True):
-            report += f"### 🎖️ Prioridade {priority}\n\n"
+            priority_text = priority_desc.get(priority, f"Prioridade {priority}")
+            report += f"### 🎖️ {priority_text}\n\n"
             
             for response in priority_groups[priority]:
                 report += f"#### {response.agent_name}\n"
                 report += f"*{response.specialty}*\n\n"
-                report += f"**Confiança:** {response.confidence:.4f} ({response.confidence*100:.2f}%)\n\n"
+                report += f"**Nível de Certeza deste Especialista:** {response.confidence:.4f} ({response.confidence*100:.2f}%)\n\n"
                 report += response.analysis
-                report += "\n\n**Recomendações:**\n"
+                report += "\n\n**Recomendações deste Especialista:**\n"
                 for rec in response.recommendations:
                     report += f"- {rec}\n"
                 report += "\n---\n\n"
         
         # Seção de consenso
-        report += "## 🎯 CONSENSO E SÍNTESE\n\n"
-        report += f"Após análise integrada por {len(responses)} agentes especializados, "
-        report += f"o consenso aponta para a classificação '{predicted_class}' com "
-        report += f"confiança agregada de {aggregated_confidence*100:.2f}%.\n\n"
+        report += "## 🎯 CONCLUSÃO GERAL E CONSENSO\n\n"
+        report += f"### O que os {len(responses)} especialistas concordam:\n\n"
+        report += f"Após análise integrada por todos os especialistas, "
+        report += f"o consenso aponta para a classificação **'{predicted_class}'** com "
+        report += f"certeza agregada de **{aggregated_confidence*100:.2f}%**.\n\n"
+        
+        # Interpretação da certeza agregada
+        if aggregated_confidence >= 0.90:
+            report += "✅ **Nível de Confiança: MUITO ALTO** - Há forte consenso entre os especialistas.\n\n"
+        elif aggregated_confidence >= 0.75:
+            report += "✅ **Nível de Confiança: BOM** - Há consenso razoável, mas com algumas ressalvas.\n\n"
+        elif aggregated_confidence >= 0.60:
+            report += "⚠️ **Nível de Confiança: MODERADO** - Os especialistas têm opiniões divididas.\n\n"
+        else:
+            report += "⚠️ **Nível de Confiança: BAIXO** - Há discordância significativa entre especialistas.\n\n"
         
         # Recomendações consolidadas
         all_recommendations = []
@@ -689,26 +773,49 @@ class ManagerAgent:
                 unique_recs.append(rec)
                 seen.add(rec)
         
-        report += "### 📋 Recomendações Consolidadas (Top 10):\n\n"
+        report += "### 📋 Principais Recomendações (Resumo das 10 Mais Importantes):\n\n"
+        report += "*Estas são as ações sugeridas pelos especialistas:*\n\n"
         for i, rec in enumerate(unique_recs[:10], 1):
             report += f"{i}. {rec}\n"
         
         report += "\n---\n\n"
         
-        report += "## ✅ CONCLUSÃO GERENCIAL\n\n"
-        report += f"O Sistema Multi-Agente avaliou '{predicted_class}' através de 15 perspectivas "
-        report += "especializadas complementares. A convergência de múltiplas análises especializadas "
-        report += "proporciona maior robustez e confiabilidade ao diagnóstico.\n\n"
+        report += "## ✅ CONCLUSÃO FINAL DO GERENTE COORDENADOR\n\n"
+        report += f"### Resumo da Análise Multi-Especialista:\n\n"
+        report += f"O sistema analisou a imagem classificada como **'{predicted_class}'** usando 15 diferentes "
+        report += "pontos de vista especializados. Cada especialista trouxe uma perspectiva única, e todas "
+        report += "foram combinadas para chegar a esta conclusão.\n\n"
+        
+        report += "**Por que múltiplos especialistas?**\n"
+        report += "Assim como na medicina ou em outras áreas, ter múltiplas opiniões especializadas "
+        report += "aumenta a confiabilidade do resultado. Cada especialista vê algo que os outros podem perder.\n\n"
         
         if aggregated_confidence > 0.9:
-            report += "**Nível de Certeza:** ALTO - Recomenda-se prosseguir com a classificação.\n"
+            report += "### 🟢 Recomendação: CONFIÁVEL\n"
+            report += "**Nível de Certeza: ALTO** ({:.2f}%)\n\n".format(aggregated_confidence*100)
+            report += "O resultado é confiável. Os especialistas estão em forte acordo. "
+            report += "Você pode prosseguir com esta classificação com segurança.\n"
         elif aggregated_confidence > 0.7:
-            report += "**Nível de Certeza:** MODERADO - Recomenda-se revisão adicional.\n"
+            report += "### 🟡 Recomendação: USAR COM PRECAUÇÃO\n"
+            report += "**Nível de Certeza: MODERADO** ({:.2f}%)\n\n".format(aggregated_confidence*100)
+            report += "O resultado é razoável, mas há alguma divergência entre especialistas. "
+            report += "Recomenda-se uma revisão adicional ou análise complementar antes de tomar decisões importantes.\n"
         else:
-            report += "**Nível de Certeza:** BAIXO - Recomenda-se análise complementar detalhada.\n"
+            report += "### 🔴 Recomendação: ANÁLISE ADICIONAL NECESSÁRIA\n"
+            report += "**Nível de Certeza: BAIXO** ({:.2f}%)\n\n".format(aggregated_confidence*100)
+            report += "Há incerteza significativa no resultado. Os especialistas têm opiniões variadas. "
+            report += "Recomenda-se fortemente buscar análise complementar mais detalhada ou consulta com "
+            report += "especialista humano antes de usar este resultado.\n"
         
         report += "\n---\n\n"
-        report += "*Relatório gerado pelo Sistema Multi-Agente de Análise Diagnóstica*\n"
-        report += f"*15 Agentes Especializados + 1 Gerente Coordenador*\n"
+        report += "### 📄 Informações sobre este Relatório\n\n"
+        report += "**Sistema:** Análise Multi-Especialista com Inteligência Artificial\n\n"
+        report += "**Composição:** 15 Especialistas Virtuais + 1 Gerente Coordenador\n\n"
+        report += "**Metodologia:** Cada especialista analisa a imagem independentemente sob sua perspectiva "
+        report += "específica. O gerente coordena e sintetiza todas as análises em um relatório integrado.\n\n"
+        report += "**Nota:** Este é um sistema de apoio à decisão. Para decisões críticas, sempre consulte "
+        report += "especialistas humanos qualificados.\n\n"
+        report += "---\n\n"
+        report += "*Relatório gerado automaticamente pelo Sistema Multi-Especialista de Análise com IA*\n"
         
         return report

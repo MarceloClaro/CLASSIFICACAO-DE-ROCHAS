@@ -1842,121 +1842,229 @@ def evaluate_image_with_statistics(model, image, classes, activation_map=None, n
 
 def display_statistical_analysis(analysis_results):
     """
-    Exibe análise estatística completa em formato organizado no Streamlit.
+    Exibe análise estatística completa em formato organizado e acessível no Streamlit.
+    Apresentação adaptada para público leigo com explicações contextualizadas.
     
     Args:
         analysis_results: Resultados da função evaluate_image_with_statistics
     """
     st.write("---")
     st.write("## 📊 ANÁLISE ESTATÍSTICA COMPLETA")
+    st.info("💡 **O que é isso?** Esta análise mostra o resultado da classificação da imagem e " +
+            "o grau de certeza do sistema sobre essa classificação. Quanto maior a certeza, " +
+            "mais confiável é o resultado.")
     
     # ========== PREDIÇÃO PRINCIPAL ==========
-    st.write("### 🎯 Predição Principal")
+    st.write("### 🎯 Resultado da Análise")
+    st.write("**O que a inteligência artificial identificou na sua imagem:**")
+    
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Classe Predita", analysis_results['predicted_class'])
+        st.metric("Classificação Identificada", analysis_results['predicted_class'])
+        st.caption("Esta é a categoria que o sistema identificou")
     with col2:
-        st.metric("Confiança", f"{analysis_results['confidence']:.2%}")
+        confidence_pct = analysis_results['confidence']
+        st.metric("Nível de Certeza", f"{confidence_pct:.2%}")
+        if confidence_pct >= 0.90:
+            st.caption("✅ Certeza muito alta")
+        elif confidence_pct >= 0.70:
+            st.caption("⚠️ Certeza moderada")
+        else:
+            st.caption("⚠️ Certeza baixa - requer atenção")
     with col3:
         safety_emoji = {
             'safe': '🟢',
             'unsafe': '🔴'
         }[analysis_results['safety_analysis']['status']]
-        st.metric("Status de Segurança", 
-                 f"{safety_emoji} {analysis_results['safety_analysis']['status'].upper()}")
+        safety_status = 'SEGURO' if analysis_results['safety_analysis']['status'] == 'safe' else 'REQUER ATENÇÃO'
+        st.metric("Avaliação de Confiabilidade", 
+                 f"{safety_emoji} {safety_status}")
+        st.caption("Indica se o resultado é confiável o suficiente")
     
     # ========== INTERVALOS DE CONFIANÇA ==========
-    st.write("### 📈 Intervalo de Confiança (95%)")
+    st.write("---")
+    st.write("### 📈 Análise de Confiabilidade (Intervalo de Confiança)")
+    st.write("**O que significa?** O sistema testou a classificação várias vezes para verificar " +
+             "se o resultado é consistente. Isso nos dá uma faixa de valores onde a certeza real " +
+             "provavelmente está.")
+    
     ci = analysis_results['confidence_interval']
-    st.write(f"**Confiança Média (Bootstrap):** {ci['mean']:.2%}")
-    st.write(f"**Intervalo:** [{ci['lower']:.2%}, {ci['upper']:.2%}]")
-    st.write(f"**Margem de Erro:** ±{ci['margin_error']:.2%}")
+    st.write(f"**Certeza Média (após múltiplos testes):** {ci['mean']:.2%}")
+    st.write(f"**Faixa de Confiança (95%):** entre {ci['lower']:.2%} e {ci['upper']:.2%}")
+    st.write(f"**Margem de Variação:** ±{ci['margin_error']:.2%}")
     
     # Progress bar visual (convert to Python float for Streamlit compatibility)
     st.progress(float(ci['mean']))
     
+    # Explicação adicional
+    with st.expander("📖 Entenda melhor este resultado"):
+        st.write("""
+        **Como interpretar:**
+        - Se a faixa é estreita (pequena diferença entre o menor e maior valor): o resultado é mais estável e confiável
+        - Se a faixa é ampla: há mais incerteza e o resultado pode variar
+        - A margem de variação mostra o quanto o resultado pode "oscilar" para mais ou para menos
+        
+        **Exemplo prático:** Se a certeza está em 65% com margem de ±4%, isso significa que 
+        o resultado real provavelmente está entre 61% e 69%.
+        """)
+    
     # ========== DIAGNÓSTICOS DIFERENCIAIS ==========
-    st.write("### 🔍 Diagnósticos Diferenciais")
+    st.write("---")
+    st.write("### 🔍 Possibilidades Alternativas (Diagnósticos Diferenciais)")
+    st.write("**O que significa?** Além da classificação principal, o sistema identifica outras " +
+             "possibilidades que a imagem poderia representar, ordenadas por probabilidade.")
     
     diff_data = []
     for diff in analysis_results['differential_diagnoses']:
         diff_data.append({
-            'Rank': diff['rank'],
-            'Classe': diff['class'],
+            'Posição': diff['rank'],
+            'Categoria': diff['class'],
             'Probabilidade': f"{diff['probability']:.2%}",
-            'Nível de Confiança': diff['confidence_level']
+            'Nível de Certeza': diff['confidence_level']
         })
     
     if diff_data:
         st.dataframe(pd.DataFrame(diff_data), use_container_width=True)
+        st.caption("💡 A primeira linha é a classificação mais provável, as demais são alternativas em ordem decrescente de probabilidade")
     
     # Teste de significância
     if analysis_results['significance_test'] and analysis_results['significance_test']['p_value']:
-        st.write("#### 📊 Teste de Significância (Top 2)")
+        st.write("#### 📊 Comparação entre as Duas Principais Possibilidades")
         sig_test = analysis_results['significance_test']
         st.write(f"**Diferença de Probabilidade:** {sig_test['probability_diff']:.2%}")
-        st.write(f"**Valor-p:** {sig_test['p_value']:.4f}")
+        st.write(f"**Valor-p (teste estatístico):** {sig_test['p_value']:.4f}")
+        
+        with st.expander("📖 O que é o valor-p?"):
+            st.write("""
+            O **valor-p** é uma medida estatística que nos ajuda a determinar se a diferença 
+            entre duas opções é significativa (importante) ou se pode ter ocorrido por acaso.
+            
+            **Regra prática:**
+            - Valor-p < 0.05: A diferença é **significativa** - há uma diferença real entre as duas opções
+            - Valor-p ≥ 0.05: A diferença **não é significativa** - as duas opções são muito parecidas
+            
+            **Neste caso:** {}
+            """.format(
+                "As duas principais possibilidades são **estatisticamente diferentes**, " +
+                "ou seja, há uma clara vantagem da primeira opção sobre a segunda." 
+                if sig_test['significant'] 
+                else "As duas principais possibilidades são **muito semelhantes**, " +
+                "o que indica que o sistema teve dificuldade em distinguir entre elas. " +
+                "Recomenda-se cautela e possivelmente uma análise adicional."
+            ))
         
         if sig_test['significant']:
-            st.success(f"✅ {sig_test['interpretation']} (p < 0.05)")
+            st.success(f"✅ {sig_test['interpretation']} (p < 0.05) - Há diferença clara entre as opções")
         else:
-            st.warning(f"⚠️ {sig_test['interpretation']} (p ≥ 0.05)")
+            st.warning(f"⚠️ {sig_test['interpretation']} (p ≥ 0.05) - As opções são muito similares, difícil distinguir")
     
     # ========== CRITÉRIOS DE EXCLUSÃO ==========
-    st.write("### ❌ Critérios de Exclusão")
+    st.write("---")
+    st.write("### ❌ Categorias Descartadas (Critérios de Exclusão)")
+    st.write("**O que significa?** O sistema identificou categorias que têm probabilidade muito baixa " +
+             "de serem a resposta correta e as descartou da análise.")
+    
     excl = analysis_results['exclusion_analysis']
     
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("Classes Excluídas", excl['excluded_count'])
+        st.metric("Categorias Descartadas", excl['excluded_count'])
+        st.caption("Opções com probabilidade muito baixa")
     with col2:
-        st.metric("Classes Restantes", excl['remaining_count'])
+        st.metric("Categorias Consideradas", excl['remaining_count'])
+        st.caption("Opções ainda em análise")
     
     if excl['excluded_classes']:
-        with st.expander("Ver classes excluídas"):
+        with st.expander("Ver categorias descartadas (probabilidade muito baixa)"):
+            st.write("Estas categorias foram descartadas porque a probabilidade era muito pequena:")
             for exc in excl['excluded_classes'][:5]:  # Mostrar até 5
                 st.write(f"- **{exc['class']}**: {exc['reason']}")
     
     # ========== CARACTERÍSTICAS DISTINTIVAS ==========
     if analysis_results['distinctive_features']:
-        st.write("### 🎨 Características Distintivas")
+        st.write("---")
+        st.write("### 🎨 Regiões Importantes da Imagem (Características Distintivas)")
+        st.write("**O que significa?** O sistema analisa quais partes da imagem foram mais importantes " +
+                 "para tomar a decisão de classificação.")
+        
         feat = analysis_results['distinctive_features']
         
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Ativação Máxima", f"{feat['max_activation']:.3f}")
+            st.caption("Intensidade máxima nas áreas analisadas")
         with col2:
             st.metric("Ativação Média", f"{feat['mean_activation']:.3f}")
+            st.caption("Intensidade média geral")
         with col3:
-            st.metric("Área de Alta Ativação", f"{feat['high_activation_percentage']:.1f}%")
+            st.metric("Área de Alta Relevância", f"{feat['high_activation_percentage']:.1f}%")
+            st.caption("Porcentagem da imagem considerada importante")
         
         st.info(f"**Interpretação:** {feat['interpretation']}")
+        
+        with st.expander("📖 Como interpretar estes valores"):
+            st.write("""
+            **Áreas de ativação** mostram onde o sistema "prestou mais atenção" na imagem:
+            
+            - **Alta ativação em área pequena** (< 15%): O sistema focou em detalhes específicos
+            - **Alta ativação em área média** (15-30%): Análise equilibrada de várias características
+            - **Alta ativação em área grande** (> 30%): O sistema considerou muitas partes da imagem
+            
+            Valores mais altos de ativação indicam regiões que tiveram maior peso na decisão.
+            """)
     
     # ========== ANÁLISE DE INCERTEZA ==========
-    st.write("### 🎲 Quantificação de Incerteza")
+    st.write("---")
+    st.write("### 🎲 Medição da Incerteza (Quantificação de Incerteza)")
+    st.write("**O que significa?** Esta análise mostra o quanto o sistema está incerto sobre o resultado. " +
+             "Maior incerteza significa que o resultado pode ser menos confiável.")
+    
     uncert = analysis_results['uncertainty_analysis']
     
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Nível de Incerteza", uncert['uncertainty_level'])
+        st.caption("Classificação geral da incerteza")
     with col2:
         st.metric("Incerteza Total", f"{uncert['total_uncertainty']:.3f}")
+        st.caption("Valor combinado de todas as fontes")
     with col3:
         st.metric("Entropia Normalizada", f"{uncert['normalized_entropy']:.3f}")
+        st.caption("Medida de dispersão das probabilidades")
     
-    st.write("**Fontes de Incerteza:**")
-    st.write(f"- Variação do Modelo: {uncert['sources']['model_variation']:.3f}")
-    st.write(f"- Ambiguidade da Predição: {uncert['sources']['prediction_ambiguity']:.3f}")
+    st.write("**Fontes de Incerteza (de onde vem a dúvida):**")
+    st.write(f"- **Variação do Modelo:** {uncert['sources']['model_variation']:.3f} " +
+             "(quanto o resultado varia entre múltiplas análises)")
+    st.write(f"- **Ambiguidade da Predição:** {uncert['sources']['prediction_ambiguity']:.3f} " +
+             "(quanto as probabilidades estão distribuídas entre várias opções)")
+    
+    with st.expander("📖 Entenda a incerteza"):
+        st.write("""
+        **Níveis de Incerteza:**
+        - **Muito Baixa/Baixa**: O sistema está bastante confiante no resultado
+        - **Moderada**: Há alguma dúvida, mas o resultado ainda é útil
+        - **Alta/Muito Alta**: O sistema tem muita dúvida - cuidado ao usar este resultado
+        
+        **Fontes:**
+        - **Variação do Modelo**: Se o modelo dá resultados diferentes ao analisar a mesma imagem várias vezes
+        - **Ambiguidade**: Se várias categorias têm probabilidades semelhantes, criando dúvida
+        """)
     
     # ========== IMPACTO DE ERROS ==========
-    st.write("### ⚠️ Avaliação de Impacto de Erros")
+    st.write("---")
+    st.write("### ⚠️ Risco de Erro (Avaliação de Impacto de Erros)")
+    st.write("**O que significa?** Esta análise estima a probabilidade de o resultado estar errado " +
+             "e qual seria o impacto de um possível erro.")
+    
     error_imp = analysis_results['error_impact']
     
     col1, col2 = st.columns(2)
     with col1:
         st.metric("Probabilidade de Erro", f"{error_imp['error_probability']:.2%}")
+        st.caption("Chance de a classificação estar incorreta")
     with col2:
-        st.metric("Escore de Impacto", f"{error_imp['impact_score']:.3f}")
+        st.metric("Índice de Impacto", f"{error_imp['impact_score']:.3f}")
+        st.caption("Gravidade de um possível erro")
     
     # Mostrar recomendação com cor apropriada
     if '⚠️ ATENÇÃO' in error_imp['recommendation']:
@@ -1967,65 +2075,199 @@ def display_statistical_analysis(analysis_results):
         st.success(error_imp['recommendation'])
     
     # ========== MARGEM DE SEGURANÇA ==========
-    st.write("### 🛡️ Margem de Segurança")
+    st.write("---")
+    st.write("### 🛡️ Análise de Segurança (Margem de Segurança)")
+    st.write("**O que significa?** Esta análise compara a certeza obtida com os níveis mínimos " +
+             "considerados seguros para uso prático do resultado.")
+    
     safety = analysis_results['safety_analysis']
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Confiança Atual", f"{safety['confidence']:.2%}")
+        st.metric("Certeza Atual", f"{safety['confidence']:.2%}")
+        st.caption("Confiança obtida nesta análise")
     with col2:
         st.metric("Mínimo Aceitável", f"{safety['min_acceptable']:.2%}")
+        st.caption("Limite mínimo recomendado")
     with col3:
         st.metric("Alvo Desejado", f"{safety['target']:.2%}")
+        st.caption("Valor ideal de confiança")
     with col4:
-        st.metric("Escore de Segurança", f"{safety['safety_score']:.2%}")
+        st.metric("Índice de Segurança", f"{safety['safety_score']:.2%}")
+        st.caption("Pontuação geral de segurança")
     
-    st.write(f"**Margem até Mínimo:** {safety['margin_to_minimum']:.2%}")
-    st.write(f"**Margem até Alvo:** {safety['margin_to_target']:.2%}")
+    st.write(f"**Distância do Mínimo:** {safety['margin_to_minimum']:.2%} " +
+             f"({'acima' if safety['margin_to_minimum'] > 0 else 'abaixo'} do limite)")
+    st.write(f"**Distância do Alvo:** {safety['margin_to_target']:.2%} para alcançar o ideal")
     
-    # Interpretação com emoji
-    st.info(safety['interpretation'])
+    # Interpretação com emoji e cores
+    if '🔴' in safety['interpretation']:
+        st.error(safety['interpretation'])
+    elif '🟡' in safety['interpretation']:
+        st.warning(safety['interpretation'])
+    else:
+        st.success(safety['interpretation'])
+    
+    with st.expander("📖 Como interpretar a segurança"):
+        st.write("""
+        **Níveis de Segurança:**
+        - 🟢 **Verde (acima do alvo)**: Resultado muito confiável - pode ser usado com segurança
+        - 🟢 **Verde (acima do mínimo)**: Resultado aceitável - pode ser usado com precaução
+        - 🟡 **Amarelo**: Resultado próximo ao limite - usar com extrema cautela
+        - 🔴 **Vermelho**: Resultado abaixo do aceitável - NÃO recomendado para uso sem análise adicional
+        
+        **Recomendação:** Sempre busque resultados com certeza acima de 70% para aplicações práticas.
+        Para decisões importantes, prefira resultados acima de 90%.
+        """)
     
     # ========== IMPACTO CLÍNICO/PRÁTICO ==========
-    st.write("### 🏥 Avaliação de Impacto Clínico/Prático")
+    st.write("---")
+    st.write("### 🏥 Impacto Prático do Resultado (Avaliação Clínica/Prática)")
+    st.write("**O que significa?** Esta seção avalia o que fazer com o resultado obtido e " +
+             "qual o nível de urgência ou importância da classificação.")
+    
     clinical = analysis_results['clinical_impact']
     
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Diagnóstico Primário", clinical['primary_diagnosis'])
+        st.metric("Classificação Principal", clinical['primary_diagnosis'])
+        st.caption("Resultado mais provável")
     with col2:
         priority_color = {
             'Normal': '🟢',
             'Média': '🟡',
             'Alta': '🔴'
         }[clinical['priority_level']]
-        st.metric("Prioridade", f"{priority_color} {clinical['priority_level']}")
+        st.metric("Nível de Prioridade", f"{priority_color} {clinical['priority_level']}")
+        st.caption("Urgência da ação necessária")
     with col3:
-        st.metric("Ambiguidade Diagnóstica", f"{clinical['diagnostic_ambiguity']:.2%}")
+        st.metric("Nível de Ambiguidade", f"{clinical['diagnostic_ambiguity']:.2%}")
+        st.caption("Quanto as opções se confundem")
     
-    st.write(f"**Ação Recomendada:** {clinical['recommended_action']}")
-    st.write(f"**Número de Diagnósticos Diferenciais:** {clinical['differential_count']}")
+    st.write(f"**📋 O que fazer agora:** {clinical['recommended_action']}")
+    st.write(f"**🔍 Outras possibilidades analisadas:** {clinical['differential_count']}")
     
     if clinical['requires_specialist']:
-        st.warning("⚕️ Consulta com especialista recomendada devido à complexidade do caso")
+        st.warning("⚕️ **Recomendação:** Consulta com especialista recomendada devido à complexidade " +
+                  "do caso ou nível de incerteza elevado")
     else:
-        st.success("✅ Caso pode ser gerenciado com protocolos padrão")
+        st.success("✅ **Situação:** Este caso pode ser tratado seguindo protocolos padrão, " +
+                  "sem necessidade imediata de consulta especializada")
+    
+    with st.expander("📖 Entenda a prioridade e recomendações"):
+        st.write("""
+        **Níveis de Prioridade:**
+        - 🟢 **Normal**: Situação estável, seguir acompanhamento de rotina
+        - 🟡 **Média**: Requer atenção moderada, acompanhar mais de perto
+        - 🔴 **Alta**: Situação que requer atenção urgente ou análise mais detalhada
+        
+        **Ambiguidade Diagnóstica:**
+        - Baixa (< 30%): As opções são bem distintas, decisão mais clara
+        - Moderada (30-70%): Há alguma sobreposição entre opções
+        - Alta (> 70%): As opções são muito similares, difícil distinção
+        
+        **Quando procurar um especialista:**
+        - Ambiguidade alta (> 70%)
+        - Certeza baixa (< 75%)
+        - Múltiplas possibilidades com probabilidades semelhantes
+        - Quando há implicações importantes da decisão
+        """)
     
     # ========== VALIDAÇÃO BOOTSTRAP ==========
-    with st.expander("📊 Detalhes da Validação Bootstrap"):
-        boot = analysis_results['bootstrap_results']
-        st.write(f"**Confiança Bootstrap:** {boot['confidence_bootstrap']:.2%}")
-        st.write(f"**Incerteza (std):** {boot['uncertainty']:.4f}")
+    with st.expander("📊 Detalhes Técnicos - Validação Bootstrap (Para Usuários Avançados)"):
+        st.write("**O que é Bootstrap?** É um método estatístico que testa o resultado múltiplas " +
+                 "vezes para verificar sua estabilidade. Quanto menor a variação, mais confiável o resultado.")
         
-        st.write("**Probabilidades Médias por Classe:**")
+        boot = analysis_results['bootstrap_results']
+        st.write(f"**Certeza Média (Bootstrap):** {boot['confidence_bootstrap']:.2%}")
+        st.write(f"**Variação (Desvio Padrão):** {boot['uncertainty']:.4f}")
+        st.caption("💡 Variação baixa (< 0.10) indica resultado estável; alta (> 0.20) indica instabilidade")
+        
+        st.write("---")
+        st.write("**Probabilidades Médias por Categoria:**")
         # Create proper dataframe for all classes
         all_classes = list(range(len(boot['mean_probabilities'])))
         prob_df = pd.DataFrame({
-            'Índice': all_classes,
+            'Índice da Categoria': all_classes,
             'Probabilidade Média': [f"{p:.2%}" for p in boot['mean_probabilities']],
             'Desvio Padrão': [f"{s:.4f}" for s in boot['std_probabilities']]
         })
         st.dataframe(prob_df.head(10), use_container_width=True)  # Mostrar top 10
+        st.caption("As 10 categorias com maiores probabilidades")
+    
+    # ========== RESUMO FINAL PARA LEIGOS ==========
+    st.write("---")
+    st.write("## 📝 RESUMO FINAL EM LINGUAGEM SIMPLES")
+    st.write("### O que você precisa saber sobre este resultado:")
+    
+    # Criar resumo baseado nos dados da análise
+    confidence = analysis_results['confidence']
+    predicted = analysis_results['predicted_class']
+    safety_status = analysis_results['safety_analysis']['status']
+    uncertainty_level = analysis_results['uncertainty_analysis']['uncertainty_level']
+    error_prob = analysis_results['error_impact']['error_probability']
+    
+    st.write(f"**1. Resultado Principal:**")
+    st.write(f"   - A imagem foi classificada como: **{predicted}**")
+    st.write(f"   - Nível de certeza: **{confidence:.2%}**")
+    
+    st.write(f"\n**2. Confiabilidade:**")
+    if safety_status == 'safe' and confidence >= 0.75:
+        st.success("   ✅ Este resultado é considerado **CONFIÁVEL** para uso.")
+    elif safety_status == 'safe' or confidence >= 0.60:
+        st.warning("   ⚠️ Este resultado é **ACEITÁVEL**, mas use com **PRECAUÇÃO**.")
+    else:
+        st.error("   ⚠️ Este resultado tem **BAIXA CONFIABILIDADE** - requer análise adicional.")
+    
+    st.write(f"\n**3. Nível de Incerteza:**")
+    st.write(f"   - Classificação: **{uncertainty_level}**")
+    if uncertainty_level in ['Muito Baixa', 'Baixa']:
+        st.write("   - Significa: O sistema está bastante seguro do resultado")
+    elif uncertainty_level == 'Moderada':
+        st.write("   - Significa: Há alguma dúvida, mas o resultado ainda é útil")
+    else:
+        st.write("   - Significa: O sistema tem dúvidas significativas sobre o resultado")
+    
+    st.write(f"\n**4. Probabilidade de Erro:**")
+    st.write(f"   - Chance de estar errado: **{error_prob:.2%}**")
+    if error_prob < 0.20:
+        st.write("   - Interpretação: Chance baixa de erro")
+    elif error_prob < 0.40:
+        st.write("   - Interpretação: Chance moderada de erro - atenção necessária")
+    else:
+        st.write("   - Interpretação: Chance alta de erro - cuidado!")
+    
+    st.write(f"\n**5. Recomendação Final:**")
+    requires_specialist = analysis_results['clinical_impact']['requires_specialist']
+    recommended_action = analysis_results['clinical_impact']['recommended_action']
+    
+    if requires_specialist:
+        st.warning(f"   ⚕️ **Consultar especialista:** Sim, recomendado")
+        st.write(f"   - Motivo: {recommended_action}")
+    else:
+        st.success(f"   ✅ **Consultar especialista:** Não é urgente")
+        st.write(f"   - Ação sugerida: {recommended_action}")
+    
+    # Adicionar glossário rápido
+    with st.expander("📖 Glossário - Entenda os Termos Técnicos"):
+        st.write("""
+        **Termos que você pode ter visto neste relatório:**
+        
+        - **Bootstrap/Validação Bootstrap**: Método estatístico que repete a análise múltiplas vezes para verificar se o resultado é estável
+        - **Confiança/Certeza**: O quanto o sistema está seguro de que a classificação está correta (em porcentagem)
+        - **Diagnóstico Diferencial**: Outras possíveis classificações que a imagem poderia ter
+        - **Entropia**: Medida de incerteza ou "desordem" - quanto maior, mais incerta é a classificação
+        - **Intervalo de Confiança**: Faixa de valores onde o resultado verdadeiro provavelmente está
+        - **Margem de Erro**: Quanto o valor pode variar para mais ou para menos
+        - **Probabilidade**: Chance de algo ser verdade, expressa em porcentagem (0% a 100%)
+        - **Significância Estatística**: Se uma diferença é real ou pode ter ocorrido por acaso
+        - **Valor-p**: Número que indica se uma diferença é estatisticamente significativa (< 0.05 = significativa)
+        
+        **Formato ABNT (Normas Brasileiras):**
+        Este relatório segue as diretrizes da Associação Brasileira de Normas Técnicas (ABNT) 
+        para apresentação de análises científicas, garantindo qualidade acadêmica nível A1 
+        (mais alto nível de qualidade acadêmica no Brasil).
+        """)
 
 def visualize_activations(model, image, class_names, gradcam_type='SmoothGradCAMpp'):
     """
