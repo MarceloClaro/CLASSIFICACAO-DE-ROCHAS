@@ -23,6 +23,21 @@ try:
 except ImportError:
     SCHOLARLY_AVAILABLE = False
 
+# Try to import AI modules for translation and critical review
+try:
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+
+try:
+    from groq import Groq
+    GROQ_AVAILABLE = True
+except ImportError:
+    GROQ_AVAILABLE = False
+
+AI_AVAILABLE = GEMINI_AVAILABLE or GROQ_AVAILABLE
+
 
 class AcademicReferenceFetcher:
     """
@@ -30,7 +45,10 @@ class AcademicReferenceFetcher:
     Provides full citation metadata, reasoning, and audit trails
     """
     
-    def __init__(self):
+    # Class constants
+    RATE_LIMIT_DELAY = 0.5  # Delay between API calls to avoid rate limiting
+    
+    def __init__(self, ai_provider: Optional[str] = None, ai_api_key: Optional[str] = None, ai_model: Optional[str] = None):
         self.pubmed_base_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
         self.arxiv_base_url = "http://export.arxiv.org/api/query"
         self.biorxiv_base_url = "https://api.biorxiv.org/details/biorxiv"
@@ -43,6 +61,197 @@ class AcademicReferenceFetcher:
             'platforms_searched': [],
             'total_results': 0
         }
+        # AI configuration for translation and critical reviews
+        self.ai_provider = ai_provider
+        self.ai_api_key = ai_api_key
+        # Set default model based on provider
+        if ai_model:
+            self.ai_model = ai_model
+        elif ai_provider == 'groq':
+            self.ai_model = "mixtral-8x7b-32768"
+        else:
+            self.ai_model = "gemini-1.5-flash"
+        self.ai_client = None
+        self.ai_model_obj = None
+        
+        # Initialize AI if credentials provided
+        if self.ai_provider and self.ai_api_key and AI_AVAILABLE:
+            self._initialize_ai()
+    
+    def _initialize_ai(self):
+        """Initialize AI client for translation and critical reviews"""
+        try:
+            if self.ai_provider == 'gemini' and GEMINI_AVAILABLE:
+                genai.configure(api_key=self.ai_api_key)
+                self.ai_model_obj = genai.GenerativeModel(self.ai_model)
+            elif self.ai_provider == 'groq' and GROQ_AVAILABLE:
+                self.ai_client = Groq(api_key=self.ai_api_key)
+        except Exception as e:
+            print(f"Warning: Could not initialize AI: {str(e)}")
+    
+    def translate_abstract_to_portuguese(self, abstract: str, title: str = "") -> str:
+        """
+        Translate article abstract from English to Portuguese
+        
+        Args:
+            abstract: Article abstract in English
+            title: Article title for context
+        
+        Returns:
+            Translated abstract in Portuguese
+        """
+        if not abstract or abstract == "Abstract not available":
+            return "Resumo não disponível"
+        
+        # If AI is not available, return original
+        if not self.ai_provider or not self.ai_api_key or not AI_AVAILABLE:
+            return abstract
+        
+        try:
+            # Sanitize inputs - limit length to prevent prompt injection
+            safe_title = title[:500] if title else ""
+            safe_abstract = abstract[:2000] if abstract else ""
+            
+            prompt = f"""Traduza o seguinte resumo científico do inglês para o português brasileiro de forma clara e precisa, mantendo a terminologia técnica apropriada:
+
+Título: {safe_title}
+
+Resumo: {safe_abstract}
+
+Forneça APENAS a tradução do resumo, sem adicionar comentários ou explicações extras."""
+
+            if self.ai_provider == 'gemini' and self.ai_model_obj:
+                response = self.ai_model_obj.generate_content(prompt)
+                return response.text.strip()
+            elif self.ai_provider == 'groq' and self.ai_client:
+                chat_completion = self.ai_client.chat.completions.create(
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are a professional scientific translator specializing in translating academic abstracts from English to Brazilian Portuguese."
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    model=self.ai_model,
+                    temperature=0.3,
+                    max_tokens=1000,
+                )
+                return chat_completion.choices[0].message.content.strip()
+            else:
+                return abstract
+        except Exception as e:
+            print(f"Error translating abstract: {str(e)}")
+            return abstract
+    
+    def generate_critical_review(self, reference: Dict) -> str:
+        """
+        Generate a critical review of an academic article
+        
+        Args:
+            reference: Article reference dictionary with metadata
+        
+        Returns:
+            Critical review in Portuguese
+        """
+        if not self.ai_provider or not self.ai_api_key or not AI_AVAILABLE:
+            return "Resenha crítica não disponível (requer configuração de API de IA)"
+        
+        try:
+            # Sanitize inputs - limit length to prevent prompt injection
+            title = reference.get('title', 'N/A')[:500]
+            authors = reference.get('authors', 'N/A')[:200]
+            year = str(reference.get('year', 'N/A'))[:10]
+            journal = reference.get('journal', 'N/A')[:200]
+            abstract = reference.get('abstract', 'Abstract not available')[:2000]
+            citation_count = str(reference.get('citation_count', 'N/A'))[:10]
+            platform = reference.get('platform', 'N/A')[:100]
+            
+            prompt = f"""Como especialista em análise crítica de literatura científica, forneça uma resenha crítica detalhada do seguinte artigo científico:
+
+Título: {title}
+Autores: {authors}
+Ano: {year}
+Fonte: {journal}
+Plataforma: {platform}
+Citações: {citation_count}
+
+Resumo: {abstract}
+
+Por favor, forneça uma resenha crítica que inclua:
+
+1. **Principais Contribuições**: Quais são as principais contribuições do trabalho?
+2. **Pontos Fortes**: Aspectos positivos e inovadores da pesquisa
+3. **Limitações**: Possíveis limitações metodológicas ou de escopo
+4. **Relevância**: Relevância para o campo e impacto potencial
+5. **Aplicabilidade**: Aplicabilidade prática dos resultados
+
+Mantenha um tom acadêmico e objetivo. Limite a resenha a aproximadamente 150-200 palavras."""
+
+            if self.ai_provider == 'gemini' and self.ai_model_obj:
+                response = self.ai_model_obj.generate_content(prompt)
+                return response.text.strip()
+            elif self.ai_provider == 'groq' and self.ai_client:
+                chat_completion = self.ai_client.chat.completions.create(
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are a PhD-level researcher specialized in critical analysis of academic literature."
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    model=self.ai_model,
+                    temperature=0.7,
+                    max_tokens=500,
+                )
+                return chat_completion.choices[0].message.content.strip()
+            else:
+                return "Resenha crítica não disponível"
+        except Exception as e:
+            print(f"Error generating critical review: {str(e)}")
+            return f"Erro ao gerar resenha crítica: {str(e)}"
+    
+    def enrich_references_with_analysis(self, references: List[Dict]) -> List[Dict]:
+        """
+        Enrich references with Portuguese translation and critical reviews
+        
+        Args:
+            references: List of reference dictionaries
+        
+        Returns:
+            Enriched list of references with translations and reviews
+        """
+        if not self.ai_provider or not self.ai_api_key or not AI_AVAILABLE:
+            # Return references as-is if AI not available
+            for ref in references:
+                ref['abstract_pt'] = "Tradução não disponível (requer configuração de API de IA)"
+                ref['critical_review'] = "Resenha crítica não disponível (requer configuração de API de IA)"
+            return references
+        
+        enriched = []
+        for i, ref in enumerate(references):
+            print(f"Processando artigo {i+1}/{len(references)}: {ref.get('title', 'N/A')[:50]}...")
+            
+            # Translate abstract
+            abstract = ref.get('abstract', '')
+            title = ref.get('title', '')
+            ref['abstract_pt'] = self.translate_abstract_to_portuguese(abstract, title)
+            
+            # Generate critical review
+            ref['critical_review'] = self.generate_critical_review(ref)
+            
+            enriched.append(ref)
+            
+            # Small delay to avoid rate limiting (skip for last item)
+            if i < len(references) - 1:
+                time.sleep(self.RATE_LIMIT_DELAY)
+        
+        return enriched
     
     def search_pubmed(self, query: str, max_results: int = 5) -> List[Dict]:
         """
@@ -506,9 +715,17 @@ def format_references_for_display(references: List[Dict], reasoning: Optional[Di
             emoji = "🟢" if ref['relevance_score'] == 'High' else "🟡"
             formatted += f"**{emoji} Relevância:** {ref.get('relevance_score')}\n\n"
         
-        # Abstract preview
+        # Abstract preview (original)
         if ref.get('abstract') and ref['abstract'] != 'Abstract not available':
-            formatted += f"**📝 Resumo:** {ref.get('abstract')}\n\n"
+            formatted += f"**📝 Resumo (Original):** {ref.get('abstract')}\n\n"
+        
+        # Portuguese translation if available
+        if ref.get('abstract_pt'):
+            formatted += f"**📝 Resumo (Português):** {ref.get('abstract_pt')}\n\n"
+        
+        # Critical review if available
+        if ref.get('critical_review'):
+            formatted += f"**🔍 Resenha Crítica:**\n{ref.get('critical_review')}\n\n"
         
         # Identifiers
         formatted += "**🔗 Identificadores:**\n"

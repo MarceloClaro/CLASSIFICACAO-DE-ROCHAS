@@ -4154,7 +4154,23 @@ def main():
                                         if ACADEMIC_REF_AVAILABLE:
                                             try:
                                                 st.write("🔍 Consultando bases de dados científicas...")
-                                                ref_fetcher = AcademicReferenceFetcher()
+                                                
+                                                # Get API configuration if available
+                                                ai_provider = None
+                                                ai_api_key = None
+                                                ai_model = None
+                                                if 'api_configured' in st.session_state and st.session_state['api_configured']:
+                                                    ai_provider = st.session_state.get('api_provider')
+                                                    ai_api_key = st.session_state.get('api_key')
+                                                    ai_model = st.session_state.get('api_model')
+                                                
+                                                # Initialize fetcher with AI capabilities
+                                                ref_fetcher = AcademicReferenceFetcher(
+                                                    ai_provider=ai_provider,
+                                                    ai_api_key=ai_api_key,
+                                                    ai_model=ai_model
+                                                )
+                                                
                                                 references = ref_fetcher.get_references_for_classification(
                                                     class_name=class_name,
                                                     domain="image classification",
@@ -4162,7 +4178,17 @@ def main():
                                                 )
                                                 
                                                 if references:
-                                                    status.update(label=f"📚 {len(references)} referências encontradas!", state="complete")
+                                                    status.update(label=f"📚 {len(references)} referências encontradas!", state="running")
+                                                    
+                                                    # Enrich references with translations and critical reviews
+                                                    if ai_provider and ai_api_key:
+                                                        st.write("🌐 Traduzindo resumos e gerando resenhas críticas...")
+                                                        references = ref_fetcher.enrich_references_with_analysis(references)
+                                                        status.update(label=f"📚 {len(references)} referências processadas com traduções e resenhas!", state="complete")
+                                                    else:
+                                                        status.update(label=f"📚 {len(references)} referências encontradas!", state="complete")
+                                                        st.info("💡 Configure uma API de IA para obter traduções e resenhas críticas dos artigos")
+                                                    
                                                     with st.expander("📚 Referências Acadêmicas Encontradas", expanded=True):
                                                         st.markdown(format_references_for_display(references))
                                                 else:
@@ -4262,11 +4288,11 @@ def main():
                                                 try:
                                                     genetic_interp = GeneticDiagnosticInterpreter()
                                                     
-                                                    # Generate multi-perspective report
+                                                    # Generate multi-perspective report with academic references
                                                     perspectives_report = genetic_interp.generate_multi_angle_report(
                                                         predicted_class=class_name,
                                                         confidence=confidence,
-                                                        base_analysis=analysis
+                                                        academic_references=references if references else None
                                                     )
                                                     
                                                     st.markdown(perspectives_report)
