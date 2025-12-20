@@ -117,12 +117,20 @@ class StatisticalAnalyzer:
         else:
             t_stat, p_value, significant = None, None, None
         
+        # Generate interpretation
+        if significant is None:
+            interpretation = 'Teste não disponível (dados insuficientes)'
+        elif significant:
+            interpretation = 'Diferença significativa'
+        else:
+            interpretation = 'Diferença não significativa'
+        
         return {
             'probability_diff': abs(prob1 - prob2),
             't_statistic': t_stat,
             'p_value': p_value,
             'significant': significant,
-            'interpretation': 'Diferença significativa' if significant else 'Diferença não significativa'
+            'interpretation': interpretation
         }
 
 
