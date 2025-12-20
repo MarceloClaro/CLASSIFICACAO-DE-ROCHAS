@@ -722,9 +722,14 @@ class ManagerAgent:
         
         try:
             # Preparar resumo das análises dos 15 agentes
+            # Configuração de verbosidade (False para produção)
+            verbose_mode = False
+            
+            # Preparar resumo das análises dos 15 agentes (top prioridade)
+            max_agents_summary = 5  # Número de agentes a incluir no resumo
             agents_summary = f"Classe predita: {predicted_class} (confiança: {confidence:.2%})\n\n"
             agents_summary += "Resumo das análises dos 15 especialistas:\n"
-            for i, resp in enumerate(responses[:5], 1):  # Top 5 por prioridade
+            for i, resp in enumerate(responses[:max_agents_summary], 1):
                 agents_summary += f"{i}. {resp.agent_name} ({resp.specialty}): confiança {resp.confidence:.2%}\n"
             
             # Criar agente CrewAI especializado em análise diagnóstica avançada
@@ -734,7 +739,7 @@ class ManagerAgent:
                 backstory='''Você é um especialista de nível PhD com vasta experiência em análise diagnóstica 
                 e classificação. Sua missão é revisar as análises de múltiplos especialistas e fornecer 
                 insights adicionais, correlações com literatura científica, e recomendações avançadas.''',
-                verbose=True,
+                verbose=verbose_mode,
                 allow_delegation=False
             )
             
@@ -763,7 +768,7 @@ class ManagerAgent:
             crew = Crew(
                 agents=[diagnostic_expert],
                 tasks=[analysis_task],
-                verbose=False,
+                verbose=verbose_mode,
                 process=Process.sequential
             )
             
@@ -772,6 +777,8 @@ class ManagerAgent:
             return str(result)
             
         except Exception as e:
+            # Usar print para compatibilidade, mas idealmente deveria usar logging
+            # TODO: Considerar migrar para logging.error() para melhor rastreabilidade
             print(f"Erro na análise CrewAI: {e}")
             return None
     
