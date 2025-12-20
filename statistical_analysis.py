@@ -21,6 +21,12 @@ DOI: https://doi.org/10.5281/zenodo.13910277
 import numpy as np
 import torch
 from scipy import stats
+from torchvision import transforms
+
+# Constants
+ENTROPY_EPSILON = 1e-10  # Small value to prevent log(0) in entropy calculations
+IMAGENET_MEAN = [0.485, 0.456, 0.406]
+IMAGENET_STD = [0.229, 0.224, 0.225]
 
 
 class StatisticalAnalyzer:
@@ -265,7 +271,7 @@ class UncertaintyAnalyzer:
         aleatoric_uncertainty = np.mean(std_probs)
         
         # Incerteza do modelo (entropia)
-        entropy = -np.sum(mean_probs * np.log(mean_probs + 1e-10))
+        entropy = -np.sum(mean_probs * np.log(mean_probs + ENTROPY_EPSILON))
         max_entropy = np.log(len(mean_probs))
         normalized_entropy = entropy / max_entropy
         
@@ -454,14 +460,12 @@ def evaluate_image_with_statistics(model, image, classes, device, n_bootstrap=10
     Returns:
         Dict com todas as análises estatísticas
     """
-    from torchvision import transforms
-    
     # Transformações padrão
     test_transforms = transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(224),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
     ])
     
     # Preparar imagem
@@ -490,10 +494,13 @@ def evaluate_image_with_statistics(model, image, classes, device, n_bootstrap=10
         mean_probs, classes, top_k=5, threshold=0.05
     )
     
+    # Create class name to index mapping for efficient lookups
+    class_to_idx = {class_name: idx for idx, class_name in enumerate(classes)}
+    
     # Intervalos de confiança para top classes
     confidence_intervals = {}
     for diff in differential_diagnoses[:3]:
-        class_idx_diff = classes.index(diff['class'])
+        class_idx_diff = class_to_idx[diff['class']]
         ci = stat_analyzer.calculate_confidence_interval(
             bootstrap_results['predictions_distribution'][:, class_idx_diff]
         )
@@ -505,8 +512,8 @@ def evaluate_image_with_statistics(model, image, classes, device, n_bootstrap=10
         for i in range(min(2, len(differential_diagnoses) - 1)):
             class1 = differential_diagnoses[i]['class']
             class2 = differential_diagnoses[i + 1]['class']
-            idx1 = classes.index(class1)
-            idx2 = classes.index(class2)
+            idx1 = class_to_idx[class1]
+            idx2 = class_to_idx[class2]
             
             test_result = stat_analyzer.significance_test(
                 mean_probs[idx1],
@@ -557,17 +564,23 @@ def evaluate_image_with_statistics(model, image, classes, device, n_bootstrap=10
     }
 
 
-def format_statistical_report(analysis_results):
+def format_statistical_report(analysis_results, classes=None):
     """
     Formata os resultados da análise estatística em um relatório markdown.
     
     Args:
         analysis_results: Dict com resultados da análise
+        classes: Lista de nomes de classes (opcional, para otimização)
     
     Returns:
         String com relatório formatado em markdown
     """
     report = []
+    
+    # Create class name to index mapping if classes provided
+    class_to_idx = {}
+    if classes:
+        class_to_idx = {class_name: idx for idx, class_name in enumerate(classes)}
     
     # Cabeçalho
     report.append("# 📊 Relatório de Análise Estatística Completa\n")
@@ -604,9 +617,14 @@ def format_statistical_report(analysis_results):
     report.append("## 4️⃣ Validação Bootstrap\n")
     report.append(f"Resultado validado através de {len(analysis_results['bootstrap_results']['predictions_distribution'])} análises independentes.\n\n")
     report.append("**Estatísticas de Variação:**\n")
-    for i, diag in enumerate(analysis_results['differential_diagnoses'][:3]):
+    for diag in analysis_results['differential_diagnoses'][:3]:
         class_name = diag['class']
-        idx = analysis_results['differential_diagnoses'][i]['rank'] - 1
+        # Use class_to_idx mapping if available, otherwise try to get from differential diagnosis
+        if class_to_idx:
+            idx = class_to_idx[class_name]
+        else:
+            # Fallback: this may not be accurate if differential diagnoses are reordered
+            idx = diag['rank'] - 1
         std = analysis_results['bootstrap_results']['std_probabilities'][idx]
         report.append(f"  - {class_name}: Desvio padrão = {std:.4f}\n")
     report.append("\n")

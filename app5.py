@@ -3,6 +3,7 @@ import zipfile
 import shutil
 import tempfile
 import random
+import traceback
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -2234,7 +2235,7 @@ def main():
                                     statistical_results['distinctive_features'] = distinctive_features
                                 
                                 # Format and display the report
-                                report = format_statistical_report(statistical_results)
+                                report = format_statistical_report(statistical_results, classes)
                                 st.markdown(report)
                                 
                                 # Add visualizations
@@ -2245,12 +2246,14 @@ def main():
                                 
                                 with col1:
                                     st.write("#### Distribuição Bootstrap - Top 3 Classes")
-                                    import matplotlib.pyplot as plt
                                     fig, ax = plt.subplots(figsize=(10, 6))
+                                    
+                                    # Create mapping for efficient lookups
+                                    class_to_idx = {cls: idx for idx, cls in enumerate(classes)}
                                     
                                     for i, diag in enumerate(statistical_results['differential_diagnoses'][:3]):
                                         class_name_diag = diag['class']
-                                        idx = classes.index(class_name_diag)
+                                        idx = class_to_idx[class_name_diag]
                                         bootstrap_dist = statistical_results['bootstrap_results']['predictions_distribution'][:, idx]
                                         ax.hist(bootstrap_dist, bins=30, alpha=0.5, label=class_name_diag)
                                     
@@ -2332,7 +2335,6 @@ def main():
                                 
                             except Exception as e:
                                 st.error(f"Erro ao executar análise estatística: {str(e)}")
-                                import traceback
                                 st.code(traceback.format_exc())
                 
                 # ========== 3D GRAD-CAM VISUALIZATION ==========
@@ -2513,7 +2515,7 @@ def main():
                                                 
                                             except Exception as e:
                                                 st.error(f"Erro ao gerar análise multi-agente: {str(e)}")
-                                                import traceback
+                                                
                                                 st.code(traceback.format_exc())
                                     
                                     # ========== GENETIC ALGORITHM MULTI-ANGLE INTERPRETATION ==========
@@ -2552,7 +2554,7 @@ def main():
                                                 
                                             except Exception as e:
                                                 st.error(f"Erro ao gerar análise multi-angular: {str(e)}")
-                                                import traceback
+                                                
                                                 st.code(traceback.format_exc())
                                     
                                 except Exception as e:
