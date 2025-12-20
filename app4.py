@@ -8,6 +8,7 @@ import shutil
 import tempfile
 import random
 import time
+import re
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -1892,14 +1893,13 @@ def encode_image_to_base64(image):
     image.save(buffered, format="PNG")
     return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-def optimize_image_for_api(image, max_size=(1024, 1024), quality=85):
+def optimize_image_for_api(image, max_size=(1024, 1024)):
     """
     Otimiza uma imagem PIL para envio à API, reduzindo tamanho se necessário.
     
     Args:
         image: PIL Image
         max_size: Tupla (largura, altura) do tamanho máximo
-        quality: Qualidade JPEG (1-100)
     
     Returns:
         PIL Image otimizada
@@ -1930,7 +1930,6 @@ def retry_api_call(func, max_retries=3, initial_delay=2.0, backoff_factor=2.0):
     Returns:
         Resultado da função ou mensagem de erro
     """
-    import re
     delay = initial_delay
     last_error = None
     
@@ -1959,7 +1958,8 @@ def retry_api_call(func, max_retries=3, initial_delay=2.0, backoff_factor=2.0):
                             match = re.search(r'seconds:\s*(\d+)', str(e))
                             if match:
                                 suggested_delay = float(match.group(1))
-                    except:
+                    except (ValueError, AttributeError):
+                        # If parsing fails, continue with default delay
                         pass
                     
                     # Usar o delay sugerido se for razoável (< 120s), senão usar exponencial backoff
@@ -2141,7 +2141,6 @@ Seja detalhado, técnico e preciso na sua análise.
     try:
         return retry_api_call(make_api_call, max_retries=max_retries, initial_delay=2.0, backoff_factor=2.0)
     except Exception as e:
-        import re
         error_msg = f"Erro ao analisar com Gemini: {str(e)}\n\n"
         error_type = str(e).lower()
         error_full = str(e)
