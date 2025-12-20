@@ -136,7 +136,7 @@ except ImportError:
 CONVERGENCE_CHECK_EPOCHS = 5  # Number of recent epochs to check for convergence stability
 
 # Valid model lists (based on official Google Gemini Cookbook)
-# Reference: https://github.com/MarceloClaro/cookbook
+# Reference: https://github.com/google-gemini/cookbook
 VALID_GEMINI_MODELS = [
     'gemini-2.5-flash',  # ⭐ Recommended - fast and efficient with multimodal support
     'gemini-2.5-flash-lite',  # Even faster version
@@ -162,7 +162,7 @@ VALID_GROQ_MODELS = [
 def validate_model_name(model_name, provider):
     """
     Validate and sanitize model name to ensure deprecated models are not used.
-    Based on official Google Gemini Cookbook: https://github.com/MarceloClaro/cookbook
+    Based on official Google Gemini Cookbook: https://github.com/google-gemini/cookbook
     
     Args:
         model_name: The model name from session state or user input
