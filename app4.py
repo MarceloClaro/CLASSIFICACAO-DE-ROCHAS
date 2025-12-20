@@ -1872,8 +1872,8 @@ def display_statistical_analysis(analysis_results):
     st.write(f"**Intervalo:** [{ci['lower']:.2%}, {ci['upper']:.2%}]")
     st.write(f"**Margem de Erro:** ±{ci['margin_error']:.2%}")
     
-    # Progress bar visual
-    st.progress(ci['mean'])
+    # Progress bar visual (convert to Python float for Streamlit compatibility)
+    st.progress(float(ci['mean']))
     
     # ========== DIAGNÓSTICOS DIFERENCIAIS ==========
     st.write("### 🔍 Diagnósticos Diferenciais")
@@ -2042,15 +2042,12 @@ def visualize_activations(model, image, class_names, gradcam_type='SmoothGradCAM
     """
     cam_extractor = None
     try:
-        # Ensure model is in eval mode and enable gradients for Grad-CAM
+        # Ensure model is in eval mode
         model.eval()
         
-        # Enable requires_grad for necessary layers
-        for param in model.parameters():
-            param.requires_grad = True
-        
+        # Prepare input tensor
+        # Note: torchcam handles gradient requirements internally
         input_tensor = test_transforms(image).unsqueeze(0).to(device)
-        input_tensor.requires_grad = True
         
         # Verificar se o modelo é suportado
         model_type = type(model).__name__
@@ -2151,15 +2148,8 @@ def visualize_activations(model, image, class_names, gradcam_type='SmoothGradCAM
                 elif hasattr(cam_extractor, 'reset_hooks'):
                     cam_extractor.reset_hooks()
             except Exception as e:
-                # If hook removal fails, log it but continue with model cleanup
+                # If hook removal fails, log it but continue
                 st.warning(f"Aviso: Não foi possível remover hooks: {e}")
-        
-        # Disable gradients on model parameters to restore original state
-        try:
-            for param in model.parameters():
-                param.requires_grad = False
-        except Exception:
-            pass  # Silently continue if this fails
 
 
 
