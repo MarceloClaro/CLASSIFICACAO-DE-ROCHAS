@@ -986,18 +986,20 @@ class LabelSmoothingCrossEntropy(nn.Module):
         n_classes = pred.size(-1)
         log_preds = torch.nn.functional.log_softmax(pred, dim=-1)
         
-        if self.weight is not None:
-            loss = -log_preds * self.weight.unsqueeze(0)
-            loss = loss.sum(dim=-1).mean()
-        else:
-            loss = -log_preds.sum(dim=-1).mean()
-        
+        # Create smoothed distribution
         with torch.no_grad():
             true_dist = torch.zeros_like(log_preds)
             true_dist.fill_(self.smoothing / (n_classes - 1))
             true_dist.scatter_(1, target.unsqueeze(1), 1.0 - self.smoothing)
         
-        return torch.mean(torch.sum(-true_dist * log_preds, dim=-1))
+        # Apply class weights if provided
+        if self.weight is not None:
+            # Weight each sample based on its target class
+            sample_weights = self.weight[target]
+            loss = torch.sum(-true_dist * log_preds, dim=-1) * sample_weights
+            return loss.mean()
+        else:
+            return torch.mean(torch.sum(-true_dist * log_preds, dim=-1))
 
 # 2. Exponential Moving Average (EMA) para pesos do modelo
 class ModelEMA:
@@ -1127,8 +1129,13 @@ class ReinforcementLearningTrainer:
         """
         Define o estado baseado em perda e acurácia de validação.
         """
-        loss_trend = 'improving' if len(self.performance_history) > 0 and val_loss < self.performance_history[-1]['loss'] else 'degrading'
-        acc_trend = 'improving' if len(self.performance_history) > 0 and val_acc > self.performance_history[-1]['acc'] else 'degrading'
+        if len(self.performance_history) == 0:
+            # First epoch - use neutral state
+            return "initial_epoch_0"
+        
+        prev = self.performance_history[-1]
+        loss_trend = 'improving' if val_loss < prev['loss'] else 'degrading'
+        acc_trend = 'improving' if val_acc > prev['acc'] else 'degrading'
         
         return f"{loss_trend}_{acc_trend}_epoch{epoch % 10}"
     
@@ -1339,6 +1346,8 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
             st.info(f"📚 **Insights do Agente:** {research_results['insights']}")
     
     if use_rl:
+        if scheduler_name != 'None':
+            st.warning("⚠️ **Atenção:** RL está ativo junto com um scheduler. O RL pode entrar em conflito com o scheduler. Considere desativar um deles.")
         st.write("🎯 **Inicializando Reinforcement Learning para ajuste dinâmico...**")
         rl_trainer = ReinforcementLearningTrainer(initial_lr=learning_rate)
     

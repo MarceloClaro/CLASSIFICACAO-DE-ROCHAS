@@ -39,7 +39,6 @@ try:
     TIMM_AVAILABLE = True
 except ImportError:
     TIMM_AVAILABLE = False
-    st.warning("⚠️ timm não está disponível. Modelos Vision Transformer não estarão disponíveis.")
 
 # Import new modules
 from visualization_3d import visualize_pca_3d, visualize_activation_heatmap_3d, create_interactive_3d_visualization
@@ -141,7 +140,6 @@ def get_augmentation_transforms(augmentation_type='standard'):
         # Standard ou base para mixup/cutmix - MELHORADO para melhor robustez
         train_transform = transforms.Compose([
             transforms.Lambda(EnhancedImagePreprocessor.enhance_image_quality),
-            transforms.Resize(256),
             # Aplicar transformações mais robustas
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.RandomVerticalFlip(p=0.2),
@@ -518,22 +516,20 @@ class LabelSmoothingCrossEntropy(nn.Module):
         n_classes = pred.size(-1)
         log_preds = torch.nn.functional.log_softmax(pred, dim=-1)
         
-        if self.weight is not None:
-            # Apply class weights
-            loss = -log_preds * self.weight.unsqueeze(0)
-            loss = loss.sum(dim=-1)
-        else:
-            loss = -log_preds.sum(dim=-1)
-        
-        loss = loss.mean()
-        
-        # Apply label smoothing
+        # Create smoothed distribution
         with torch.no_grad():
             true_dist = torch.zeros_like(log_preds)
             true_dist.fill_(self.smoothing / (n_classes - 1))
             true_dist.scatter_(1, target.unsqueeze(1), 1.0 - self.smoothing)
         
-        return torch.mean(torch.sum(-true_dist * log_preds, dim=-1))
+        # Apply class weights if provided
+        if self.weight is not None:
+            # Weight each sample based on its target class
+            sample_weights = self.weight[target]
+            loss = torch.sum(-true_dist * log_preds, dim=-1) * sample_weights
+            return loss.mean()
+        else:
+            return torch.mean(torch.sum(-true_dist * log_preds, dim=-1))
 
 def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, l1_lambda, patience, optimizer_name='Adam', scheduler_name='None', augmentation_type='standard', label_smoothing=0.1, use_gradient_clipping=True):
     """
