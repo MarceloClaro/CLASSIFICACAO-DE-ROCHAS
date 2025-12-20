@@ -1867,8 +1867,10 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
             image.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
             
+            # The new API requires the 'models/' prefix
+            model_path = f'models/{model_name}' if not model_name.startswith('models/') else model_name
             response = client.models.generate_content(
-                model=model_name,
+                model=model_path,
                 contents=[prompt, {"mime_type": "image/png", "data": img_byte_arr}]
             )
             return response.text

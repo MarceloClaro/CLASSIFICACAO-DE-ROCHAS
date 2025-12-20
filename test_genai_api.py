@@ -60,7 +60,9 @@ if genai is not None:
     if GEMINI_NEW_API:
         print("✓ Should use NEW API:")
         print("  client = genai.Client(api_key=api_key)")
-        print("  response = client.models.generate_content(model=model_name, contents=prompt)")
+        print("  # Note: Model name must include 'models/' prefix")
+        print("  model_path = f'models/{model_name}' if not model_name.startswith('models/') else model_name")
+        print("  response = client.models.generate_content(model=model_path, contents=prompt)")
     else:
         print("✓ Should use OLD API:")
         print("  genai.configure(api_key=api_key)")

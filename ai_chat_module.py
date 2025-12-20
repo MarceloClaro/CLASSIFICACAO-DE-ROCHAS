@@ -194,8 +194,10 @@ IMPORTANTE:
             if self.api_provider == 'gemini':
                 if GEMINI_NEW_API:
                     # New google-genai package API
+                    # The new API requires the 'models/' prefix
+                    model_path = f'models/{self.model_name}' if not self.model_name.startswith('models/') else self.model_name
                     response = self.client.models.generate_content(
-                        model=self.model_name,
+                        model=model_path,
                         contents=prompt
                     )
                     return response.text
@@ -229,6 +231,12 @@ IMPORTANTE:
             if "configure" in str(e).lower():
                 error_msg += "💡 Dica: Parece que há um problema de configuração da API.\n"
                 error_msg += "   Tente reinstalar o pacote: pip install --upgrade google-generativeai\n"
+            elif "404" in str(e) and "not found" in str(e).lower():
+                error_msg += "🔍 Modelo não encontrado. Verifique se:\n"
+                error_msg += "   1. O nome do modelo está correto (gemini-1.0-pro, gemini-1.5-pro, gemini-1.5-flash)\n"
+                error_msg += "   2. O modelo está disponível na sua região\n"
+                error_msg += "   3. Você tem acesso ao modelo com sua API key\n"
+                error_msg += "   Para usar o pacote estável, instale: pip install --force-reinstall google-generativeai\n"
             elif "api key" in str(e).lower() or "401" in str(e):
                 error_msg += "🔑 Verifique se a API key está correta e se você tem créditos disponíveis.\n"
                 error_msg += "   Para Gemini: https://ai.google.dev/\n"
