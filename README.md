@@ -67,7 +67,7 @@ A complete diagnostic intelligence platform that provides:
 - **Feature Analysis**: PCA, t-SNE visualization in 2D and 3D
 
 ### 🤖 AI-Powered Diagnostics
-- **LLM Integration**: Google Gemini (2.5 Flash/Pro, 1.5 Flash, Pro) and Groq (Mixtral, Llama 3.1)
+- **LLM Integration**: Google Gemini (1.5 Pro/Flash Latest, 1.0 Pro Latest, Pro, Pro Vision) and Groq (Llama 4 Scout/Maverick multimodal, Mixtral, Llama 3.1)
 - **PhD-Level Reports**: Comprehensive diagnostic analysis with clinical reasoning
 - **Academic References**: Auto-fetched citations from PubMed, arXiv, Google Scholar
 - **Multi-Perspective**: Genetic algorithm generates 5 different interpretations

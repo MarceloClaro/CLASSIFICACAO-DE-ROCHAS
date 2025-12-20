@@ -42,7 +42,7 @@ show_3d_gradcam = st.checkbox("Mostrar Grad-CAM em 3D")
 ### 2. 🤖 Chat com IA para Análise Diagnóstica
 
 #### Suporte para Múltiplos Provedores
-- **Google Gemini**: modelos gemini-2.5-flash (recomendado), gemini-1.5-flash, gemini-2.5-pro, gemini-pro
+- **Google Gemini**: modelos gemini-1.5-pro-latest (recomendado), gemini-1.5-flash-latest, gemini-1.0-pro-latest, gemini-pro, gemini-pro-vision
 - **Groq**: modelos mixtral-8x7b-32768, llama-3.1-70b-versatile, llama-3.1-8b-instant
 
 #### Análise Diagnóstica Completa
@@ -316,7 +316,7 @@ streamlit run app5.py
 ```python
 # 1. Treinar com dataset de lesões de pele
 # 2. Avaliar imagem de paciente
-# 3. Usar Gemini com gemini-2.5-flash (recomendado)
+# 3. Usar Gemini com gemini-1.5-pro-latest (recomendado)
 # 4. API key do Google AI Studio
 # 5. Obter análise detalhada como residência médica
 ```

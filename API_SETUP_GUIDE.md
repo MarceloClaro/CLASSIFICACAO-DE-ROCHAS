@@ -76,6 +76,12 @@ O sistema detecta automaticamente qual pacote está instalado:
 4. Gere uma nova API Key
 
 **Modelos Disponíveis:**
+
+**Modelos Multimodais (com suporte a visão):**
+- `meta-llama/llama-4-scout-17b-16e-instruct` - ⭐ **RECOMENDADO** - Scout Llama 4 (multimodal, 128K contexto)
+- `meta-llama/llama-4-maverick-17b-128e-instruct` - Llama 4 Maverick (multimodal, 128K contexto)
+
+**Modelos Apenas Texto:**
 - `mixtral-8x7b-32768` - Modelo Mixtral com 32K tokens de contexto
 - `llama-3.1-70b-versatile` - LLama 3.1 70B
 - `llama-3.1-8b-instant` - LLama 3.1 8B (mais rápido)

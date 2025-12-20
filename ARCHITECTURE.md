@@ -181,7 +181,7 @@ This document describes the architecture of an enterprise-grade, scalable AI pla
 #### Large Language Models Integration
 
 **Google Gemini**
-- Models: gemini-2.5-flash (recomendado), gemini-1.5-flash, gemini-2.5-pro, gemini-pro
+- Models: gemini-1.5-pro-latest (recomendado), gemini-1.5-flash-latest, gemini-1.0-pro-latest, gemini-pro, gemini-pro-vision
 - Use Case: PhD-level diagnostic analysis
 - Latency: 10-30 seconds per request
 
