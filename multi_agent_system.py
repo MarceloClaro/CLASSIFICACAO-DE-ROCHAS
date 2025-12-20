@@ -764,6 +764,12 @@ class ManagerAgent:
         if not CREWAI_AVAILABLE:
             return None
         
+        # Check if OPENAI_API_KEY is available (required by CrewAI)
+        import os
+        if not os.environ.get('OPENAI_API_KEY'):
+            print("⚠️ CrewAI requer OPENAI_API_KEY como variável de ambiente. Análise CrewAI será ignorada.")
+            return None
+        
         try:
             # Preparar resumo das análises dos 15 agentes
             # Configuração de verbosidade (False para produção)
@@ -833,6 +839,14 @@ class ManagerAgent:
             
             return str(result)
             
+        except ImportError as e:
+            # Handle missing API key or import errors
+            error_msg = str(e)
+            if 'OPENAI_API_KEY' in error_msg or 'api' in error_msg.lower():
+                print(f"⚠️ CrewAI requer OPENAI_API_KEY para funcionar. Configure a variável de ambiente OPENAI_API_KEY.")
+            else:
+                print(f"Erro de importação no CrewAI: {e}")
+            return None
         except Exception as e:
             # Usar print para compatibilidade, mas idealmente deveria usar logging
             # TODO: Considerar migrar para logging.error() para melhor rastreabilidade
