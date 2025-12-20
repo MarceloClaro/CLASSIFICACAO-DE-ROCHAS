@@ -163,8 +163,8 @@ def cutmix_data(x, y, alpha=1.0):
     cut_h = int(H * cut_rat)
 
     # Centro do box
-    cx = np.random.randint(W)
-    cy = np.random.randint(H)
+    cx = np.random.randint(0, W)
+    cy = np.random.randint(0, H)
 
     bbx1 = np.clip(cx - cut_w // 2, 0, W)
     bby1 = np.clip(cy - cut_h // 2, 0, H)
@@ -445,10 +445,10 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
             # Calcular loss
             if use_mixup or use_cutmix:
                 loss = mixup_criterion(criterion, outputs, labels_a, labels_b, lam)
-                # Para acurácia, usar o label principal
+                # Para acurácia com mixup/cutmix, usar o label com maior peso (lam)
                 _, preds = torch.max(outputs, 1)
-                running_corrects += (lam * (preds == labels_a).sum().float() + 
-                                   (1 - lam) * (preds == labels_b).sum().float())
+                # Aproximar acurácia usando o label dominante
+                running_corrects += (preds == labels_a).sum().float()
             else:
                 _, preds = torch.max(outputs, 1)
                 loss = criterion(outputs, labels)
@@ -456,10 +456,7 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
             
             # Adicionar regularização L1 se especificado
             if l1_lambda > 0:
-                l1_reg = torch.tensor(0., requires_grad=True).to(device)
-                for param in model.parameters():
-                    if param.requires_grad:
-                        l1_reg = l1_reg + torch.norm(param, 1)
+                l1_reg = sum(torch.norm(param, 1) for param in model.parameters() if param.requires_grad)
                 loss = loss + l1_lambda * l1_reg
             
             loss.backward()
