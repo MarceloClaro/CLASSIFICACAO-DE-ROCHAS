@@ -58,21 +58,14 @@ O sistema detecta automaticamente qual pacote está instalado:
 3. Crie um novo projeto ou selecione um existente
 4. Copie a API Key gerada
 
-**Modelos Disponíveis (Recomendados - 2024):**
+**Modelos Disponíveis (API v1beta):**
+- `gemini-1.5-pro-latest` - ⭐ **RECOMENDADO** - Modelo mais avançado e recente
+- `gemini-1.5-flash-latest` - Modelo rápido e eficiente
+- `gemini-1.0-pro-latest` - Modelo estável
+- `gemini-pro` - Modelo para uso geral
+- `gemini-1.0-pro-vision-latest` - Visão mais recente
 
-**Modelos de Nova Geração (Recomendados):**
-- `gemini-2.5-flash` - ⭐ **RECOMENDADO** - Rápido e eficiente, multimodal
-- `gemini-2.5-flash-lite` - Ultra rápido para tarefas simples
-- `gemini-2.5-pro` - Avançado com capacidade de raciocínio superior
-- `gemini-3-flash-preview` - Próxima geração (preview)
-- `gemini-3-pro-preview` - Avançado próxima geração (preview)
-
-**Modelos Legados (não recomendados):**
-- `gemini-1.5-pro-latest` - Modelo mais antigo
-- `gemini-1.5-flash-latest` - Modelo rápido legado
-- `gemini-1.0-pro-latest` - Modelo estável legado
-
-**Nota:** Os modelos 2.5 e 3.0 são os mais atuais e recomendados. Baseado no [Gemini API Cookbook](https://github.com/google-gemini/cookbook).
+**Nota:** Os modelos com sufixo `-latest` são atualizados automaticamente para a versão mais recente disponível.
 
 ### Groq
 
@@ -169,52 +162,27 @@ pip install google-generativeai
 2. Confirme que o billing está ativo (para Gemini)
 3. Verifique se você tem créditos disponíveis
 
-### Erro: Rate Limit ou Quota Exceeded (429)
+### Erro: Rate Limit ou Quota Exceeded
 
-**Causa:** Você excedeu o limite de requisições por minuto/dia, ou sua quota gratuita foi esgotada.
-
-**Mensagem típica:**
-```
-429 You exceeded your current quota, please check your plan and billing details.
-Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_*
-```
+**Causa:** Você excedeu o limite de requisições por minuto/dia.
 
 **Solução:**
-
-1. **Aguarde alguns minutos** - Os limites são reiniciados após um tempo
-2. **Verifique sua quota** em https://ai.dev/usage?tab=rate-limit
-3. **Considere upgrade do plano** se você precisa de mais requisições
-4. **Use modelos mais eficientes:**
-   - `gemini-2.5-flash-lite` (mais leve, usa menos quota)
-   - `gemini-2.5-flash` (balanço entre eficiência e qualidade)
-5. **Para Groq:** Verifique seus limites em https://console.groq.com/
-
-**Limites do Free Tier (Gemini):**
-- Requisições por minuto: Limitado
-- Requisições por dia: Limitado
-- Tokens de entrada por dia: Limitado
-- Tokens de entrada por minuto: Limitado
-
-**Dica:** Se você está desenvolvendo/testando, considere adicionar delays entre requisições ou usar o plano pago para limites maiores.
+- Aguarde alguns minutos
+- Considere upgrade do plano
+- Para Groq: Verifique seus limites em https://console.groq.com/
 
 ### Erro: "404 models/gemini-1.5-pro is not found for API version v1beta"
 
-**Causa:** Uso de nomes de modelo incorretos ou modelos descontinuados.
+**Causa:** Uso de nomes de modelo incorretos ou sem o sufixo `-latest` recomendado.
 
-**Solução:** ✅ JÁ CORRIGIDO! O código agora usa os modelos corretos disponíveis:
-
-**Modelos Recomendados (2024):**
-- `gemini-2.5-flash` ⭐ (recomendado)
-- `gemini-2.5-flash-lite`
-- `gemini-2.5-pro`
-- `gemini-3-flash-preview`
-- `gemini-3-pro-preview`
-
-**Modelos Legados (ainda funcionam):**
-- `gemini-1.5-pro-latest`
+**Solução:** ✅ JÁ CORRIGIDO! O código agora usa os modelos corretos disponíveis na API v1beta:
+- `gemini-1.5-pro-latest` ⭐ (recomendado)
 - `gemini-1.5-flash-latest`
+- `gemini-1.0-pro-latest`
+- `gemini-pro`
+- `gemini-1.0-pro-vision-latest`
 
-**Importante:** Use sempre os modelos da série 2.5 ou 3.0 para melhor desempenho e recursos mais recentes.
+**Importante:** Use sempre os modelos com `-latest` quando disponível para garantir acesso à versão mais recente.
 
 Se ainda tiver problemas:
 
@@ -234,20 +202,15 @@ pip install google-generativeai
 ### Escolha do Modelo
 
 **Para análises detalhadas e raciocínio complexo:**
-- Gemini: Use `gemini-2.5-pro` ⭐ **RECOMENDADO**
+- Gemini: Use `gemini-1.5-pro-latest` ⭐ **RECOMENDADO**
 - Groq: Use `mixtral-8x7b-32768` ou `llama-3.1-70b-versatile`
 
 **Para análises rápidas e eficientes:**
-- Gemini: Use `gemini-2.5-flash` ⭐ **RECOMENDADO**
+- Gemini: Use `gemini-1.5-flash-latest` ⭐ **RECOMENDADO**
 - Groq: Use `llama-3.1-8b-instant`
 
-**Para análise de imagens (multimodal):**
-- Gemini: Use `gemini-2.5-flash` ⭐ **RECOMENDADO** ou `gemini-2.5-pro`
-- Groq: Use `llama-4-scout-17b-16e-instruct` ⭐ (multimodal)
-
-**Para economia de quota (free tier):**
-- Gemini: Use `gemini-2.5-flash-lite` ⭐ **MAIS LEVE** - Consome menos tokens
-- Groq: Use `llama-3.1-8b-instant`
+**Para análise de imagens:**
+- Gemini: Use `gemini-1.5-pro-latest` ⭐ **RECOMENDADO** ou `gemini-1.0-pro-vision-latest`
 
 ### Segurança da API Key
 
@@ -273,61 +236,6 @@ pip install google-generativeai
 - [Google Generative AI Python SDK](https://github.com/google/generative-ai-python)
 - [Groq Documentation](https://console.groq.com/docs)
 - [Groq Python SDK](https://github.com/groq/groq-python)
-
-## 🤖 Sistema Multi-Agente e CrewAI
-
-### O que é o Sistema Multi-Agente?
-
-O sistema inclui 15 agentes especializados + 1 gerente coordenador que analisam a imagem classificada de múltiplas perspectivas:
-
-- **Agente Morfológico** - Análise de forma e estrutura
-- **Agente Textural** - Análise de textura e padrões
-- **Agente Cromático** - Análise de cor e tonalidade
-- **Agente Espacial** - Análise de distribuição espacial
-- **Agente Estatístico** - Análise estatística e métricas
-- **Agente de Diagnóstico Diferencial** - Análise de alternativas
-- **Agente de Qualidade** - Controle de qualidade
-- **Agente Contextual** - Análise de contexto
-- **Agente Bibliográfico** - Revisão de literatura
-- **Agente Metodológico** - Avaliação metodológica
-- **Agente de Risco** - Avaliação de risco e incertezas
-- **Agente Comparativo** - Análise comparativa
-- **Agente de Relevância Clínica** - Relevância prática
-- **Agente de Integração** - Integração multi-modal
-- **Agente de Validação** - Validação cruzada
-
-**Importante:** O sistema multi-agente **funciona sem necessidade de configuração adicional** - não requer API keys extras.
-
-### CrewAI (Opcional - EXPERIMENTAL)
-
-O CrewAI é uma funcionalidade **opcional e experimental** que adiciona análise avançada usando inteligência artificial colaborativa.
-
-**Requisitos para usar CrewAI:**
-- ✅ Pacote `crewai` instalado: `pip install crewai crewai-tools`
-- ✅ Variável de ambiente `OPENAI_API_KEY` configurada
-- ✅ Conta OpenAI com créditos disponíveis
-
-**Como configurar:**
-
-```bash
-# No terminal, antes de executar o app
-export OPENAI_API_KEY='sua-chave-openai-aqui'
-
-# Ou no Windows
-set OPENAI_API_KEY=sua-chave-openai-aqui
-```
-
-**Nota:** Se você não tem uma API key da OpenAI, **não ative o CrewAI**. O sistema multi-agente funciona perfeitamente sem ele.
-
-**Quando usar CrewAI:**
-- ✅ Quando você precisa de análises ainda mais profundas
-- ✅ Quando você tem uma API key da OpenAI disponível
-- ✅ Quando você quer correlações avançadas com literatura científica
-
-**Quando NÃO usar CrewAI:**
-- ❌ Se você não tem API key da OpenAI
-- ❌ Se você quer análise mais rápida
-- ❌ Se você quer economizar créditos de API
 
 ## 🆘 Suporte
 
