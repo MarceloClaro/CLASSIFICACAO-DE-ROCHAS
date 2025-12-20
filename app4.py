@@ -205,7 +205,7 @@ def visualize_data(dataset, classes):
     """
     Exibe algumas imagens do conjunto de dados com suas classes.
     """
-    st.write("Visualização de algumas imagens do conjunto de dados:")
+    st.write("### 📊 Visualização de algumas imagens do conjunto de dados original:")
     fig, axes = plt.subplots(1, 5, figsize=(15, 3))
     for i in range(5):
         idx = np.random.randint(len(dataset))
@@ -216,7 +216,7 @@ def visualize_data(dataset, classes):
         axes[i].axis('off')
     st.pyplot(fig)
 
-def plot_class_distribution(dataset, classes):
+def plot_class_distribution(dataset, classes, title="Distribuição das Classes"):
     """
     Exibe a distribuição das classes no conjunto de dados e mostra os valores quantitativos.
     """
@@ -238,11 +238,149 @@ def plot_class_distribution(dataset, classes):
     for i, count in enumerate(class_counts):
         ax.text(i, count, str(count), ha='center', va='bottom', fontweight='bold')
     
-    ax.set_title("Distribuição das Classes (Quantidade de Imagens)")
+    ax.set_title(title)
     ax.set_xlabel("Classes")
     ax.set_ylabel("Número de Imagens")
     
     st.pyplot(fig)
+    
+    return class_counts
+
+def show_augmented_images(dataset, transform, classes, num_augmentations=5):
+    """
+    Mostra imagens originais e suas versões aumentadas.
+    """
+    st.write("### 🔄 Exemplos de Imagens Aumentadas (Data Augmentation)")
+    st.write("Cada linha mostra uma imagem original seguida de suas versões aumentadas:")
+    
+    # Selecionar 3 imagens aleatórias
+    num_samples = 3
+    for sample_idx in range(num_samples):
+        idx = np.random.randint(len(dataset))
+        original_image, label = dataset[idx]
+        
+        # Criar figura com 1 original + num_augmentations aumentadas
+        fig, axes = plt.subplots(1, num_augmentations + 1, figsize=(15, 3))
+        
+        # Mostrar imagem original
+        axes[0].imshow(np.array(original_image))
+        axes[0].set_title(f'Original\n{classes[label]}')
+        axes[0].axis('off')
+        axes[0].set_facecolor('#e6f2ff')
+        
+        # Mostrar imagens aumentadas
+        for i in range(1, num_augmentations + 1):
+            augmented_image = transform(original_image)
+            # Desnormalizar para visualização
+            augmented_np = augmented_image.permute(1, 2, 0).numpy()
+            # Reverter normalização ImageNet
+            mean = np.array(IMAGENET_MEAN)
+            std = np.array(IMAGENET_STD)
+            augmented_np = std * augmented_np + mean
+            augmented_np = np.clip(augmented_np, 0, 1)
+            
+            axes[i].imshow(augmented_np)
+            axes[i].set_title(f'Aumentada {i}')
+            axes[i].axis('off')
+        
+        plt.tight_layout()
+        st.pyplot(fig)
+
+def calculate_dataset_statistics(dataset, classes):
+    """
+    Calcula estatísticas do dataset incluindo média, desvio padrão, etc.
+    """
+    st.write("### 📈 Estatísticas do Dataset")
+    
+    # Contagem por classe
+    labels = [label for _, label in dataset]
+    class_counts = np.bincount(labels)
+    
+    # Criar dataframe com estatísticas
+    stats_data = {
+        'Classe': classes,
+        'Quantidade': class_counts,
+        'Percentual (%)': [f"{(count/len(dataset)*100):.2f}" for count in class_counts]
+    }
+    
+    df_stats = pd.DataFrame(stats_data)
+    
+    st.write("#### Distribuição de Classes:")
+    st.dataframe(df_stats, use_container_width=True)
+    
+    # Estatísticas gerais
+    st.write("#### Estatísticas Gerais:")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total de Imagens", len(dataset))
+    
+    with col2:
+        st.metric("Número de Classes", len(classes))
+    
+    with col3:
+        st.metric("Imagens por Classe (Média)", f"{np.mean(class_counts):.1f}")
+    
+    with col4:
+        st.metric("Desvio Padrão", f"{np.std(class_counts):.1f}")
+    
+    # Verificar balanceamento
+    min_count = np.min(class_counts)
+    max_count = np.max(class_counts)
+    imbalance_ratio = max_count / min_count if min_count > 0 else float('inf')
+    
+    if imbalance_ratio > 1.5:
+        st.warning(f"⚠️ Dataset desbalanceado detectado! Razão: {imbalance_ratio:.2f}x (Classe mais frequente / Classe menos frequente)")
+        st.info("💡 Recomendação: Considere usar 'Perda Ponderada para Classes Desbalanceadas' nas configurações.")
+    else:
+        st.success(f"✅ Dataset relativamente balanceado. Razão: {imbalance_ratio:.2f}x")
+    
+    return df_stats
+
+def visualize_pca_features(features, labels, classes, n_components=2):
+    """
+    Visualiza features usando PCA.
+    """
+    st.write(f"### 🔬 Análise PCA ({n_components} Componentes)")
+    
+    # Aplicar PCA
+    pca = PCA(n_components=n_components)
+    features_pca = pca.fit_transform(features)
+    
+    # Mostrar variância explicada
+    explained_var = pca.explained_variance_ratio_
+    st.write(f"**Variância Explicada:** {explained_var[0]*100:.2f}% (PC1), {explained_var[1]*100:.2f}% (PC2)")
+    st.write(f"**Variância Total Explicada:** {sum(explained_var)*100:.2f}%")
+    
+    # Criar visualização
+    fig, ax = plt.subplots(figsize=(12, 8))
+    
+    # Mapear labels para nomes de classes
+    labels_named = [classes[label] for label in labels]
+    
+    # Criar scatter plot
+    scatter = sns.scatterplot(
+        x=features_pca[:, 0], 
+        y=features_pca[:, 1], 
+        hue=labels_named,
+        palette="tab10",
+        ax=ax,
+        s=100,
+        alpha=0.7,
+        edgecolor='black',
+        linewidth=0.5
+    )
+    
+    ax.set_xlabel(f'Componente Principal 1 ({explained_var[0]*100:.1f}%)')
+    ax.set_ylabel(f'Componente Principal 2 ({explained_var[1]*100:.1f}%)')
+    ax.set_title('Visualização PCA das Features Extraídas')
+    ax.legend(title='Classes', bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    st.pyplot(fig)
+    
+    return features_pca, explained_var
 
 def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
     """
@@ -316,13 +454,65 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
 
     # Carregar o dataset original sem transformações
     full_dataset = datasets.ImageFolder(root=data_dir)
-
-    # Exibir algumas imagens do dataset
+    
+    # ========== CONTAGEM INICIAL DOS DADOS ==========
+    st.write("## 📊 ANÁLISE INICIAL DO DATASET")
+    st.write(f"### 🔢 **Contagem Inicial: {len(full_dataset)} imagens**")
+    
+    # Exibir estatísticas detalhadas
+    stats_df = calculate_dataset_statistics(full_dataset, full_dataset.classes)
+    
+    # Exibir algumas imagens do dataset original
     visualize_data(full_dataset, full_dataset.classes)
-    plot_class_distribution(full_dataset, full_dataset.classes)
+    
+    # Plotar distribuição inicial
+    st.write("### 📊 Distribuição Inicial das Classes")
+    initial_class_counts = plot_class_distribution(full_dataset, full_dataset.classes, 
+                                                    title="Distribuição INICIAL das Classes (Sem Aumento de Dados)")
 
+    # ========== TÉCNICA DE AUMENTO DE DADOS ==========
+    st.write("---")
+    st.write("## 🔄 APLICAÇÃO DA TÉCNICA DE AUMENTO DE DADOS")
+    st.write(f"**Técnica Selecionada:** `{augmentation_type}`")
+    
+    if augmentation_type == 'none':
+        st.info("ℹ️ Nenhuma técnica de aumento de dados foi selecionada. As imagens serão usadas como estão.")
+    elif augmentation_type == 'standard':
+        st.info("ℹ️ Técnica Standard: Aplicação de transformações aleatórias (rotação, flip, crop, jitter, etc.)")
+    elif augmentation_type == 'mixup':
+        st.info("ℹ️ Técnica Mixup: Mistura linear de pares de imagens e seus rótulos")
+    elif augmentation_type == 'cutmix':
+        st.info("ℹ️ Técnica CutMix: Recorte e colagem de regiões entre imagens diferentes")
+    
     # Obter transformações baseadas no tipo de augmentação
     train_transform = get_augmentation_transforms(augmentation_type)
+    
+    # Mostrar exemplos de imagens aumentadas
+    if augmentation_type != 'none':
+        show_augmented_images(full_dataset, train_transform, full_dataset.classes, num_augmentations=4)
+    
+    # ========== ESTIMATIVA APÓS AUMENTO ==========
+    st.write("---")
+    st.write("## 📈 ESTIMATIVA APÓS AUMENTO DE DADOS")
+    
+    # Calcular estimativa de imagens após aumento
+    # Durante o treinamento, cada época gera versões aumentadas
+    if augmentation_type == 'none':
+        augmentation_multiplier = 1
+        st.write(f"### 🔢 **Total Estimado: {len(full_dataset)} imagens** (sem aumento)")
+    else:
+        # Com augmentation, cada época gera versões diferentes
+        # Estimativa conservadora: cada imagem pode gerar de 3-5 variações por época
+        augmentation_multiplier = 4  # Média estimada
+        total_estimated = len(full_dataset) * augmentation_multiplier * epochs
+        st.write(f"### 🔢 **Total de Imagens Original: {len(full_dataset)}**")
+        st.write(f"### 🔢 **Multiplicador Estimado por Época: ~{augmentation_multiplier}x**")
+        st.write(f"### 🔢 **Total Estimado Durante {epochs} Épocas: ~{total_estimated:,} imagens aumentadas**")
+        st.info(f"💡 **Explicação:** Durante o treinamento, cada uma das {len(full_dataset)} imagens originais será " +
+                f"transformada aleatoriamente a cada época, gerando aproximadamente {augmentation_multiplier}x variações únicas " +
+                f"ao longo de {epochs} épocas, totalizando cerca de {total_estimated:,} imagens processadas.")
+    
+    st.write("---")
     
     # Criar o dataset personalizado com aumento de dados
     train_dataset = CustomDataset(full_dataset, transform=train_transform)
@@ -1728,6 +1918,28 @@ def main():
 
         # Visualizar clusters
         visualize_clusters(features_reshaped, labels, hierarchical_labels, kmeans_labels, classes)
+        
+        # ========== OPÇÃO DE VISUALIZAÇÃO PCA ==========
+        st.write("---")
+        st.write("## 🔬 Análise PCA das Features")
+        
+        show_pca = st.checkbox("📊 Mostrar Análise PCA das Features Extraídas", value=True)
+        
+        if show_pca:
+            # Opção de escolher número de componentes
+            n_components = st.selectbox(
+                "Escolha o número de componentes principais para visualização:",
+                options=[2, 3],
+                index=0,
+                help="2 componentes: Visualização 2D | 3 componentes: Visualização 3D (não implementado ainda)"
+            )
+            
+            if n_components == 2:
+                visualize_pca_features(features_reshaped, labels, classes, n_components=2)
+            else:
+                st.info("📌 Visualização 3D será implementada em versão futura.")
+                # Mostrar 2D por padrão
+                visualize_pca_features(features_reshaped, labels, classes, n_components=2)
 
         # Avaliação de uma imagem individual
         evaluate = st.radio("Deseja avaliar uma imagem?", ("Sim", "Não"))
