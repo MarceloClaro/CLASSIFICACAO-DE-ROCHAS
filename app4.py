@@ -132,6 +132,9 @@ try:
 except ImportError:
     GENETIC_INTERP_AVAILABLE = False
 
+# Constants
+CONVERGENCE_CHECK_EPOCHS = 5  # Number of recent epochs to check for convergence stability
+
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -4196,8 +4199,8 @@ def main():
                                         
                                         # Calculate convergence metrics
                                         if 'valid_accuracy' in hist and len(hist['valid_accuracy']) > 1:
-                                            # Take last N epochs (up to 5) for convergence analysis
-                                            n_epochs_to_check = min(5, len(hist['valid_accuracy']))
+                                            # Take last N epochs (up to CONVERGENCE_CHECK_EPOCHS) for convergence analysis
+                                            n_epochs_to_check = min(CONVERGENCE_CHECK_EPOCHS, len(hist['valid_accuracy']))
                                             last_n_acc = hist['valid_accuracy'][-n_epochs_to_check:]
                                             acc_variance = np.var(last_n_acc) if len(last_n_acc) > 1 else 0
                                             statistical_results["Estabilidade da Convergência"] = "Alta" if acc_variance < 0.001 else "Média" if acc_variance < 0.01 else "Baixa"
