@@ -133,8 +133,10 @@ def visualize_activation_heatmap_3d(
         colorscale='Hot',
         reversescale=True,
         colorbar=dict(
-            title="Ativação",
-            titleside="right"
+            title=dict(
+                text="Ativação",
+                side="right"
+            )
         ),
         hovertemplate='X: %{x}<br>Y: %{y}<br>Ativação: %{z:.3f}<extra></extra>'
     )])
