@@ -8,7 +8,7 @@
 - ✅ Box expansível na sidebar para configuração de API
 - ✅ Seleção de provedor: Nenhum, Gemini ou Groq
 - ✅ Modelos disponíveis por provedor:
-  - **Gemini**: gemini-pro, gemini-1.5-pro, gemini-1.5-flash
+  - **Gemini**: gemini-1.0-pro, gemini-1.5-pro, gemini-1.5-flash
   - **Groq**: mixtral-8x7b-32768, llama-3.1-70b-versatile, llama-3.1-8b-instant
 - ✅ Campo seguro para API Key (tipo password)
 - ✅ Indicador visual de API configurada

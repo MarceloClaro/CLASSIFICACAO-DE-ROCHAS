@@ -22,7 +22,7 @@ Todas as funcionalidades solicitadas foram implementadas com sucesso!
 - **Status**: IMPLEMENTADO
 - **Descrição**: Integração com APIs de IA para análise diagnóstica
 - **Provedores**:
-  - Google Gemini (gemini-pro, gemini-1.5-pro, gemini-1.5-flash)
+  - Google Gemini (gemini-1.0-pro, gemini-1.5-pro, gemini-1.5-flash)
   - Groq (mixtral-8x7b-32768, llama-3.1-70b-versatile, llama-3.1-8b-instant)
 - **Funcionalidades**:
   - Análise diagnóstica PhD-level
@@ -214,7 +214,7 @@ visualize_activation_heatmap_3d(activation_map)
 
 #### Exemplo de Uso
 ```python
-analyzer = AIAnalyzer('gemini', api_key, 'gemini-pro')
+analyzer = AIAnalyzer('gemini', api_key, 'gemini-1.0-pro')
 analysis = analyzer.generate_comprehensive_analysis(
     predicted_class="Melanoma",
     confidence=0.945,

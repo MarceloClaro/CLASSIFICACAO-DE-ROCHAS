@@ -36,7 +36,7 @@ class AIAnalyzer:
         Args:
             api_provider: 'gemini' or 'groq'
             api_key: API key for the selected provider
-            model_name: Model name (e.g., 'gemini-pro', 'mixtral-8x7b-32768')
+            model_name: Model name (e.g., 'gemini-1.0-pro', 'mixtral-8x7b-32768')
         """
         self.api_provider = api_provider.lower()
         self.api_key = api_key
