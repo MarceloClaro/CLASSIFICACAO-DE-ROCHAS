@@ -22,6 +22,17 @@ Sistema avançado de classificação de imagens utilizando Deep Learning com an�
 - 🎯 **Regularização L1 e L2**: Controle fino de overfitting
 - 🔍 **4 Tipos de Grad-CAM**: GradCAM, GradCAM++, SmoothGradCAM++, LayerCAM
 
+### 🚀 **NOVO! Funcionalidades v5.0**
+
+- 🌐 **Visualização 3D Interativa**: PCA e Grad-CAM em 3D com Plotly
+- 🤖 **Chat com IA**: Análise diagnóstica PhD-level com Gemini e Groq
+- 🧬 **Algoritmos Genéticos**: Interpretação multi-angular automatizada
+- 📚 **Referências Acadêmicas**: Integração com PubMed, arXiv e Google Scholar
+- 🔬 **Análise Forense**: Diagnóstico detalhado como residência médica/perícia
+- 📋 **Relatórios Automáticos**: Geração de laudos técnicos completos
+
+👉 **[Ver documentação completa v5.0](FEATURES_V5.md)**
+
 ## 🚀 Instalação
 
 ### Pré-requisitos
@@ -37,10 +48,31 @@ pip install -r requirements.txt
 
 ## 📱 Como Usar
 
-### 1. Aplicação Principal (app3.py)
+### 1. Aplicação Avançada v5.0 (app5.py) 🆕
+
+```bash
+streamlit run app5.py
+```
+
+**Funcionalidades Completas v5.0**:
+- ✅ Todas as funcionalidades do app3.py
+- ✅ **Visualização 3D Interativa** (PCA e Grad-CAM)
+- ✅ **Chat com IA** (Gemini e Groq para análise diagnóstica)
+- ✅ **Algoritmos Genéticos** (interpretação multi-angular)
+- ✅ **Referências Acadêmicas** (PubMed, arXiv)
+- ✅ **Análise PhD-level** (diagnóstico forense/médico)
+- ✅ **Relatórios Automáticos** (laudos técnicos completos)
+
+**Requer API Keys** (opcionais):
+- Google Gemini API: https://ai.google.dev/
+- Groq API: https://console.groq.com/
+
+### 2. Aplicação Principal (app3.py / app4.py)
 
 ```bash
 streamlit run app3.py
+# ou
+streamlit run app4.py
 ```
 
 **Funcionalidades**:
@@ -55,7 +87,7 @@ streamlit run app3.py
 - ✅ 4 variantes de Grad-CAM para interpretabilidade
 - ✅ Clustering não supervisionado
 
-### 2. Guia de Comparação de Modelos
+### 3. Guia de Comparação de Modelos
 
 ```bash
 streamlit run model_comparison_guide.py
@@ -116,6 +148,7 @@ streamlit run model_comparison_guide.py
 - [📊 Análise de Performance](PERFORMANCE_ANALYSIS.md) - Documentação completa do sistema de análise
 - [🔬 Guia de Comparação](model_comparison_guide.py) - Interface interativa para comparação de modelos
 - [✨ Melhorias no Treinamento](TRAINING_IMPROVEMENTS.md) - Documentação detalhada das novas funcionalidades v3.0
+- [🚀 **NOVO! Funcionalidades v5.0**](FEATURES_V5.md) - Documentação completa da versão 5.0
 
 ## 🛠️ Estrutura do Projeto
 
@@ -125,10 +158,16 @@ CLASSIFICACAO-DE-ROCHAS/
 ├── app2.py                     # Aplicação intermediária
 ├── app3.py                     # Aplicação completa com análise
 ├── app4.py                     # Variante app3
+├── app5.py                     # 🆕 Aplicação v5.0 com IA e 3D
 ├── performance_analyzer.py     # Módulo de análise de performance
 ├── model_comparison_guide.py   # Guia interativo de comparação
+├── visualization_3d.py         # 🆕 Módulo de visualização 3D
+├── ai_chat_module.py           # 🆕 Chat com IA (Gemini/Groq)
+├── academic_references.py      # 🆕 Busca de referências acadêmicas
+├── genetic_interpreter.py      # 🆕 Algoritmos genéticos
 ├── PERFORMANCE_ANALYSIS.md     # Documentação técnica
-├── requirements.txt            # Dependências
+├── FEATURES_V5.md              # 🆕 Documentação v5.0
+├── requirements.txt            # Dependências (atualizado)
 └── dataset/                    # Dados de treinamento
 ```
 
@@ -279,6 +318,7 @@ Desenvolvido no contexto do Laboratório de Educação e Inteligência Artificia
 ---
 
 **Última atualização**: 2024  
-**Versão**: 3.0 (com melhorias avançadas de treinamento)
+**Versão**: 5.0 (com visualização 3D, IA, e algoritmos genéticos)  
+**Versões anteriores**: v3.0 (melhorias de treinamento), v4.0 (otimizações)
 
 CLASSIFICAÇÃO DE PELE: https://g.co/gemini/share/6c65af20056b
