@@ -1735,6 +1735,11 @@ def evaluate_image_with_statistics(model, image, classes, activation_map=None, n
         Dict com análise completa incluindo estatísticas e diagnósticos
     """
     model.eval()
+    
+    # Ensure model parameters don't require gradients (in case Grad-CAM left them enabled)
+    for param in model.parameters():
+        param.requires_grad = False
+    
     image_tensor = test_transforms(image).unsqueeze(0).to(device)
     
     # 1. Predição básica
@@ -2135,9 +2140,26 @@ def visualize_activations(model, image, class_names, gradcam_type='SmoothGradCAM
         st.info("Visualização Grad-CAM não disponível para este modelo/configuração.")
         return None
     finally:
-        # CRITICAL: Remove hooks to prevent interference with subsequent model calls
+        # CRITICAL: Remove hooks and reset model state to prevent interference with subsequent calls
         if cam_extractor is not None:
-            cam_extractor.remove_hooks()
+            try:
+                # Try multiple cleanup methods for compatibility with different torchcam versions
+                if hasattr(cam_extractor, 'remove_hooks'):
+                    cam_extractor.remove_hooks()
+                elif hasattr(cam_extractor, 'clear_hooks'):
+                    cam_extractor.clear_hooks()
+                elif hasattr(cam_extractor, 'reset_hooks'):
+                    cam_extractor.reset_hooks()
+            except Exception as e:
+                # If hook removal fails, log it but continue with model cleanup
+                st.warning(f"Aviso: Não foi possível remover hooks: {e}")
+        
+        # Disable gradients on model parameters to restore original state
+        try:
+            for param in model.parameters():
+                param.requires_grad = False
+        except Exception:
+            pass  # Silently continue if this fails
 
 
 
