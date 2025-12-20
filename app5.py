@@ -2192,7 +2192,7 @@ def main():
                     
                     with col2:
                         if api_provider == 'gemini':
-                            model_options = ['gemini-1.0-pro', 'gemini-1.5-pro', 'gemini-1.5-flash']
+                            model_options = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.5-pro', 'gemini-pro']
                         else:
                             model_options = ['mixtral-8x7b-32768', 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant']
                         
@@ -2373,16 +2373,17 @@ def main():
                                     if '404' in error_msg and 'not found' in error_msg:
                                         st.error("🔍 Modelo não encontrado. Verifique se:")
                                         st.markdown("""
-                                        1. O nome do modelo está correto (gemini-1.0-pro, gemini-1.5-pro, gemini-1.5-flash)
+                                        1. O nome do modelo está correto (gemini-2.5-flash, gemini-1.5-flash, gemini-2.5-pro, gemini-pro)
                                         2. O modelo está disponível na sua região
                                         3. Você tem acesso ao modelo com sua API key
                                         """)
                                         st.info("💡 Recomendação: Use o pacote estável e modelos disponíveis: pip install google-generativeai")
                                         st.markdown("""
-                                        **Modelos recomendados:**
-                                        - gemini-1.5-flash (rápido e eficiente)
-                                        - gemini-1.5-pro (mais avançado)
-                                        - gemini-pro (estável)
+                                        **Modelos recomendados (API v1beta):**
+                                        - gemini-2.5-flash (RECOMENDADO - rápido, eficiente e mais recente)
+                                        - gemini-1.5-flash (rápido e estável)
+                                        - gemini-2.5-pro (avançado para tarefas complexas)
+                                        - gemini-pro (estável para uso geral)
                                         """)
                                     else:
                                         st.info("Verifique se a API key está correta e se você tem créditos disponíveis.")

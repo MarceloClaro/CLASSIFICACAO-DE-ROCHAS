@@ -3690,7 +3690,7 @@ def main():
         
         if api_provider_sidebar != 'Nenhum':
             if api_provider_sidebar == 'Gemini':
-                model_options_sidebar = ['gemini-1.0-pro', 'gemini-1.5-pro', 'gemini-1.5-flash']
+                model_options_sidebar = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.5-pro', 'gemini-pro']
             else:  # Groq
                 model_options_sidebar = ['mixtral-8x7b-32768', 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant']
             
@@ -4129,7 +4129,7 @@ def main():
                     
                     with col2:
                         if api_provider == 'gemini':
-                            model_options = ['gemini-1.0-pro', 'gemini-1.5-pro', 'gemini-1.5-flash']
+                            model_options = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.5-pro', 'gemini-pro']
                         else:
                             model_options = ['mixtral-8x7b-32768', 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant']
                         
@@ -4439,7 +4439,7 @@ def main():
                     - ✅ Exportação completa para CSV
                     
                     **Modelos com Suporte de Visão:**
-                    - Gemini: gemini-1.0-pro, gemini-1.5-pro, gemini-1.5-flash
+                    - Gemini: gemini-2.5-flash, gemini-1.5-flash, gemini-2.5-pro, gemini-pro
                     - Groq: Suporte limitado dependendo do modelo
                     """)
 

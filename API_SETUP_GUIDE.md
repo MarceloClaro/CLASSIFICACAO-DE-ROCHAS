@@ -58,10 +58,11 @@ O sistema detecta automaticamente qual pacote está instalado:
 3. Crie um novo projeto ou selecione um existente
 4. Copie a API Key gerada
 
-**Modelos Disponíveis:**
-- `gemini-1.0-pro` - Modelo base
-- `gemini-1.5-pro` - Modelo avançado com contexto maior
-- `gemini-1.5-flash` - Modelo rápido e eficiente
+**Modelos Disponíveis (API v1beta):**
+- `gemini-2.5-flash` - ⭐ **RECOMENDADO** - Mais recente, rápido e eficiente
+- `gemini-1.5-flash` - Modelo rápido e estável
+- `gemini-2.5-pro` - Modelo avançado para tarefas complexas e raciocínio
+- `gemini-pro` - Modelo estável para uso geral
 
 ### Groq
 
@@ -163,19 +164,23 @@ pip install google-generativeai
 
 ### Erro: "404 models/gemini-1.5-pro is not found for API version v1beta"
 
-**Causa:** O pacote `google-genai` (novo) pode ter problemas de compatibilidade com alguns modelos ou versões da API.
+**Causa:** Os modelos antigos (`gemini-1.0-pro`, `gemini-1.5-pro`) foram descontinuados ou renomeados na API v1beta do Gemini.
 
-**Solução:** ✅ JÁ CORRIGIDO! O código agora adiciona automaticamente o prefixo 'models/' quando necessário.
+**Solução:** ✅ JÁ CORRIGIDO! O código agora usa os modelos atualizados e suportados pela API v1beta:
+- `gemini-2.5-flash` (mais recente e recomendado)
+- `gemini-1.5-flash` (estável)
+- `gemini-2.5-pro` (avançado)
+- `gemini-pro` (uso geral)
 
 Se ainda tiver problemas:
 
 ```bash
-# Opção 1: Use o pacote estável (recomendado)
+# Atualize o pacote google-generativeai
+pip install --upgrade google-generativeai
+
+# Ou, se estiver usando o pacote beta, migre para o estável:
 pip uninstall google-genai -y
 pip install google-generativeai
-
-# Opção 2: Aguarde atualização do pacote google-genai
-pip install --upgrade google-genai
 ```
 
 **Nota:** O pacote `google-generativeai` é mais estável e recomendado para uso em produção.
@@ -184,12 +189,13 @@ pip install --upgrade google-genai
 
 ### Escolha do Modelo
 
-**Para análises detalhadas:**
-- Gemini: Use `gemini-1.5-pro`
+**Para análises detalhadas e raciocínio complexo:**
+- Gemini: Use `gemini-2.5-pro`
 - Groq: Use `mixtral-8x7b-32768` ou `llama-3.1-70b-versatile`
 
-**Para análises rápidas:**
-- Gemini: Use `gemini-1.5-flash`
+**Para análises rápidas e eficientes:**
+- Gemini: Use `gemini-2.5-flash` ⭐ **RECOMENDADO** (mais recente)
+- Gemini: Use `gemini-1.5-flash` (alternativa estável)
 - Groq: Use `llama-3.1-8b-instant`
 
 ### Segurança da API Key
