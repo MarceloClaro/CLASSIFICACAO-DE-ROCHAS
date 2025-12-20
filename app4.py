@@ -2194,6 +2194,80 @@ def display_statistical_analysis(analysis_results):
         })
         st.dataframe(prob_df.head(10), use_container_width=True)  # Mostrar top 10
         st.caption("As 10 categorias com maiores probabilidades")
+    
+    # ========== RESUMO FINAL PARA LEIGOS ==========
+    st.write("---")
+    st.write("## 📝 RESUMO FINAL EM LINGUAGEM SIMPLES")
+    st.write("### O que você precisa saber sobre este resultado:")
+    
+    # Criar resumo baseado nos dados da análise
+    confidence = analysis_results['confidence']
+    predicted = analysis_results['predicted_class']
+    safety_status = analysis_results['safety_analysis']['status']
+    uncertainty_level = analysis_results['uncertainty_analysis']['uncertainty_level']
+    error_prob = analysis_results['error_impact']['error_probability']
+    
+    st.write(f"**1. Resultado Principal:**")
+    st.write(f"   - A imagem foi classificada como: **{predicted}**")
+    st.write(f"   - Nível de certeza: **{confidence:.2%}**")
+    
+    st.write(f"\n**2. Confiabilidade:**")
+    if safety_status == 'safe' and confidence >= 0.75:
+        st.success("   ✅ Este resultado é considerado **CONFIÁVEL** para uso.")
+    elif safety_status == 'safe' or confidence >= 0.60:
+        st.warning("   ⚠️ Este resultado é **ACEITÁVEL**, mas use com **PRECAUÇÃO**.")
+    else:
+        st.error("   ⚠️ Este resultado tem **BAIXA CONFIABILIDADE** - requer análise adicional.")
+    
+    st.write(f"\n**3. Nível de Incerteza:**")
+    st.write(f"   - Classificação: **{uncertainty_level}**")
+    if uncertainty_level in ['Muito Baixa', 'Baixa']:
+        st.write("   - Significa: O sistema está bastante seguro do resultado")
+    elif uncertainty_level == 'Moderada':
+        st.write("   - Significa: Há alguma dúvida, mas o resultado ainda é útil")
+    else:
+        st.write("   - Significa: O sistema tem dúvidas significativas sobre o resultado")
+    
+    st.write(f"\n**4. Probabilidade de Erro:**")
+    st.write(f"   - Chance de estar errado: **{error_prob:.2%}**")
+    if error_prob < 0.20:
+        st.write("   - Interpretação: Chance baixa de erro")
+    elif error_prob < 0.40:
+        st.write("   - Interpretação: Chance moderada de erro - atenção necessária")
+    else:
+        st.write("   - Interpretação: Chance alta de erro - cuidado!")
+    
+    st.write(f"\n**5. Recomendação Final:**")
+    requires_specialist = analysis_results['clinical_impact']['requires_specialist']
+    recommended_action = analysis_results['clinical_impact']['recommended_action']
+    
+    if requires_specialist:
+        st.warning(f"   ⚕️ **Consultar especialista:** Sim, recomendado")
+        st.write(f"   - Motivo: {recommended_action}")
+    else:
+        st.success(f"   ✅ **Consultar especialista:** Não é urgente")
+        st.write(f"   - Ação sugerida: {recommended_action}")
+    
+    # Adicionar glossário rápido
+    with st.expander("📖 Glossário - Entenda os Termos Técnicos"):
+        st.write("""
+        **Termos que você pode ter visto neste relatório:**
+        
+        - **Bootstrap/Validação Bootstrap**: Método estatístico que repete a análise múltiplas vezes para verificar se o resultado é estável
+        - **Confiança/Certeza**: O quanto o sistema está seguro de que a classificação está correta (em porcentagem)
+        - **Diagnóstico Diferencial**: Outras possíveis classificações que a imagem poderia ter
+        - **Entropia**: Medida de incerteza ou "desordem" - quanto maior, mais incerta é a classificação
+        - **Intervalo de Confiança**: Faixa de valores onde o resultado verdadeiro provavelmente está
+        - **Margem de Erro**: Quanto o valor pode variar para mais ou para menos
+        - **Probabilidade**: Chance de algo ser verdade, expressa em porcentagem (0% a 100%)
+        - **Significância Estatística**: Se uma diferença é real ou pode ter ocorrido por acaso
+        - **Valor-p**: Número que indica se uma diferença é estatisticamente significativa (< 0.05 = significativa)
+        
+        **Formato ABNT (Normas Brasileiras):**
+        Este relatório segue as diretrizes da Associação Brasileira de Normas Técnicas (ABNT) 
+        para apresentação de análises científicas, garantindo qualidade acadêmica nível A1 
+        (mais alto nível de qualidade acadêmica no Brasil).
+        """)
 
 def visualize_activations(model, image, class_names, gradcam_type='SmoothGradCAMpp'):
     """

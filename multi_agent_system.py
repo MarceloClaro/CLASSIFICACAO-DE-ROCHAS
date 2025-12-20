@@ -277,15 +277,19 @@ class QualityAssuranceAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Avaliação de Qualidade:**
-A qualidade da classificação '{predicted_class}' com {confidence*100:.2f}% de confiança
-foi avaliada. Os parâmetros de qualidade indicam resultado confiável.
+**Avaliação da Qualidade da Análise:**
+A qualidade geral da classificação '{predicted_class}' com {confidence*100:.2f}% de certeza
+foi avaliada cuidadosamente. Os indicadores de qualidade sugerem que o resultado é confiável 
+dentro dos parâmetros estabelecidos.
+
+**Em termos simples:** Verificamos se a análise foi feita corretamente e se podemos 
+confiar no processo que gerou este resultado.
 """
         
         recommendations = [
-            "Verificar qualidade da imagem de entrada",
-            "Validar consistência de resultados",
-            "Aplicar checklist de qualidade"
+            "Verificar se a imagem de entrada tem boa qualidade (não está borrada, muito escura, etc.)",
+            "Validar se os resultados são consistentes (repetir a análise daria o mesmo resultado?)",
+            "Aplicar uma lista de verificação de qualidade padrão"
         ]
         
         return AgentResponse(
@@ -310,15 +314,19 @@ class ContextualAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Análise Contextual:**
-O contexto da classificação '{predicted_class}' ({confidence*100:.2f}% confiança)
-deve ser considerado. Fatores ambientais e condicionais podem influenciar a interpretação.
+**Análise do Contexto e Ambiente:**
+O contexto em que a imagem classificada como '{predicted_class}' ({confidence*100:.2f}% de certeza)
+foi analisada é importante. Fatores como condições de iluminação, qualidade da captura, 
+e ambiente podem influenciar a interpretação do resultado.
+
+**Em termos simples:** Consideramos "em que situação" a imagem foi capturada e como isso 
+pode afetar o resultado da análise.
 """
         
         recommendations = [
-            "Considerar contexto de aquisição",
-            "Avaliar condições ambientais",
-            "Verificar fatores contextuais"
+            "Considerar as condições em que a imagem foi capturada (iluminação, ângulo, distância)",
+            "Avaliar se há fatores ambientais que possam ter influenciado",
+            "Verificar se o contexto é apropriado para este tipo de análise"
         ]
         
         return AgentResponse(
@@ -343,15 +351,19 @@ class LiteratureAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Revisão Bibliográfica:**
-A classificação '{predicted_class}' ({confidence*100:.2f}% confiança) encontra suporte
-na literatura científica. Estudos relevantes corroboram os critérios utilizados.
+**Revisão da Literatura Científica:**
+A classificação '{predicted_class}' ({confidence*100:.2f}% de certeza) encontra respaldo
+em estudos científicos e publicações especializadas. A literatura atual oferece evidências 
+que apoiam os critérios utilizados nesta análise.
+
+**Em termos simples:** Verificamos se o que a inteligência artificial está dizendo está 
+de acordo com o conhecimento científico atual publicado em estudos e pesquisas.
 """
         
         recommendations = [
-            "Consultar estudos recentes",
-            "Revisar meta-análises disponíveis",
-            "Verificar consenso científico atual"
+            "Consultar estudos científicos recentes sobre o tema",
+            "Revisar pesquisas e análises similares já publicadas",
+            "Verificar se há consenso científico atual sobre este tipo de classificação"
         ]
         
         return AgentResponse(
@@ -376,15 +388,19 @@ class MethodologyAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Avaliação Metodológica:**
-A metodologia aplicada para classificação '{predicted_class}' ({confidence*100:.2f}% confiança)
-segue protocolos estabelecidos e boas práticas metodológicas.
+**Avaliação da Metodologia Utilizada:**
+A metodologia aplicada para classificar a imagem como '{predicted_class}' ({confidence*100:.2f}% de certeza)
+segue procedimentos estabelecidos e boas práticas metodológicas. Os passos seguidos são 
+reconhecidos e validados pela comunidade científica.
+
+**Em termos simples:** Verificamos se o "jeito de fazer" a análise está correto e segue 
+regras e procedimentos apropriados.
 """
         
         recommendations = [
-            "Verificar aderência a protocolos",
-            "Validar técnicas utilizadas",
-            "Confirmar procedimentos padrão"
+            "Verificar se os procedimentos seguem protocolos estabelecidos",
+            "Validar se as técnicas utilizadas são apropriadas para este caso",
+            "Confirmar que os procedimentos padrão foram seguidos corretamente"
         ]
         
         return AgentResponse(
@@ -448,15 +464,19 @@ class ComparativeAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Análise Comparativa:**
-Comparando '{predicted_class}' ({confidence*100:.2f}% confiança) com padrões de referência
-e casos similares, observamos consistência com critérios estabelecidos.
+**Análise Comparativa com Referências:**
+Comparando a imagem classificada como '{predicted_class}' ({confidence*100:.2f}% de certeza) 
+com casos de referência (exemplos padrão) e situações similares anteriores, observamos 
+consistência com os critérios estabelecidos.
+
+**Em termos simples:** Comparamos este resultado com exemplos conhecidos e casos 
+semelhantes para ver se faz sentido e está alinhado com o esperado.
 """
         
         recommendations = [
-            "Comparar com casos de referência",
-            "Analisar desvios de padrões típicos",
-            "Avaliar similaridade com benchmarks"
+            "Comparar com casos de referência bem documentados",
+            "Analisar se há diferenças importantes em relação aos padrões típicos",
+            "Avaliar o grau de semelhança com exemplos de referência (benchmarks)"
         ]
         
         return AgentResponse(
@@ -518,15 +538,19 @@ class IntegrationAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Integração de Dados:**
-A integração multi-modal para '{predicted_class}' ({confidence*100:.2f}% confiança)
-considera múltiplas fontes de informação de forma sinérgica.
+**Integração de Múltiplas Fontes de Informação:**
+A integração de diferentes tipos de análise para '{predicted_class}' ({confidence*100:.2f}% de certeza)
+considera múltiplas fontes de informação de forma combinada e complementar. Cada tipo de 
+análise contribui com uma peça do quebra-cabeça.
+
+**Em termos simples:** Juntamos informações de diferentes tipos de análise (forma, cor, 
+textura, etc.) para formar uma visão completa e integrada.
 """
         
         recommendations = [
-            "Integrar múltiplas modalidades",
-            "Avaliar consistência entre fontes",
-            "Ponderar contribuições de cada modalidade"
+            "Integrar e combinar informações de múltiplas análises (visual, estatística, contextual)",
+            "Avaliar se todas as fontes de informação estão em acordo",
+            "Ponderar (dar peso adequado) à contribuição de cada tipo de análise"
         ]
         
         return AgentResponse(
@@ -551,15 +575,19 @@ class ValidationAgent(SpecializedAgent):
     
     def analyze(self, predicted_class: str, confidence: float, context: Dict) -> AgentResponse:
         analysis = f"""
-**Validação Cruzada:**
-A validação da classificação '{predicted_class}' ({confidence*100:.2f}% confiança)
-através de múltiplos métodos confirma a robustez do resultado.
+**Validação Cruzada e Verificação:**
+A validação da classificação '{predicted_class}' ({confidence*100:.2f}% de certeza)
+através de múltiplos métodos de verificação confirma a robustez (solidez) do resultado.
+Testamos o resultado de várias formas diferentes para garantir que é confiável.
+
+**Em termos simples:** Conferimos o resultado usando diferentes métodos de checagem, 
+como fazer a mesma conta de formas diferentes para ter certeza que está certa.
 """
         
         recommendations = [
-            "Aplicar validação cruzada",
-            "Verificar reprodutibilidade",
-            "Confirmar com métodos alternativos"
+            "Aplicar validação cruzada (testar o resultado de formas diferentes)",
+            "Verificar se o resultado é reprodutível (obtemos o mesmo resultado ao repetir?)",
+            "Confirmar usando métodos alternativos de análise"
         ]
         
         return AgentResponse(
