@@ -2193,11 +2193,14 @@ def main():
                     with col2:
                         if api_provider == 'gemini':
                             model_options = [
+                                'gemini-2.5-flash',  # ⭐ Recommended
+                                'gemini-2.5-flash-lite',
+                                'gemini-2.5-pro',
+                                'gemini-3-flash-preview',
+                                'gemini-3-pro-preview',
+                                # Legacy models
                                 'gemini-1.5-pro-latest',
-                                'gemini-1.5-flash-latest',
-                                'gemini-1.0-pro-latest',
-                                'gemini-pro',
-                                'gemini-1.0-pro-vision-latest'
+                                'gemini-1.5-flash-latest'
                             ]
                         else:
                             model_options = [
@@ -2385,18 +2388,18 @@ def main():
                                     if '404' in error_msg and 'not found' in error_msg:
                                         st.error("🔍 Modelo não encontrado. Verifique se:")
                                         st.markdown("""
-                                        1. O nome do modelo está correto (gemini-1.5-pro-latest, gemini-1.5-flash-latest, gemini-1.0-pro-latest, gemini-pro)
-                                        2. O modelo está disponível na sua região
-                                        3. Você tem acesso ao modelo com sua API key
+                                        📚 Use os modelos atuais do Gemini API.
+                                        Baseado no cookbook oficial: https://github.com/google-gemini/cookbook
                                         """)
-                                        st.info("💡 Recomendação: Use o pacote estável e modelos disponíveis: pip install google-generativeai")
                                         st.markdown("""
-                                        **Modelos disponíveis (API v1beta):**
-                                        - gemini-1.5-pro-latest ⭐ RECOMENDADO (mais recente, avançado)
-                                        - gemini-1.5-flash-latest (rápido e eficiente)
-                                        - gemini-1.0-pro-latest (estável)
-                                        - gemini-pro (uso geral)
-                                        - gemini-1.0-pro-vision-latest (visão mais recente)
+                                        **Modelos recomendados (todos com suporte multimodal):**
+                                        - gemini-2.5-flash ⭐ RECOMENDADO (rápido e eficiente)
+                                        - gemini-2.5-flash-lite (ainda mais rápido)
+                                        - gemini-2.5-pro (avançado com capacidade de raciocínio)
+                                        - gemini-3-flash-preview (próxima geração - preview)
+                                        - gemini-3-pro-preview (avançado próxima geração - preview)
+                                        
+                                        ⚠️ Modelos legados (1.5, 1.0) não são mais recomendados
                                         """)
                                     else:
                                         st.info("Verifique se a API key está correta e se você tem créditos disponíveis.")

@@ -135,10 +135,17 @@ except ImportError:
 # Constants
 CONVERGENCE_CHECK_EPOCHS = 5  # Number of recent epochs to check for convergence stability
 
-# Valid model lists
+# Valid model lists (based on official Google Gemini Cookbook)
+# Reference: https://github.com/MarceloClaro/cookbook
 VALID_GEMINI_MODELS = [
+    'gemini-2.5-flash',  # ⭐ Recommended - fast and efficient with multimodal support
+    'gemini-2.5-flash-lite',  # Even faster version
+    'gemini-2.5-pro',  # Advanced model with thinking capabilities
+    'gemini-3-flash-preview',  # Preview of next generation
+    'gemini-3-pro-preview',  # Advanced preview
+    # Legacy models (for backwards compatibility, but not recommended)
     'gemini-1.5-pro-latest',
-    'gemini-1.5-flash-latest', 
+    'gemini-1.5-flash-latest',
     'gemini-1.0-pro-latest',
     'gemini-pro',
     'gemini-1.0-pro-vision-latest'
@@ -155,6 +162,7 @@ VALID_GROQ_MODELS = [
 def validate_model_name(model_name, provider):
     """
     Validate and sanitize model name to ensure deprecated models are not used.
+    Based on official Google Gemini Cookbook: https://github.com/MarceloClaro/cookbook
     
     Args:
         model_name: The model name from session state or user input
@@ -165,15 +173,15 @@ def validate_model_name(model_name, provider):
     """
     if not model_name:
         # Return default model if none specified
-        return 'gemini-1.5-pro-latest' if provider == 'Gemini' else 'mixtral-8x7b-32768'
+        return 'gemini-2.5-flash' if provider == 'Gemini' else 'mixtral-8x7b-32768'
     
     # Check if model is in valid list
     if provider == 'Gemini':
         if model_name in VALID_GEMINI_MODELS:
             return model_name
         else:
-            # Model is deprecated or invalid, return default
-            return 'gemini-1.5-pro-latest'
+            # Model is deprecated or invalid, return recommended default
+            return 'gemini-2.5-flash'
     elif provider == 'Groq':
         if model_name in VALID_GROQ_MODELS:
             return model_name
@@ -2042,15 +2050,17 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
             )
         elif "404" in str(e) and "not found" in error_type:
             error_msg += (
-                "🔍 Modelo não encontrado ou não suporta análise de imagens.\n"
-                "   Modelos com suporte a visão (imagens):\n"
-                "   - gemini-1.5-pro-latest ⭐ RECOMENDADO (avançado com visão)\n"
-                "   - gemini-1.5-flash-latest (rápido com visão)\n"
-                "   - gemini-1.0-pro-vision-latest (visão com auto-update)\n"
+                "🔍 Modelo não encontrado. Use os modelos atuais do Gemini API.\n"
+                "   📚 Baseado no cookbook oficial: https://github.com/google-gemini/cookbook\n"
                 "   \n"
-                "   Modelos SEM suporte a visão:\n"
-                "   - gemini-1.0-pro-latest\n"
-                "   - gemini-pro\n"
+                "   Modelos recomendados (todos com suporte multimodal/visão):\n"
+                "   - gemini-2.5-flash ⭐ RECOMENDADO (rápido e eficiente)\n"
+                "   - gemini-2.5-flash-lite (ainda mais rápido)\n"
+                "   - gemini-2.5-pro (avançado com capacidade de raciocínio)\n"
+                "   - gemini-3-flash-preview (próxima geração - preview)\n"
+                "   - gemini-3-pro-preview (avançado próxima geração - preview)\n"
+                "   \n"
+                "   ⚠️ Modelos legados (1.5, 1.0) não são mais recomendados\n"
             )
         elif "api key" in error_type or "401" in str(e) or "403" in str(e):
             error_msg += (
@@ -3820,11 +3830,14 @@ def main():
         if api_provider_sidebar != 'Nenhum':
             if api_provider_sidebar == 'Gemini':
                 model_options_sidebar = [
+                    'gemini-2.5-flash',  # ⭐ Recommended
+                    'gemini-2.5-flash-lite',
+                    'gemini-2.5-pro',
+                    'gemini-3-flash-preview',
+                    'gemini-3-pro-preview',
+                    # Legacy models (not recommended)
                     'gemini-1.5-pro-latest',
-                    'gemini-1.5-flash-latest', 
-                    'gemini-1.0-pro-latest',
-                    'gemini-pro',
-                    'gemini-1.0-pro-vision-latest'
+                    'gemini-1.5-flash-latest'
                 ]
             else:  # Groq
                 model_options_sidebar = [
@@ -4609,8 +4622,10 @@ def main():
                     - ✅ Exportação completa para CSV
                     
                     **Modelos com Suporte de Visão:**
-                    - Gemini: gemini-1.5-pro-latest, gemini-1.5-flash-latest, gemini-1.0-pro-vision-latest
+                    - Gemini: gemini-2.5-flash ⭐, gemini-2.5-pro, gemini-3-flash-preview
                     - Groq: Suporte limitado dependendo do modelo
+                    
+                    📚 Baseado no cookbook oficial: https://github.com/google-gemini/cookbook
                     """)
 
         # Limpar o diretório temporário
