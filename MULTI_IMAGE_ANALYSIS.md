@@ -272,7 +272,8 @@ graph TD
 
 ### Código
 - `app4.py`: Implementação principal
-- Commit: `abc7500`
+- Commit principal: `abc7500` (multi-image implementation)
+- Commit documentação: `3a634d0`
 
 ### Documentação
 - `API_SETUP_GUIDE.md`: Guia de configuração
