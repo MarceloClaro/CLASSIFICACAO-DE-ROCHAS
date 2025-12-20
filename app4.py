@@ -34,6 +34,22 @@ try:
 except ImportError:
     ADVANCED_OPTIMIZERS_AVAILABLE = False
 
+# Importar timm para Vision Transformers
+try:
+    import timm
+    TIMM_AVAILABLE = True
+except ImportError:
+    TIMM_AVAILABLE = False
+
+# Importar CrewAI para agentes inteligentes
+try:
+    from crewai import Agent, Task, Crew, Process
+    from crewai_tools import WebsiteSearchTool, SerperDevTool
+    from langchain.llms import OpenAI
+    CREWAI_AVAILABLE = True
+except ImportError:
+    CREWAI_AVAILABLE = False
+
 # Importar APIs com suporte de visão
 try:
     import google.generativeai as genai
@@ -858,7 +874,7 @@ def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
     Retorna o modelo pré-treinado selecionado, incluindo CNNs e Vision Transformers.
     
     Args:
-        model_name: Nome do modelo (ResNet18, ResNet50, DenseNet121, ViT-B/16, ViT-B/32, ViT-L/16)
+        model_name: Nome do modelo (ResNet18, ResNet50, DenseNet121, ViT-B/16, ViT-B/32, ViT-L/16, Swin-T, Swin-B)
         num_classes: Número de classes
         dropout_p: Taxa de dropout
         fine_tune: Se deve fazer fine-tuning completo
@@ -873,15 +889,44 @@ def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
         model = models.resnet50(weights='DEFAULT')
     elif model_name == 'DenseNet121':
         model = models.densenet121(weights='DEFAULT')
-    # Vision Transformers
+    # Vision Transformers (torchvision)
     elif model_name == 'ViT-B/16':
         model = models.vit_b_16(weights='DEFAULT')
     elif model_name == 'ViT-B/32':
         model = models.vit_b_32(weights='DEFAULT')
     elif model_name == 'ViT-L/16':
         model = models.vit_l_16(weights='DEFAULT')
+    # Vision Transformers e Swin (timm - mais robustos)
+    elif model_name == 'ViT-B/16-timm' and TIMM_AVAILABLE:
+        model = timm.create_model('vit_base_patch16_224', pretrained=True, num_classes=num_classes, drop_rate=dropout_p)
+        if not fine_tune:
+            for name, param in model.named_parameters():
+                if 'head' not in name:
+                    param.requires_grad = False
+        return model.to(device)
+    elif model_name == 'ViT-L/16-timm' and TIMM_AVAILABLE:
+        model = timm.create_model('vit_large_patch16_224', pretrained=True, num_classes=num_classes, drop_rate=dropout_p)
+        if not fine_tune:
+            for name, param in model.named_parameters():
+                if 'head' not in name:
+                    param.requires_grad = False
+        return model.to(device)
+    elif model_name == 'Swin-T' and TIMM_AVAILABLE:
+        model = timm.create_model('swin_tiny_patch4_window7_224', pretrained=True, num_classes=num_classes, drop_rate=dropout_p)
+        if not fine_tune:
+            for name, param in model.named_parameters():
+                if 'head' not in name:
+                    param.requires_grad = False
+        return model.to(device)
+    elif model_name == 'Swin-B' and TIMM_AVAILABLE:
+        model = timm.create_model('swin_base_patch4_window7_224', pretrained=True, num_classes=num_classes, drop_rate=dropout_p)
+        if not fine_tune:
+            for name, param in model.named_parameters():
+                if 'head' not in name:
+                    param.requires_grad = False
+        return model.to(device)
     else:
-        st.error(f"Modelo '{model_name}' não suportado.")
+        st.error(f"Modelo '{model_name}' não suportado ou timm não está disponível.")
         return None
 
     if not fine_tune:
@@ -924,7 +969,246 @@ def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
     model = model.to(device)
     return model
 
-def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, l1_lambda, patience, optimizer_name='Adam', scheduler_name='None', augmentation_type='standard'):
+# ============= MELHORIAS AVANÇADAS =============
+
+# 1. Label Smoothing Loss
+class LabelSmoothingCrossEntropy(nn.Module):
+    """
+    Label smoothing cross entropy loss.
+    Previne overconfident predictions e melhora generalização.
+    """
+    def __init__(self, smoothing=0.1, weight=None):
+        super().__init__()
+        self.smoothing = smoothing
+        self.weight = weight
+    
+    def forward(self, pred, target):
+        n_classes = pred.size(-1)
+        log_preds = torch.nn.functional.log_softmax(pred, dim=-1)
+        
+        if self.weight is not None:
+            loss = -log_preds * self.weight.unsqueeze(0)
+            loss = loss.sum(dim=-1).mean()
+        else:
+            loss = -log_preds.sum(dim=-1).mean()
+        
+        with torch.no_grad():
+            true_dist = torch.zeros_like(log_preds)
+            true_dist.fill_(self.smoothing / (n_classes - 1))
+            true_dist.scatter_(1, target.unsqueeze(1), 1.0 - self.smoothing)
+        
+        return torch.mean(torch.sum(-true_dist * log_preds, dim=-1))
+
+# 2. Exponential Moving Average (EMA) para pesos do modelo
+class ModelEMA:
+    """
+    Mantém média móvel exponencial dos pesos do modelo.
+    Melhora generalização e estabilidade.
+    """
+    def __init__(self, model, decay=0.999):
+        self.model = model
+        self.decay = decay
+        self.shadow = {}
+        self.backup = {}
+        self.register()
+
+    def register(self):
+        for name, param in self.model.named_parameters():
+            if param.requires_grad:
+                self.shadow[name] = param.data.clone()
+
+    def update(self):
+        for name, param in self.model.named_parameters():
+            if param.requires_grad:
+                new_average = self.decay * self.shadow[name] + (1.0 - self.decay) * param.data
+                self.shadow[name] = new_average.clone()
+
+    def apply_shadow(self):
+        for name, param in self.model.named_parameters():
+            if param.requires_grad:
+                self.backup[name] = param.data.clone()
+                param.data = self.shadow[name]
+
+    def restore(self):
+        for name, param in self.model.named_parameters():
+            if param.requires_grad:
+                param.data = self.backup[name]
+        self.backup = {}
+
+# 3. Agente CrewAI para buscar informações de treinamento
+class TrainingResearchAgent:
+    """
+    Agente inteligente que busca informações na web para melhorar o treinamento.
+    """
+    def __init__(self, use_crewai=False):
+        self.use_crewai = use_crewai and CREWAI_AVAILABLE
+        self.insights = []
+        
+    def research_training_strategies(self, model_name, dataset_type):
+        """
+        Pesquisa estratégias de treinamento para o modelo e tipo de dataset.
+        """
+        if not self.use_crewai:
+            # Retornar insights padrão
+            return {
+                'learning_rate': 0.0001,
+                'batch_size': 16,
+                'augmentation': 'standard',
+                'scheduler': 'CosineAnnealingLR',
+                'insights': ['Using default configuration']
+            }
+        
+        try:
+            # Definir agentes CrewAI
+            researcher = Agent(
+                role='ML Training Researcher',
+                goal=f'Find optimal training strategies for {model_name} on {dataset_type} images',
+                backstory='Expert in deep learning optimization and hyperparameter tuning',
+                verbose=True,
+                allow_delegation=False
+            )
+            
+            # Definir tarefa
+            research_task = Task(
+                description=f'''
+                Research and recommend:
+                1. Optimal learning rate for {model_name}
+                2. Best data augmentation strategies for {dataset_type}
+                3. Recommended batch size and scheduler
+                4. Common pitfalls to avoid
+                ''',
+                agent=researcher,
+                expected_output='Training recommendations in JSON format'
+            )
+            
+            # Executar crew
+            crew = Crew(
+                agents=[researcher],
+                tasks=[research_task],
+                verbose=2,
+                process=Process.sequential
+            )
+            
+            result = crew.kickoff()
+            self.insights.append(result)
+            
+            return {
+                'research': result,
+                'insights': self.insights
+            }
+            
+        except Exception as e:
+            st.warning(f"CrewAI research failed: {e}. Using default config.")
+            return {
+                'learning_rate': 0.0001,
+                'batch_size': 16,
+                'augmentation': 'standard',
+                'scheduler': 'CosineAnnealingLR',
+                'insights': [f'Error: {e}']
+            }
+
+# 4. Reinforcement Learning para ajuste dinâmico de hiperparâmetros
+class ReinforcementLearningTrainer:
+    """
+    Usa RL para ajustar hiperparâmetros durante o treinamento.
+    Implementa Q-Learning simples para ajustar learning rate e batch size.
+    """
+    def __init__(self, initial_lr=0.001, lr_range=(0.00001, 0.01)):
+        self.lr = initial_lr
+        self.lr_range = lr_range
+        self.q_table = {}  # Estado -> Ação -> Q-value
+        self.alpha = 0.1  # Learning rate do RL
+        self.gamma = 0.9  # Discount factor
+        self.epsilon = 0.2  # Exploration rate
+        self.actions = ['increase_lr', 'decrease_lr', 'keep_lr']
+        self.performance_history = []
+        
+    def get_state(self, val_loss, val_acc, epoch):
+        """
+        Define o estado baseado em perda e acurácia de validação.
+        """
+        loss_trend = 'improving' if len(self.performance_history) > 0 and val_loss < self.performance_history[-1]['loss'] else 'degrading'
+        acc_trend = 'improving' if len(self.performance_history) > 0 and val_acc > self.performance_history[-1]['acc'] else 'degrading'
+        
+        return f"{loss_trend}_{acc_trend}_epoch{epoch % 10}"
+    
+    def choose_action(self, state):
+        """
+        Escolhe ação usando epsilon-greedy.
+        """
+        if np.random.random() < self.epsilon:
+            return np.random.choice(self.actions)
+        
+        if state not in self.q_table:
+            self.q_table[state] = {action: 0.0 for action in self.actions}
+        
+        return max(self.q_table[state], key=self.q_table[state].get)
+    
+    def update_q_value(self, state, action, reward, next_state):
+        """
+        Atualiza Q-value usando Q-learning.
+        """
+        if state not in self.q_table:
+            self.q_table[state] = {action: 0.0 for action in self.actions}
+        if next_state not in self.q_table:
+            self.q_table[next_state] = {action: 0.0 for action in self.actions}
+        
+        old_q = self.q_table[state][action]
+        next_max_q = max(self.q_table[next_state].values())
+        new_q = old_q + self.alpha * (reward + self.gamma * next_max_q - old_q)
+        self.q_table[state][action] = new_q
+    
+    def adjust_learning_rate(self, action):
+        """
+        Ajusta learning rate baseado na ação.
+        """
+        if action == 'increase_lr':
+            self.lr = min(self.lr * 1.2, self.lr_range[1])
+        elif action == 'decrease_lr':
+            self.lr = max(self.lr * 0.8, self.lr_range[0])
+        # 'keep_lr' não faz nada
+        
+        return self.lr
+    
+    def compute_reward(self, val_loss, val_acc):
+        """
+        Computa recompensa baseado no desempenho.
+        """
+        if len(self.performance_history) == 0:
+            reward = 0.0
+        else:
+            prev = self.performance_history[-1]
+            loss_improvement = prev['loss'] - val_loss
+            acc_improvement = val_acc - prev['acc']
+            reward = loss_improvement * 10 + acc_improvement * 100
+        
+        self.performance_history.append({'loss': val_loss, 'acc': val_acc})
+        return reward
+    
+    def step(self, val_loss, val_acc, epoch, optimizer):
+        """
+        Executa um passo de RL: escolhe ação, ajusta LR, computa recompensa.
+        """
+        state = self.get_state(val_loss, val_acc, epoch)
+        action = self.choose_action(state)
+        new_lr = self.adjust_learning_rate(action)
+        
+        # Atualizar learning rate no otimizador
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = new_lr
+        
+        reward = self.compute_reward(val_loss, val_acc)
+        next_state = self.get_state(val_loss, val_acc, epoch + 1)
+        self.update_q_value(state, action, reward, next_state)
+        
+        return {
+            'action': action,
+            'new_lr': new_lr,
+            'reward': reward,
+            'state': state
+        }
+
+def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, l1_lambda, patience, optimizer_name='Adam', scheduler_name='None', augmentation_type='standard', label_smoothing=0.1, use_gradient_clipping=True, use_ema=True, use_rl=False, use_crewai=False):
     """
     Função principal para treinamento do modelo.
     

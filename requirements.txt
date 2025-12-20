@@ -19,3 +19,9 @@ beautifulsoup4
 scholarly
 deap
 scipy
+timm
+crewai
+crewai-tools
+langchain
+langchain-community
+faiss-cpu
