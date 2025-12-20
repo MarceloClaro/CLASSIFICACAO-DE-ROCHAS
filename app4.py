@@ -1,4 +1,8 @@
 import os
+
+# Disable CrewAI telemetry to avoid signal handler errors in non-main threads (Streamlit)
+os.environ['CREWAI_DISABLE_TELEMETRY'] = 'true'
+
 import zipfile
 import shutil
 import tempfile
@@ -52,10 +56,15 @@ except ImportError:
 
 # Importar APIs com suporte de visão
 try:
-    import google.generativeai as genai
+    import google.genai as genai
     GEMINI_AVAILABLE = True
 except ImportError:
-    GEMINI_AVAILABLE = False
+    # Fallback to old package if new one not available
+    try:
+        import google.generativeai as genai
+        GEMINI_AVAILABLE = True
+    except ImportError:
+        GEMINI_AVAILABLE = False
 
 try:
     from groq import Groq
@@ -1785,7 +1794,7 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
         str: Análise técnica e forense da imagem
     """
     if not GEMINI_AVAILABLE:
-        return "Google Generative AI não está disponível. Instale com: pip install google-generativeai"
+        return "Google Generative AI não está disponível. Instale com: pip install google-genai"
     
     try:
         genai.configure(api_key=api_key)
