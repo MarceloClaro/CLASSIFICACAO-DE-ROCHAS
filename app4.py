@@ -321,6 +321,7 @@ def calculate_dataset_statistics(dataset, classes):
     df_stats = pd.DataFrame(stats_data)
     
     st.write("#### Distribuição de Classes:")
+    # Fixed: Removed width=None parameter as it's no longer supported in Streamlit
     st.dataframe(df_stats)
     
     # Estatísticas gerais
