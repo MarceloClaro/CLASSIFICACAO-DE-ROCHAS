@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from PIL import Image
+from PIL import Image, ImageEnhance
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader, random_split
@@ -23,9 +23,15 @@ import gc
 import logging
 import base64
 # Importações adicionais para Grad-CAM
-from torchcam.methods import SmoothGradCAMpp
+from torchcam.methods import SmoothGradCAMpp, GradCAM, GradCAMpp, LayerCAM
 from torchvision.transforms.functional import normalize, resize, to_pil_image
 import cv2
+# Importar otimizadores avançados
+try:
+    import torch_optimizer as optim_advanced
+    ADVANCED_OPTIMIZERS_AVAILABLE = True
+except ImportError:
+    ADVANCED_OPTIMIZERS_AVAILABLE = False
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -46,26 +52,131 @@ def set_seed(seed):
 
 set_seed(42)  # Definir a seed para reprodutibilidade
 
-# Definir as transformações para aumento de dados (aplicando transformações aleatórias)
-train_transforms = transforms.Compose([
-    transforms.RandomApply([
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(degrees=90),
-        transforms.ColorJitter(),
-        transforms.RandomResizedCrop(224, scale=(0.8, 1.0)),
-        transforms.RandomAffine(degrees=0, shear=10),
-    ], p=0.5),
+# ImageNet normalization values
+IMAGENET_MEAN = [0.485, 0.456, 0.406]
+IMAGENET_STD = [0.229, 0.224, 0.225]
+
+# Enhanced image preprocessing class
+class EnhancedImagePreprocessor:
+    """Classe para melhorar o tratamento de imagens antes do treinamento"""
+    
+    @staticmethod
+    def enhance_image_quality(image):
+        """Aplica melhorias de qualidade na imagem"""
+        # Ajustar contraste
+        enhancer = ImageEnhance.Contrast(image)
+        image = enhancer.enhance(1.2)
+        
+        # Ajustar nitidez
+        enhancer = ImageEnhance.Sharpness(image)
+        image = enhancer.enhance(1.1)
+        
+        # Ajustar brilho levemente
+        enhancer = ImageEnhance.Brightness(image)
+        image = enhancer.enhance(1.05)
+        
+        return image
+
+def get_augmentation_transforms(augmentation_type='standard'):
+    """
+    Retorna transformações de acordo com o tipo de aumento de dados
+    
+    Args:
+        augmentation_type: 'none', 'standard', 'mixup', 'cutmix'
+    """
+    if augmentation_type == 'none':
+        # Sem aumento de dados - apenas transformações básicas
+        train_transform = transforms.Compose([
+            transforms.Lambda(EnhancedImagePreprocessor.enhance_image_quality),
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+        ])
+    else:
+        # Standard ou base para mixup/cutmix
+        train_transform = transforms.Compose([
+            transforms.Lambda(EnhancedImagePreprocessor.enhance_image_quality),
+            transforms.RandomApply([
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomRotation(degrees=90),
+                transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+                transforms.RandomResizedCrop(224, scale=(0.8, 1.0)),
+                transforms.RandomAffine(degrees=0, shear=10),
+            ], p=0.5),
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+        ])
+    
+    return train_transform
+
+# Transformações para validação e teste com normalização ImageNet
+test_transforms = transforms.Compose([
+    transforms.Lambda(EnhancedImagePreprocessor.enhance_image_quality),
     transforms.Resize(256),
     transforms.CenterCrop(224),
     transforms.ToTensor(),
+    transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
 ])
 
-# Transformações para validação e teste
-test_transforms = transforms.Compose([
-    transforms.Resize(256),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-])
+# Implementação de Mixup
+def mixup_data(x, y, alpha=1.0):
+    """Aplica Mixup ao batch de dados"""
+    if alpha > 0:
+        lam = np.random.beta(alpha, alpha)
+    else:
+        lam = 1
+
+    batch_size = x.size()[0]
+    index = torch.randperm(batch_size).to(x.device)
+
+    mixed_x = lam * x + (1 - lam) * x[index, :]
+    y_a, y_b = y, y[index]
+    return mixed_x, y_a, y_b, lam
+
+def mixup_criterion(criterion, pred, y_a, y_b, lam):
+    """Calcula a loss para Mixup"""
+    return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
+
+# Implementação de CutMix
+def cutmix_data(x, y, alpha=1.0):
+    """Aplica CutMix ao batch de dados"""
+    if alpha > 0:
+        lam = np.random.beta(alpha, alpha)
+    else:
+        lam = 1
+
+    batch_size = x.size()[0]
+    index = torch.randperm(batch_size).to(x.device)
+
+    # Gerar bbox
+    W = x.size()[2]
+    H = x.size()[3]
+    cut_rat = np.sqrt(1. - lam)
+    cut_w = int(W * cut_rat)
+    cut_h = int(H * cut_rat)
+
+    # Centro do box
+    cx = np.random.randint(0, W)
+    cy = np.random.randint(0, H)
+
+    bbx1 = np.clip(cx - cut_w // 2, 0, W)
+    bby1 = np.clip(cy - cut_h // 2, 0, H)
+    bbx2 = np.clip(cx + cut_w // 2, 0, W)
+    bby2 = np.clip(cy + cut_h // 2, 0, H)
+
+    x_cutmix = x.clone()
+    x_cutmix[:, :, bbx1:bbx2, bby1:bby2] = x[index, :, bbx1:bbx2, bby1:bby2]
+
+    # Ajustar lambda com a área real
+    lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (W * H))
+    y_a, y_b = y, y[index]
+    return x_cutmix, y_a, y_b, lam
+
+# Definir as transformações padrão para compatibilidade com código existente
+train_transforms = get_augmentation_transforms('standard')
 
 # Dataset personalizado
 class CustomDataset(torch.utils.data.Dataset):
@@ -176,9 +287,30 @@ def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
     model = model.to(device)
     return model
 
-def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience):
+def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, l1_lambda, patience, optimizer_name='Adam', scheduler_name='None', augmentation_type='standard'):
     """
     Função principal para treinamento do modelo.
+    
+    Args:
+        data_dir: Diretório com os dados
+        num_classes: Número de classes
+        model_name: Nome do modelo
+        fine_tune: Se deve fazer fine-tuning completo
+        epochs: Número de épocas
+        learning_rate: Taxa de aprendizagem
+        batch_size: Tamanho do lote
+        train_split: Proporção de treino
+        valid_split: Proporção de validação
+        use_weighted_loss: Se deve usar perda ponderada
+        l2_lambda: Regularização L2 (weight decay)
+        l1_lambda: Regularização L1
+        patience: Paciência para early stopping
+        optimizer_name: Nome do otimizador (Adam, AdamW, SGD, Ranger, Lion)
+        scheduler_name: Nome do scheduler (None, CosineAnnealingLR, OneCycleLR)
+        augmentation_type: Tipo de aumento de dados (none, standard, mixup, cutmix)
+    
+    Returns:
+        tuple: (model, classes) ou None em caso de erro
     """
     set_seed(42)
 
@@ -189,8 +321,11 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     visualize_data(full_dataset, full_dataset.classes)
     plot_class_distribution(full_dataset, full_dataset.classes)
 
+    # Obter transformações baseadas no tipo de augmentação
+    train_transform = get_augmentation_transforms(augmentation_type)
+    
     # Criar o dataset personalizado com aumento de dados
-    train_dataset = CustomDataset(full_dataset, transform=train_transforms)
+    train_dataset = CustomDataset(full_dataset, transform=train_transform)
     valid_dataset = CustomDataset(full_dataset, transform=test_transforms)
     test_dataset = CustomDataset(full_dataset, transform=test_transforms)
 
@@ -234,7 +369,35 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
         return None
 
     # Definir o otimizador com L2 regularization (weight_decay)
-    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=l2_lambda)
+    trainable_params = filter(lambda p: p.requires_grad, model.parameters())
+    
+    if optimizer_name == 'Adam':
+        optimizer = optim.Adam(trainable_params, lr=learning_rate, weight_decay=l2_lambda)
+    elif optimizer_name == 'AdamW':
+        optimizer = optim.AdamW(trainable_params, lr=learning_rate, weight_decay=l2_lambda)
+    elif optimizer_name == 'SGD':
+        optimizer = optim.SGD(trainable_params, lr=learning_rate, weight_decay=l2_lambda, momentum=0.9, nesterov=True)
+    elif optimizer_name == 'Ranger' and ADVANCED_OPTIMIZERS_AVAILABLE:
+        optimizer = optim_advanced.Ranger(trainable_params, lr=learning_rate, weight_decay=l2_lambda)
+    elif optimizer_name == 'Lion' and ADVANCED_OPTIMIZERS_AVAILABLE:
+        optimizer = optim_advanced.Lion(trainable_params, lr=learning_rate, weight_decay=l2_lambda)
+    else:
+        st.warning(f"Otimizador {optimizer_name} não disponível. Usando Adam.")
+        optimizer = optim.Adam(trainable_params, lr=learning_rate, weight_decay=l2_lambda)
+    
+    # Configurar Learning Rate Scheduler
+    scheduler = None
+    if scheduler_name == 'CosineAnnealingLR':
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=learning_rate/100)
+    elif scheduler_name == 'OneCycleLR':
+        steps_per_epoch = len(train_loader)
+        scheduler = optim.lr_scheduler.OneCycleLR(
+            optimizer, 
+            max_lr=learning_rate*10, 
+            epochs=epochs,
+            steps_per_epoch=steps_per_epoch,
+            pct_start=0.3
+        )
 
     # Listas para armazenar as perdas e acurácias
     train_losses = []
@@ -245,6 +408,15 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     # Early Stopping
     best_valid_loss = float('inf')
     epochs_no_improve = 0
+    
+    # Parâmetros para Mixup e CutMix
+    use_mixup = (augmentation_type == 'mixup')
+    use_cutmix = (augmentation_type == 'cutmix')
+    mixup_alpha = 1.0
+    cutmix_alpha = 1.0
+    
+    # Cache de parâmetros para regularização L1 (otimização)
+    trainable_params_list = list(filter(lambda p: p.requires_grad, model.parameters())) if l1_lambda > 0 else []
 
     # Treinamento
     for epoch in range(epochs):
@@ -258,19 +430,43 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
             labels = labels.to(device)
 
             optimizer.zero_grad()
+            
+            # Aplicar Mixup ou CutMix se selecionado
+            if use_mixup:
+                inputs, labels_a, labels_b, lam = mixup_data(inputs, labels, mixup_alpha)
+            elif use_cutmix:
+                inputs, labels_a, labels_b, lam = cutmix_data(inputs, labels, cutmix_alpha)
+            
             try:
                 outputs = model(inputs)
             except Exception as e:
                 st.error(f"Erro durante o treinamento: {e}")
                 return None
 
-            _, preds = torch.max(outputs, 1)
-            loss = criterion(outputs, labels)
+            # Calcular loss
+            if use_mixup or use_cutmix:
+                loss = mixup_criterion(criterion, outputs, labels_a, labels_b, lam)
+                _, preds = torch.max(outputs, 1)
+            else:
+                _, preds = torch.max(outputs, 1)
+                loss = criterion(outputs, labels)
+            
+            # Adicionar regularização L1 se configurado
+            if l1_lambda > 0:
+                l1_reg = torch.tensor(0., device=device)
+                for param in trainable_params_list:
+                    l1_reg += torch.norm(param, 1)
+                loss = loss + l1_lambda * l1_reg
+            
             loss.backward()
             optimizer.step()
+            
+            # Atualizar scheduler OneCycleLR a cada batch
+            if scheduler_name == 'OneCycleLR' and scheduler is not None:
+                scheduler.step()
 
             running_loss += loss.item() * inputs.size(0)
-            running_corrects += torch.sum(preds == labels.data)
+            running_corrects += torch.sum(preds == labels.data if not (use_mixup or use_cutmix) else preds == labels_a.data)
 
         epoch_loss = running_loss / len(train_dataset)
         epoch_acc = running_corrects.double() / len(train_dataset)
@@ -302,6 +498,10 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
         st.write(f'**Época {epoch+1}/{epochs}**')
         st.write(f'Perda de Treino: {epoch_loss:.4f} | Acurácia de Treino: {epoch_acc:.4f}')
         st.write(f'Perda de Validação: {valid_epoch_loss:.4f} | Acurácia de Validação: {valid_epoch_acc:.4f}')
+
+        # Atualizar scheduler CosineAnnealingLR após cada época
+        if scheduler_name == 'CosineAnnealingLR' and scheduler is not None:
+            scheduler.step()
 
         # Early Stopping
         if valid_epoch_loss < best_valid_loss:
@@ -558,9 +758,15 @@ def evaluate_image(model, image, classes):
 
 #________________________________________________
 
-def visualize_activations(model, image, class_names):
+def visualize_activations(model, image, class_names, gradcam_type='SmoothGradCAMpp'):
     """
-    Visualiza as ativações na imagem usando Grad-CAM.
+    Visualiza as ativações na imagem usando diferentes variantes de Grad-CAM.
+    
+    Args:
+        model: Modelo treinado
+        image: Imagem PIL
+        class_names: Lista de nomes das classes
+        gradcam_type: Tipo de Grad-CAM ('GradCAM', 'GradCAMpp', 'SmoothGradCAMpp', 'LayerCAM')
     """
     try:
         # Ensure model is in eval mode and enable gradients for Grad-CAM
@@ -584,7 +790,17 @@ def visualize_activations(model, image, class_names):
             return
         
         # Criar o objeto CAM usando torchcam
-        cam_extractor = SmoothGradCAMpp(model, target_layer=target_layer)
+        if gradcam_type == 'GradCAM':
+            cam_extractor = GradCAM(model, target_layer=target_layer)
+        elif gradcam_type == 'GradCAMpp':
+            cam_extractor = GradCAMpp(model, target_layer=target_layer)
+        elif gradcam_type == 'SmoothGradCAMpp':
+            cam_extractor = SmoothGradCAMpp(model, target_layer=target_layer)
+        elif gradcam_type == 'LayerCAM':
+            cam_extractor = LayerCAM(model, target_layer=target_layer)
+        else:
+            st.error(f"Tipo de Grad-CAM não suportado: {gradcam_type}")
+            return
         
         # Habilitar gradientes explicitamente
         with torch.set_grad_enabled(True):
@@ -625,7 +841,7 @@ def visualize_activations(model, image, class_names):
         
         # Imagem com Grad-CAM
         ax[1].imshow(superimposed_img)
-        ax[1].set_title('Grad-CAM')
+        ax[1].set_title(f'{gradcam_type}')
         ax[1].axis('off')
         
         # Exibir as imagens com o Streamlit
@@ -816,7 +1032,8 @@ def main():
             """)
 
   
-    num_classes = st.sidebar.number_input("Número de Classes:", min_value=1, step=1)
+    # Nota: O número de classes será detectado automaticamente do dataset
+    num_classes = st.sidebar.number_input("Número de Classes (será detectado automaticamente):", min_value=1, step=1, value=2, disabled=True, help="Este valor será automaticamente detectado do dataset após o upload")
     #_______________________________________________________________________________________
     # Sidebar com o conteúdo explicativo e fórmula LaTeX
     with st.sidebar:
@@ -1177,6 +1394,51 @@ def main():
 
   
     l2_lambda = st.sidebar.number_input("L2 Regularization (Weight Decay):", min_value=0.0, max_value=0.1, value=0.01, step=0.01)
+    l1_lambda = st.sidebar.number_input("L1 Regularization:", min_value=0.0, max_value=0.01, value=0.0, step=0.001, 
+                                        help="Adiciona regularização L1 (Lasso) ao treinamento. Promove esparsidade nos pesos.")
+    
+    #________________________________________________________________________________________
+    # Novos parâmetros de treinamento
+    st.sidebar.write("---")
+    st.sidebar.subheader("⚙️ Configurações Avançadas")
+    
+    # Tipo de Aumento de Dados
+    augmentation_type = st.sidebar.selectbox(
+        "Técnica de Aumento de Dados:",
+        options=['none', 'standard', 'mixup', 'cutmix'],
+        index=1,
+        help="None: Sem aumento | Standard: Transformações básicas | Mixup: Mistura imagens | Cutmix: Recorta e cola regiões"
+    )
+    
+    # Otimizador
+    optimizer_options = ['Adam', 'AdamW', 'SGD']
+    if ADVANCED_OPTIMIZERS_AVAILABLE:
+        optimizer_options.extend(['Ranger', 'Lion'])
+    
+    optimizer_name = st.sidebar.selectbox(
+        "Otimizador:",
+        options=optimizer_options,
+        index=0,
+        help="Adam: Adaptativo padrão | AdamW: Adam com weight decay melhorado | SGD: Gradiente descendente com momento | Ranger: Lookahead + RAdam | Lion: Otimizador eficiente recente"
+    )
+    
+    # Learning Rate Scheduler
+    scheduler_name = st.sidebar.selectbox(
+        "Agendador de Learning Rate:",
+        options=['None', 'CosineAnnealingLR', 'OneCycleLR'],
+        index=0,
+        help="None: LR constante | CosineAnnealingLR: Reduz LR com coseno | OneCycleLR: Aumenta e depois reduz LR"
+    )
+    
+    # Tipo de Grad-CAM
+    gradcam_type = st.sidebar.selectbox(
+        "Tipo de Grad-CAM:",
+        options=['GradCAM', 'GradCAMpp', 'SmoothGradCAMpp', 'LayerCAM'],
+        index=2,
+        help="GradCAM: Básico | GradCAMpp: Melhorado | SmoothGradCAMpp: Suavizado | LayerCAM: Por camada"
+    )
+    
+    st.sidebar.write("---")
     
     #________________________________________________________________________________________
     # Sidebar com o conteúdo explicativo e fórmula LaTeX
@@ -1400,7 +1662,7 @@ def main():
     
     zip_file = st.file_uploader("Upload do arquivo ZIP com as imagens", type=["zip"])
 
-    if zip_file is not None and num_classes > 0 and train_split + valid_split <= 0.95:
+    if zip_file is not None and train_split + valid_split <= 0.95:
         temp_dir = tempfile.mkdtemp()
         zip_path = os.path.join(temp_dir, "uploaded.zip")
         with open(zip_path, "wb") as f:
@@ -1409,8 +1671,23 @@ def main():
             zip_ref.extractall(temp_dir)
         data_dir = temp_dir
 
+        # Detectar automaticamente o número de classes do dataset
+        try:
+            temp_dataset = datasets.ImageFolder(root=data_dir)
+            detected_num_classes = len(temp_dataset.classes)
+            st.success(f"✅ Número de classes detectado automaticamente: **{detected_num_classes}**")
+            st.write(f"Classes encontradas: {', '.join(temp_dataset.classes)}")
+            num_classes = detected_num_classes
+        except Exception as e:
+            st.error(f"Erro ao detectar classes: {e}")
+            st.error("Certifique-se de que o ZIP contém pastas com nomes de classes e imagens dentro delas.")
+            shutil.rmtree(temp_dir)
+            return
+
         st.write("Iniciando o treinamento supervisionado...")
-        model_data = train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, patience)
+        model_data = train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, 
+                                batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, l1_lambda, 
+                                patience, optimizer_name, scheduler_name, augmentation_type)
 
         if model_data is None:
             st.error("Erro no treinamento do modelo.")
@@ -1469,8 +1746,8 @@ def main():
                 st.write(f"**Classe Predita:** {class_name}")
                 st.write(f"**Confiança:** {confidence:.4f}")
 
-                # Visualizar ativações
-                visualize_activations(model, eval_image, classes)
+                # Visualizar ativações com o tipo de Grad-CAM selecionado
+                visualize_activations(model, eval_image, classes, gradcam_type)
 
         # Limpar o diretório temporário
         shutil.rmtree(temp_dir)
