@@ -11,3 +11,10 @@ torchcam
 opencv-python
 torch_optimizer
 psutil
+plotly
+google-generativeai
+groq
+requests
+beautifulsoup4
+scholarly
+deap
