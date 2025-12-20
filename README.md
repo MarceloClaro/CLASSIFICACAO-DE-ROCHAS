@@ -63,7 +63,17 @@ A complete diagnostic intelligence platform that provides:
 - **4 Grad-CAM Variants**: GradCAM, GradCAM++, SmoothGradCAM++, LayerCAM
 - **2D & 3D Visualization**: Interactive Plotly charts for activation maps
 - **Multi-Agent Validation**: 15 specialized agents analyze from different perspectives
-- **Statistical Analysis**: Bootstrap validation, confidence intervals, significance testing
+- **Statistical Analysis** ⭐ NEW: 10 comprehensive analyses including:
+  - Confidence intervals (95% CI) with margin of error
+  - Statistical significance tests (t-tests, p-values)
+  - Bootstrap validation (50-500 iterations)
+  - Differential diagnosis ranking
+  - Exclusion criteria application
+  - Distinctive feature identification
+  - Uncertainty source quantification
+  - Error impact assessment
+  - Safety margin evaluation
+  - Practical impact analysis
 - **Feature Analysis**: PCA, t-SNE visualization in 2D and 3D
 
 ### 🤖 AI-Powered Diagnostics
@@ -171,6 +181,7 @@ Access at: `http://localhost:8501`
 - **[Features v5.0](FEATURES_V5.md)**: Complete feature documentation
 - **[Architecture](ARCHITECTURE.md)**: System design and technical details
 - **[Performance Analysis](PERFORMANCE_ANALYSIS.md)**: Benchmarking and optimization
+- **[Statistical Analysis Guide](STATISTICAL_ANALYSIS_GUIDE.md)**: Comprehensive statistical analysis features ⭐ NEW
 
 ### 💼 For Business & Startups
 - **[Startup Pitch](STARTUP_PITCH.md)**: Market opportunity, business model, projections
