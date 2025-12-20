@@ -321,7 +321,7 @@ def calculate_dataset_statistics(dataset, classes):
     df_stats = pd.DataFrame(stats_data)
     
     st.write("#### Distribuição de Classes:")
-    st.dataframe(df_stats, width=None)
+    st.dataframe(df_stats)
     
     # Estatísticas gerais
     st.write("#### Estatísticas Gerais:")
