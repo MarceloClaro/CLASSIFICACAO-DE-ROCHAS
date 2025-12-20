@@ -168,23 +168,28 @@ def validate_model_name(model_name, provider):
     
     Args:
         model_name: The model name from session state or user input
-        provider: The AI provider ('Gemini' or 'Groq')
+        provider: The AI provider ('Gemini', 'gemini', 'Groq', 'groq')
     
     Returns:
         str: Valid model name or default model for the provider
     """
     if not model_name:
         # Return default model if none specified
-        return 'gemini-2.5-flash' if provider == 'Gemini' else 'mixtral-8x7b-32768'
+        # Normalize provider to lowercase for comparison
+        provider_lower = provider.lower() if provider else ''
+        return 'gemini-2.5-flash' if provider_lower == 'gemini' else 'mixtral-8x7b-32768'
+    
+    # Normalize provider to lowercase for case-insensitive comparison
+    provider_lower = provider.lower() if provider else ''
     
     # Check if model is in valid list
-    if provider == 'Gemini':
+    if provider_lower == 'gemini':
         if model_name in VALID_GEMINI_MODELS:
             return model_name
         else:
             # Model is deprecated or invalid, return recommended default
             return 'gemini-2.5-flash'
-    elif provider == 'Groq':
+    elif provider_lower == 'groq':
         if model_name in VALID_GROQ_MODELS:
             return model_name
         else:
@@ -4453,14 +4458,23 @@ def main():
                     with col2:
                         if api_provider == 'gemini':
                             model_options = [
+                                'gemini-2.5-flash',  # ⭐ Recommended
+                                'gemini-2.5-flash-lite',
+                                'gemini-2.5-pro',
+                                'gemini-3-flash-preview',
+                                'gemini-3-pro-preview',
+                                # Legacy models (not recommended)
                                 'gemini-1.5-pro-latest',
-                                'gemini-1.5-flash-latest',
-                                'gemini-1.0-pro-latest',
-                                'gemini-pro',
-                                'gemini-1.0-pro-vision-latest'
+                                'gemini-1.5-flash-latest'
                             ]
                         else:
-                            model_options = ['mixtral-8x7b-32768', 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant']
+                            model_options = [
+                                'meta-llama/llama-4-scout-17b-16e-instruct',
+                                'meta-llama/llama-4-maverick-17b-128e-instruct',
+                                'mixtral-8x7b-32768',
+                                'llama-3.1-70b-versatile',
+                                'llama-3.1-8b-instant'
+                            ]
                         
                         ai_model = st.selectbox(
                             "Modelo:",
