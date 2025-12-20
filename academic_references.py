@@ -341,10 +341,10 @@ class AcademicReferenceFetcher:
         class_name: str,
         domain: str = "image classification",
         max_per_source: int = 3,
-        include_reasoning: bool = True
-    ) -> Tuple[List[Dict], Dict]:
+        include_reasoning: bool = False
+    ):
         """
-        Get comprehensive references for a classification task with reasoning
+        Get comprehensive references for a classification task with optional reasoning
         
         Args:
             class_name: The predicted class name
@@ -353,7 +353,8 @@ class AcademicReferenceFetcher:
             include_reasoning: Whether to include search reasoning metadata
         
         Returns:
-            Tuple of (references list, reasoning dictionary)
+            - If include_reasoning is True: Tuple of (references list, reasoning dictionary)
+            - If include_reasoning is False: Just the references list (backward compatible)
         """
         all_references = []
         reasoning = {
@@ -441,10 +442,12 @@ class AcademicReferenceFetcher:
             count = sum(1 for ref in final_references if ref.get('platform') == platform)
             reasoning['results_by_platform'][platform] = count
         
+        # Return based on include_reasoning flag
         if include_reasoning:
             return final_references, reasoning
         else:
-            return final_references, {}
+            # Backward compatible - return only references
+            return final_references
 
 
 def format_references_for_display(references: List[Dict], reasoning: Optional[Dict] = None) -> str:
