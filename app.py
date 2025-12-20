@@ -168,6 +168,7 @@ def train_model(data_dir, num_classes, epochs, learning_rate, batch_size, train_
     ax[1].legend()
 
     st.pyplot(fig)
+    plt.close(fig)
 
     return model, full_dataset.classes
 

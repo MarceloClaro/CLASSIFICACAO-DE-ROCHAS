@@ -60,6 +60,34 @@ set_seed(42)  # Definir a seed para reprodutibilidade
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
+def denormalize_image(tensor, mean=IMAGENET_MEAN, std=IMAGENET_STD):
+    """
+    Denormaliza um tensor de imagem normalizado com valores ImageNet.
+    
+    Args:
+        tensor: Tensor de imagem (C, H, W) ou array numpy (H, W, C)
+        mean: Média usada na normalização
+        std: Desvio padrão usado na normalização
+    
+    Returns:
+        Array numpy (H, W, C) com valores no intervalo [0, 1]
+    """
+    if isinstance(tensor, torch.Tensor):
+        # Convert tensor to numpy
+        image = tensor.permute(1, 2, 0).cpu().numpy()
+    else:
+        image = tensor
+    
+    # Denormalize
+    mean = np.array(mean)
+    std = np.array(std)
+    image = std * image + mean
+    
+    # Clip to valid range
+    image = np.clip(image, 0, 1)
+    
+    return image
+
 # Enhanced image preprocessing class
 class EnhancedImagePreprocessor:
     """Classe para melhorar o tratamento de imagens antes do treinamento"""
@@ -219,6 +247,7 @@ def visualize_data(dataset, classes):
         axes[i].set_title(classes[label])
         axes[i].axis('off')
     st.pyplot(fig)
+    plt.close(fig)
 
 def plot_class_distribution(dataset, classes):
     """
@@ -246,6 +275,7 @@ def plot_class_distribution(dataset, classes):
     ax.set_ylabel("Número de Imagens")
     
     st.pyplot(fig)
+    plt.close(fig)
 
 def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
     """
@@ -602,6 +632,7 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     st.write("### 📊 Análise Detalhada por Classe")
     fig_detailed = performance_analyzer.plot_detailed_metrics(class_metrics, full_dataset.classes)
     st.pyplot(fig_detailed)
+    plt.close(fig_detailed)
     
     # Opção de exportar relatório
     st.write("### 💾 Exportar Resultados")
@@ -648,6 +679,7 @@ def plot_metrics(epochs, train_losses, valid_losses, train_accuracies, valid_acc
     ax[1].legend()
 
     st.pyplot(fig)
+    plt.close(fig)
 
 def compute_metrics(model, dataloader, classes):
     """
@@ -684,6 +716,7 @@ def compute_metrics(model, dataloader, classes):
     ax.set_ylabel('Verdadeiro')
     ax.set_title('Matriz de Confusão Normalizada')
     st.pyplot(fig)
+    plt.close(fig)
 
     # Curva ROC
     if len(classes) == 2:
@@ -697,6 +730,7 @@ def compute_metrics(model, dataloader, classes):
         ax.set_title('Curva ROC')
         ax.legend(loc='lower right')
         st.pyplot(fig)
+        plt.close(fig)
     else:
         # Multiclasse
         binarized_labels = label_binarize(all_labels, classes=range(len(classes)))
@@ -732,11 +766,13 @@ def error_analysis(model, dataloader, classes):
         fig, axes = plt.subplots(1, min(5, len(misclassified_images)), figsize=(15, 3))
         for i in range(min(5, len(misclassified_images))):
             image = misclassified_images[i]
-            image = image.permute(1, 2, 0).numpy()
+            # Denormalize the image for proper display
+            image = denormalize_image(image)
             axes[i].imshow(image)
             axes[i].set_title(f"V: {classes[misclassified_labels[i]]}\nP: {classes[misclassified_preds[i]]}")
             axes[i].axis('off')
         st.pyplot(fig)
+        plt.close(fig)
     else:
         st.write("Nenhuma imagem mal classificada encontrada.")
 
@@ -822,6 +858,7 @@ def visualize_clusters(features, true_labels, hierarchical_labels, kmeans_labels
 
     # Exibir os gráficos
     st.pyplot(fig)
+    plt.close(fig)
 
 def evaluate_image(model, image, classes):
     """
@@ -925,6 +962,7 @@ def visualize_activations(model, image, class_names, gradcam_type='SmoothGradCAM
         
         # Exibir as imagens com o Streamlit
         st.pyplot(fig)
+        plt.close(fig)
     except Exception as e:
         st.error(f"Erro ao gerar mapa de ativação: {e}")
     finally:
