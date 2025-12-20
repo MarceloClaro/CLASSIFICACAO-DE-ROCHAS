@@ -79,6 +79,31 @@ try:
 except ImportError:
     MULTI_AGENT_AVAILABLE = False
 
+# Import new advanced modules from app5
+try:
+    from visualization_3d import visualize_pca_3d, visualize_activation_heatmap_3d, create_interactive_3d_visualization
+    VISUALIZATION_3D_AVAILABLE = True
+except ImportError:
+    VISUALIZATION_3D_AVAILABLE = False
+
+try:
+    from ai_chat_module import AIAnalyzer, describe_gradcam_regions
+    AI_CHAT_AVAILABLE = True
+except ImportError:
+    AI_CHAT_AVAILABLE = False
+
+try:
+    from academic_references import AcademicReferenceFetcher, format_references_for_display
+    ACADEMIC_REF_AVAILABLE = True
+except ImportError:
+    ACADEMIC_REF_AVAILABLE = False
+
+try:
+    from genetic_interpreter import GeneticDiagnosticInterpreter
+    GENETIC_INTERP_AVAILABLE = True
+except ImportError:
+    GENETIC_INTERP_AVAILABLE = False
+
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -3859,15 +3884,27 @@ def main():
                 "Escolha o número de componentes principais para visualização:",
                 options=[2, 3],
                 index=0,
-                help="2 componentes: Visualização 2D | 3 componentes: Visualização 3D (não implementado ainda)"
+                help="2 componentes: Visualização 2D | 3 componentes: Visualização 3D interativa com Plotly"
             )
             
             if n_components == 2:
                 visualize_pca_features(features_reshaped, labels, classes, n_components=2)
             else:
-                st.info("📌 Visualização 3D será implementada em versão futura.")
-                # Mostrar 2D por padrão
-                visualize_pca_features(features_reshaped, labels, classes, n_components=2)
+                # 3D Visualization with Plotly
+                st.write("### 📊 Visualização PCA 3D Interativa")
+                if VISUALIZATION_3D_AVAILABLE:
+                    try:
+                        fig_3d = visualize_pca_3d(features_reshaped, labels, classes)
+                        st.plotly_chart(fig_3d, use_container_width=True)
+                        st.success("✅ Visualização 3D interativa gerada! Você pode rotacionar, fazer zoom e explorar.")
+                    except Exception as e:
+                        st.error(f"Erro ao gerar visualização 3D: {str(e)}")
+                        st.info("Mostrando visualização 2D como alternativa")
+                        visualize_pca_features(features_reshaped, labels, classes, n_components=2)
+                else:
+                    st.warning("⚠️ Módulo de visualização 3D não disponível. Instale com: pip install plotly")
+                    st.info("Mostrando visualização 2D como alternativa")
+                    visualize_pca_features(features_reshaped, labels, classes, n_components=2)
 
         # Avaliação de uma imagem individual
         evaluate = st.radio("Deseja avaliar uma imagem?", ("Sim", "Não"))
@@ -3888,6 +3925,20 @@ def main():
 
                 # Visualizar ativações com o tipo de Grad-CAM selecionado
                 activation_map = visualize_activations(model, eval_image, classes, gradcam_type)
+                
+                # ========== VISUALIZAÇÃO 3D DO GRAD-CAM ==========
+                if activation_map is not None and VISUALIZATION_3D_AVAILABLE:
+                    st.write("---")
+                    st.write("### 🌐 Visualização 3D do Grad-CAM")
+                    show_3d_gradcam = st.checkbox("Mostrar Grad-CAM em 3D", value=False, help="Visualização interativa 3D do mapa de ativação")
+                    if show_3d_gradcam:
+                        try:
+                            with st.spinner("🔄 Gerando visualização 3D do Grad-CAM..."):
+                                fig_gradcam_3d = visualize_activation_heatmap_3d(activation_map)
+                                st.plotly_chart(fig_gradcam_3d, use_container_width=True)
+                                st.success("✅ Visualização 3D gerada! Você pode rotacionar e fazer zoom no heatmap.")
+                        except Exception as e:
+                            st.error(f"Erro ao gerar visualização 3D do Grad-CAM: {str(e)}")
                 
                 # ========== ANÁLISE ESTATÍSTICA COMPLETA ==========
                 st.write("---")
@@ -3942,7 +3993,147 @@ def main():
                     help="Download do resultado da classificação desta imagem"
                 )
                 
-                # Opção para análise com IA se API configurada
+                # ========== AI CHAT DIAGNOSTIC ANALYSIS (ENHANCED from app5) ==========
+                st.write("---")
+                st.write("## 🤖 Análise Diagnóstica Avançada com IA")
+                
+                enable_ai_analysis = st.checkbox(
+                    "Ativar Análise Diagnóstica Completa com IA", 
+                    value=False,
+                    help="Análise PhD-level com IA, referências acadêmicas e interpretação multi-perspectiva"
+                )
+                
+                if enable_ai_analysis and AI_CHAT_AVAILABLE:
+                    st.write("### Configuração da API")
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        api_provider = st.selectbox(
+                            "Provedor de API:",
+                            options=['gemini', 'groq'],
+                            help="Escolha entre Google Gemini ou Groq"
+                        )
+                    
+                    with col2:
+                        if api_provider == 'gemini':
+                            model_options = ['gemini-1.0-pro', 'gemini-1.5-pro', 'gemini-1.5-flash']
+                        else:
+                            model_options = ['mixtral-8x7b-32768', 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant']
+                        
+                        ai_model = st.selectbox(
+                            "Modelo:",
+                            options=model_options
+                        )
+                    
+                    api_key = st.text_input(
+                        "API Key:",
+                        type="password",
+                        help="Insira sua chave API (Gemini: https://ai.google.dev/ | Groq: https://console.groq.com/)"
+                    )
+                    
+                    if api_key:
+                        if st.button("🔬 Gerar Análise Diagnóstica Completa"):
+                            with st.spinner("Gerando análise diagnóstica aprofundada..."):
+                                try:
+                                    # Fetch academic references
+                                    st.write("📚 Buscando referências acadêmicas...")
+                                    references = []
+                                    if ACADEMIC_REF_AVAILABLE:
+                                        try:
+                                            ref_fetcher = AcademicReferenceFetcher()
+                                            references = ref_fetcher.get_references_for_classification(
+                                                class_name=class_name,
+                                                domain="image classification",
+                                                max_per_source=3
+                                            )
+                                            
+                                            if references:
+                                                with st.expander("📚 Referências Acadêmicas Encontradas"):
+                                                    st.markdown(format_references_for_display(references))
+                                        except Exception as e:
+                                            st.warning(f"⚠️ Não foi possível buscar referências: {str(e)}")
+                                    
+                                    # Generate Grad-CAM description
+                                    gradcam_desc = ""
+                                    if activation_map is not None:
+                                        gradcam_desc = describe_gradcam_regions(activation_map)
+                                    
+                                    # Collect training statistics
+                                    training_stats = {
+                                        "Épocas Treinadas": epochs,
+                                        "Taxa de Aprendizagem": learning_rate,
+                                        "Batch Size": batch_size,
+                                        "Modelo": model_name,
+                                        "Tipo de Augmentação": augmentation_type,
+                                        "Otimizador": optimizer_name
+                                    }
+                                    
+                                    # Collect statistical results
+                                    statistical_results = {
+                                        "Informação": "Métricas baseadas no treinamento realizado",
+                                        "Nota": "Para análise completa, avalie em conjunto de teste separado"
+                                    }
+                                    
+                                    # Initialize AI analyzer
+                                    ai_analyzer = AIAnalyzer(
+                                        api_provider=api_provider,
+                                        api_key=api_key,
+                                        model_name=ai_model
+                                    )
+                                    
+                                    # Generate comprehensive analysis
+                                    st.write("🧠 Gerando interpretação diagnóstica...")
+                                    analysis = ai_analyzer.generate_comprehensive_analysis(
+                                        predicted_class=class_name,
+                                        confidence=confidence,
+                                        training_stats=training_stats,
+                                        statistical_results=statistical_results,
+                                        gradcam_description=gradcam_desc,
+                                        references=references
+                                    )
+                                    
+                                    # Display analysis
+                                    st.success("✅ Análise Diagnóstica Completa Gerada!")
+                                    st.markdown(analysis)
+                                    
+                                    # ========== GENETIC ALGORITHM MULTI-PERSPECTIVE ANALYSIS ==========
+                                    if GENETIC_INTERP_AVAILABLE:
+                                        st.write("---")
+                                        st.write("### 🧬 Interpretação Multi-Perspectiva com Algoritmos Genéticos")
+                                        
+                                        use_genetic = st.checkbox(
+                                            "Gerar Análise Multi-Perspectiva (5 ângulos diferentes)",
+                                            value=False,
+                                            help="Usa algoritmo genético para explorar diferentes perspectivas de interpretação"
+                                        )
+                                        
+                                        if use_genetic:
+                                            with st.spinner("🔄 Executando algoritmo genético para múltiplas perspectivas..."):
+                                                try:
+                                                    genetic_interp = GeneticDiagnosticInterpreter()
+                                                    
+                                                    # Generate multi-perspective report
+                                                    perspectives_report = genetic_interp.generate_multi_angle_report(
+                                                        predicted_class=class_name,
+                                                        confidence=confidence,
+                                                        base_analysis=analysis
+                                                    )
+                                                    
+                                                    st.markdown(perspectives_report)
+                                                    st.success("✅ Análise multi-perspectiva concluída! 5 ângulos de interpretação gerados.")
+                                                    
+                                                except Exception as e:
+                                                    st.error(f"Erro ao gerar análise genética: {str(e)}")
+                                    
+                                except Exception as e:
+                                    st.error(f"Erro ao gerar análise com IA: {str(e)}")
+                                    st.info("Verifique se a API key está correta e se você tem créditos disponíveis.")
+                
+                elif enable_ai_analysis and not AI_CHAT_AVAILABLE:
+                    st.warning("⚠️ Módulo de IA não disponível. Instale com: pip install google-generativeai groq")
+                
+                # Opção para análise com IA se API configurada (MODO LEGADO)
                 if 'api_configured' in st.session_state and st.session_state['api_configured']:
                     st.write("---")
                     st.write("## 🤖 Análise Diagnóstica com IA (Visão Computacional)")
