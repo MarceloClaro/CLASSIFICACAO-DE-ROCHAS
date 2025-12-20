@@ -95,7 +95,6 @@ Análise solicitada:
 Na interface, selecione um modelo com suporte a visão:
 - ⭐ `gemini-1.5-pro-latest` (recomendado)
 - `gemini-1.5-flash-latest`
-- `gemini-pro-vision`
 - `gemini-1.0-pro-vision-latest`
 
 ### 2. Faça Upload da Imagem
@@ -190,7 +189,6 @@ A confiança de 87% é BEM JUSTIFICADA porque:
 |--------|-----------------|
 | `gemini-1.5-pro-latest` ⭐ | Análise avançada, mais precisa |
 | `gemini-1.5-flash-latest` | Análise rápida, eficiente |
-| `gemini-pro-vision` | Especializado em visão |
 | `gemini-1.0-pro-vision-latest` | Visão com auto-update |
 
 ### Sem Suporte a Visão (Apenas Texto) ❌
@@ -239,7 +237,7 @@ graph TD
 ### Erro: "Modelo não suporta visão"
 **Solução:** Use um dos modelos com `-vision` ou `-latest`:
 - `gemini-1.5-pro-latest`
-- `gemini-pro-vision`
+- `gemini-1.0-pro-vision-latest`
 
 ### Grad-CAM não aparece
 **Causa:** Modelo ou arquitetura não suportada

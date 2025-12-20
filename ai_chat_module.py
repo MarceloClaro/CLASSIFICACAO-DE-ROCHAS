@@ -262,20 +262,17 @@ IMPORTANTE:
                 )
             elif "404" in str(e) and "not found" in error_type:
                 error_msg += (
-                    "🔍 Modelo não encontrado. Verifique se:\n"
-                    "   1. O nome do modelo está correto (gemini-1.5-pro-latest, gemini-1.5-flash-latest, gemini-1.0-pro-latest, gemini-pro)\n"
-                    "   2. O modelo está disponível na sua região\n"
-                    "   3. Você tem acesso ao modelo com sua API key\n"
+                    "🔍 Modelo não encontrado. Use os modelos atuais do Gemini API.\n"
+                    "   📚 Baseado no cookbook oficial: https://github.com/google-gemini/cookbook\n"
                     "   \n"
-                    "   💡 Recomendação: Use o pacote estável e modelos disponíveis:\n"
-                    "   pip install google-generativeai\n"
+                    "   Modelos recomendados (todos com suporte multimodal):\n"
+                    "   - gemini-2.5-flash ⭐ RECOMENDADO (rápido e eficiente)\n"
+                    "   - gemini-2.5-flash-lite (ainda mais rápido)\n"
+                    "   - gemini-2.5-pro (avançado com capacidade de raciocínio)\n"
+                    "   - gemini-3-flash-preview (próxima geração - preview)\n"
+                    "   - gemini-3-pro-preview (avançado próxima geração - preview)\n"
                     "   \n"
-                    "   Modelos disponíveis (API v1beta):\n"
-                    "   - gemini-1.5-pro-latest ⭐ RECOMENDADO (mais recente e avançado)\n"
-                    "   - gemini-1.5-flash-latest (rápido e eficiente)\n"
-                    "   - gemini-1.0-pro-latest (estável)\n"
-                    "   - gemini-pro (uso geral)\n"
-                    "   - gemini-pro-vision (com suporte a visão)\n"
+                    "   ⚠️ Modelos legados (1.5, 1.0) não são mais recomendados\n"
                 )
             elif "api key" in error_type or "401" in str(e) or "403" in str(e):
                 error_msg += (

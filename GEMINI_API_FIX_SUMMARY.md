@@ -26,8 +26,8 @@ Updated all model references with the **actual available models** from the Gemin
 - ✅ `gemini-1.5-flash-latest` (fast and efficient, auto-updates)
 - ✅ `gemini-1.0-pro-latest` (stable, auto-updates)
 - ✅ `gemini-pro` (general purpose)
-- ✅ `gemini-pro-vision` (image analysis support)
 - ✅ `gemini-1.0-pro-vision-latest` (vision with auto-updates)
+- ❌ `gemini-pro-vision` (DEPRECATED - no longer available in API v1beta)
 
 **Groq Models (from actual API):**
 - ✅ `meta-llama/llama-4-scout-17b-16e-instruct` ⭐ **RECOMMENDED** (multimodal with vision)
@@ -101,7 +101,7 @@ Updated all model references with the **actual available models** from the Gemin
    - Fast: `gemini-1.5-flash-latest` (efficient, auto-updates)
    - Stable: `gemini-1.0-pro-latest`
    - Basic: `gemini-pro`
-   - **With Vision:** `gemini-pro-vision` or `gemini-1.0-pro-vision-latest`
+   - **With Vision:** `gemini-1.5-pro-latest` (recommended) or `gemini-1.0-pro-vision-latest`
    
    **Groq Models:**
    - ⭐ **Recommended:** `meta-llama/llama-4-scout-17b-16e-instruct` (multimodal with vision!)
@@ -207,7 +207,7 @@ python test_genai_api.py
 
 #### Vision Support Needed?
 **Use these models:**
-- → `gemini-pro-vision` for general vision tasks
+- → `gemini-1.5-pro-latest` ⭐ RECOMMENDED for advanced vision tasks
 - → `gemini-1.0-pro-vision-latest` for latest vision features
 
 ### Groq Models
@@ -225,9 +225,9 @@ python test_genai_api.py
 
 | Provider | Model | Type | Context | Vision | Recommended Use |
 |----------|-------|------|---------|--------|-----------------|
-| **Gemini** | gemini-1.5-pro-latest | Advanced | Large | No | ⭐ Best for complex analysis |
-| **Gemini** | gemini-1.5-flash-latest | Fast | Medium | No | Fast general tasks |
-| **Gemini** | gemini-pro-vision | Vision | Medium | ✅ Yes | Image analysis |
+| **Gemini** | gemini-1.5-pro-latest | Advanced | Large | ✅ Yes | ⭐ Best for complex analysis & images |
+| **Gemini** | gemini-1.5-flash-latest | Fast | Medium | ✅ Yes | Fast general tasks & images |
+| **Gemini** | gemini-1.0-pro-vision-latest | Vision | Medium | ✅ Yes | Image analysis |
 | **Groq** | llama-4-scout-17b-16e-instruct | Multimodal | 128K | ✅ Yes | ⭐ Fast image analysis |
 | **Groq** | llama-4-maverick-17b-128e-instruct | Multimodal | 128K | ✅ Yes | Advanced multimodal |
 | **Groq** | mixtral-8x7b-32768 | Text | 32K | No | Fast text inference |

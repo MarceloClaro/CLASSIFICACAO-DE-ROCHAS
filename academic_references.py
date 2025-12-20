@@ -63,14 +63,15 @@ class AcademicReferenceFetcher:
         }
         # AI configuration for translation and critical reviews
         self.ai_provider = ai_provider
-        self.ai_api_key = ai_api_key
-        # Set default model based on provider
+        self.ai_api_key = api_key
+        # Set default model based on provider (using current recommended models)
+        # Reference: https://github.com/google-gemini/cookbook
         if ai_model:
             self.ai_model = ai_model
         elif ai_provider == 'groq':
             self.ai_model = "mixtral-8x7b-32768"
         else:
-            self.ai_model = "gemini-1.5-flash"
+            self.ai_model = "gemini-2.5-flash"  # Updated to current recommended model
         self.ai_client = None
         self.ai_model_obj = None
         

@@ -63,7 +63,6 @@ O sistema detecta automaticamente qual pacote está instalado:
 - `gemini-1.5-flash-latest` - Modelo rápido e eficiente
 - `gemini-1.0-pro-latest` - Modelo estável
 - `gemini-pro` - Modelo para uso geral
-- `gemini-pro-vision` - Modelo com suporte a análise de imagens
 - `gemini-1.0-pro-vision-latest` - Visão mais recente
 
 **Nota:** Os modelos com sufixo `-latest` são atualizados automaticamente para a versão mais recente disponível.
@@ -181,7 +180,6 @@ pip install google-generativeai
 - `gemini-1.5-flash-latest`
 - `gemini-1.0-pro-latest`
 - `gemini-pro`
-- `gemini-pro-vision`
 - `gemini-1.0-pro-vision-latest`
 
 **Importante:** Use sempre os modelos com `-latest` quando disponível para garantir acesso à versão mais recente.
@@ -212,7 +210,7 @@ pip install google-generativeai
 - Groq: Use `llama-3.1-8b-instant`
 
 **Para análise de imagens:**
-- Gemini: Use `gemini-pro-vision` ou `gemini-1.0-pro-vision-latest`
+- Gemini: Use `gemini-1.5-pro-latest` ⭐ **RECOMENDADO** ou `gemini-1.0-pro-vision-latest`
 
 ### Segurança da API Key
 

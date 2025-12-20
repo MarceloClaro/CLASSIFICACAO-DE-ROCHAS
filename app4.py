@@ -135,6 +135,63 @@ except ImportError:
 # Constants
 CONVERGENCE_CHECK_EPOCHS = 5  # Number of recent epochs to check for convergence stability
 
+# Valid model lists (based on official Google Gemini Cookbook)
+# Reference: https://github.com/google-gemini/cookbook
+VALID_GEMINI_MODELS = [
+    'gemini-2.5-flash',  # ⭐ Recommended - fast and efficient with multimodal support
+    'gemini-2.5-flash-lite',  # Even faster version
+    'gemini-2.5-pro',  # Advanced model with thinking capabilities
+    'gemini-3-flash-preview',  # Preview of next generation
+    'gemini-3-pro-preview',  # Advanced preview
+    # Legacy models (for backwards compatibility, but not recommended)
+    'gemini-1.5-pro-latest',
+    'gemini-1.5-flash-latest',
+    'gemini-1.0-pro-latest',
+    'gemini-pro',
+    'gemini-1.0-pro-vision-latest'
+]
+
+VALID_GROQ_MODELS = [
+    'meta-llama/llama-4-scout-17b-16e-instruct',
+    'meta-llama/llama-4-maverick-17b-128e-instruct',
+    'mixtral-8x7b-32768',
+    'llama-3.1-70b-versatile',
+    'llama-3.1-8b-instant'
+]
+
+def validate_model_name(model_name, provider):
+    """
+    Validate and sanitize model name to ensure deprecated models are not used.
+    Based on official Google Gemini Cookbook: https://github.com/google-gemini/cookbook
+    
+    Args:
+        model_name: The model name from session state or user input
+        provider: The AI provider ('Gemini' or 'Groq')
+    
+    Returns:
+        str: Valid model name or default model for the provider
+    """
+    if not model_name:
+        # Return default model if none specified
+        return 'gemini-2.5-flash' if provider == 'Gemini' else 'mixtral-8x7b-32768'
+    
+    # Check if model is in valid list
+    if provider == 'Gemini':
+        if model_name in VALID_GEMINI_MODELS:
+            return model_name
+        else:
+            # Model is deprecated or invalid, return recommended default
+            return 'gemini-2.5-flash'
+    elif provider == 'Groq':
+        if model_name in VALID_GROQ_MODELS:
+            return model_name
+        else:
+            # Model is invalid, return default
+            return 'mixtral-8x7b-32768'
+    else:
+        # Unknown provider, return the model as-is
+        return model_name
+
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -1993,16 +2050,17 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
             )
         elif "404" in str(e) and "not found" in error_type:
             error_msg += (
-                "🔍 Modelo não encontrado ou não suporta análise de imagens.\n"
-                "   Modelos com suporte a visão (imagens):\n"
-                "   - gemini-1.5-pro-latest ⭐ RECOMENDADO (avançado com visão)\n"
-                "   - gemini-1.5-flash-latest (rápido com visão)\n"
-                "   - gemini-pro-vision (especializado em visão)\n"
-                "   - gemini-1.0-pro-vision-latest (visão com auto-update)\n"
+                "🔍 Modelo não encontrado. Use os modelos atuais do Gemini API.\n"
+                "   📚 Baseado no cookbook oficial: https://github.com/google-gemini/cookbook\n"
                 "   \n"
-                "   Modelos SEM suporte a visão:\n"
-                "   - gemini-1.0-pro-latest\n"
-                "   - gemini-pro\n"
+                "   Modelos recomendados (todos com suporte multimodal/visão):\n"
+                "   - gemini-2.5-flash ⭐ RECOMENDADO (rápido e eficiente)\n"
+                "   - gemini-2.5-flash-lite (ainda mais rápido)\n"
+                "   - gemini-2.5-pro (avançado com capacidade de raciocínio)\n"
+                "   - gemini-3-flash-preview (próxima geração - preview)\n"
+                "   - gemini-3-pro-preview (avançado próxima geração - preview)\n"
+                "   \n"
+                "   ⚠️ Modelos legados (1.5, 1.0) não são mais recomendados\n"
             )
         elif "api key" in error_type or "401" in str(e) or "403" in str(e):
             error_msg += (
@@ -3772,12 +3830,14 @@ def main():
         if api_provider_sidebar != 'Nenhum':
             if api_provider_sidebar == 'Gemini':
                 model_options_sidebar = [
+                    'gemini-2.5-flash',  # ⭐ Recommended
+                    'gemini-2.5-flash-lite',
+                    'gemini-2.5-pro',
+                    'gemini-3-flash-preview',
+                    'gemini-3-pro-preview',
+                    # Legacy models (not recommended)
                     'gemini-1.5-pro-latest',
-                    'gemini-1.5-flash-latest', 
-                    'gemini-1.0-pro-latest',
-                    'gemini-pro',
-                    'gemini-pro-vision',
-                    'gemini-1.0-pro-vision-latest'
+                    'gemini-1.5-flash-latest'
                 ]
             else:  # Groq
                 model_options_sidebar = [
@@ -4228,7 +4288,6 @@ def main():
                                 'gemini-1.5-flash-latest',
                                 'gemini-1.0-pro-latest',
                                 'gemini-pro',
-                                'gemini-pro-vision',
                                 'gemini-1.0-pro-vision-latest'
                             ]
                         else:
@@ -4263,7 +4322,9 @@ def main():
                                                 if 'api_configured' in st.session_state and st.session_state['api_configured']:
                                                     ai_provider = st.session_state.get('api_provider')
                                                     ai_api_key = st.session_state.get('api_key')
-                                                    ai_model = st.session_state.get('api_model')
+                                                    ai_model_raw = st.session_state.get('api_model')
+                                                    # Validate and sanitize model name
+                                                    ai_model = validate_model_name(ai_model_raw, ai_provider)
                                                 
                                                 # Initialize fetcher with AI capabilities
                                                 ref_fetcher = AcademicReferenceFetcher(
@@ -4413,7 +4474,9 @@ def main():
                 if 'api_configured' in st.session_state and st.session_state['api_configured']:
                     st.write("---")
                     st.write("## 🤖 Análise Diagnóstica com IA (Visão Computacional)")
-                    st.write(f"**API Configurada:** {st.session_state['api_provider']} - {st.session_state['api_model']}")
+                    # Display validated model name
+                    validated_model = validate_model_name(st.session_state.get('api_model'), st.session_state.get('api_provider'))
+                    st.write(f"**API Configurada:** {st.session_state['api_provider']} - {validated_model}")
                     
                     # Info about multi-image analysis
                     if gradcam_image is not None:
@@ -4433,16 +4496,21 @@ def main():
                             # Gerar descrição do Grad-CAM
                             gradcam_desc = generate_gradcam_description(activation_map) if activation_map is not None else ""
                             
+                            # Validate and sanitize model name
+                            api_provider = st.session_state['api_provider']
+                            api_model = validate_model_name(st.session_state['api_model'], api_provider)
+                            api_key = st.session_state['api_key']
+                            
                             # Executar análise com IA apropriada
-                            if st.session_state['api_provider'] == 'Gemini':
+                            if api_provider == 'Gemini':
                                 if not GEMINI_AVAILABLE:
                                     st.error("❌ Google Generative AI não está instalado. Execute: pip install google-generativeai")
                                     ai_analysis_text = "Erro: Biblioteca não disponível"
                                 else:
                                     ai_analysis_text = analyze_image_with_gemini(
                                         eval_image,
-                                        st.session_state['api_key'],
-                                        st.session_state['api_model'],
+                                        api_key,
+                                        api_model,
                                         class_name,
                                         confidence,
                                         gradcam_desc,
@@ -4455,8 +4523,8 @@ def main():
                                 else:
                                     ai_analysis_text = analyze_image_with_groq_vision(
                                         eval_image,
-                                        st.session_state['api_key'],
-                                        st.session_state['api_model'],
+                                        api_key,
+                                        api_model,
                                         class_name,
                                         confidence,
                                         gradcam_desc
@@ -4519,8 +4587,8 @@ def main():
                                 'imagem': eval_image_file.name,
                                 'classe_predita': class_name,
                                 'confianca': confidence,
-                                'api_provider': st.session_state['api_provider'],
-                                'api_model': st.session_state['api_model'],
+                                'api_provider': api_provider,
+                                'api_model': api_model,
                                 'gradcam_description': gradcam_desc,
                                 'analise_completa': ai_analysis_text,
                                 'modelo_classificacao': model_name,
@@ -4554,8 +4622,10 @@ def main():
                     - ✅ Exportação completa para CSV
                     
                     **Modelos com Suporte de Visão:**
-                    - Gemini: gemini-1.5-pro-latest, gemini-1.5-flash-latest, gemini-1.0-pro-latest, gemini-pro, gemini-pro-vision
+                    - Gemini: gemini-2.5-flash ⭐, gemini-2.5-pro, gemini-3-flash-preview
                     - Groq: Suporte limitado dependendo do modelo
+                    
+                    📚 Baseado no cookbook oficial: https://github.com/google-gemini/cookbook
                     """)
 
         # Limpar o diretório temporário
