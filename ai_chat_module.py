@@ -263,18 +263,19 @@ IMPORTANTE:
             elif "404" in str(e) and "not found" in error_type:
                 error_msg += (
                     "🔍 Modelo não encontrado. Verifique se:\n"
-                    "   1. O nome do modelo está correto (gemini-2.5-flash, gemini-2.5-pro, gemini-1.5-flash, gemini-pro)\n"
+                    "   1. O nome do modelo está correto (gemini-1.5-pro-latest, gemini-1.5-flash-latest, gemini-1.0-pro-latest, gemini-pro)\n"
                     "   2. O modelo está disponível na sua região\n"
                     "   3. Você tem acesso ao modelo com sua API key\n"
                     "   \n"
                     "   💡 Recomendação: Use o pacote estável e modelos disponíveis:\n"
                     "   pip install google-generativeai\n"
                     "   \n"
-                    "   Modelos recomendados (API v1beta):\n"
-                    "   - gemini-2.5-flash (RECOMENDADO - rápido, eficiente e mais recente)\n"
-                    "   - gemini-1.5-flash (rápido e estável)\n"
-                    "   - gemini-2.5-pro (avançado para tarefas complexas)\n"
-                    "   - gemini-pro (estável para uso geral)\n"
+                    "   Modelos disponíveis (API v1beta):\n"
+                    "   - gemini-1.5-pro-latest ⭐ RECOMENDADO (mais recente e avançado)\n"
+                    "   - gemini-1.5-flash-latest (rápido e eficiente)\n"
+                    "   - gemini-1.0-pro-latest (estável)\n"
+                    "   - gemini-pro (uso geral)\n"
+                    "   - gemini-pro-vision (com suporte a visão)\n"
                 )
             elif "api key" in error_type or "401" in str(e) or "403" in str(e):
                 error_msg += (

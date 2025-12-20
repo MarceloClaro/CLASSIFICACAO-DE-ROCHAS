@@ -59,10 +59,14 @@ O sistema detecta automaticamente qual pacote está instalado:
 4. Copie a API Key gerada
 
 **Modelos Disponíveis (API v1beta):**
-- `gemini-2.5-flash` - ⭐ **RECOMENDADO** - Mais recente, rápido e eficiente
-- `gemini-1.5-flash` - Modelo rápido e estável
-- `gemini-2.5-pro` - Modelo avançado para tarefas complexas e raciocínio
-- `gemini-pro` - Modelo estável para uso geral
+- `gemini-1.5-pro-latest` - ⭐ **RECOMENDADO** - Modelo mais avançado e recente
+- `gemini-1.5-flash-latest` - Modelo rápido e eficiente
+- `gemini-1.0-pro-latest` - Modelo estável
+- `gemini-pro` - Modelo para uso geral
+- `gemini-pro-vision` - Modelo com suporte a análise de imagens
+- `gemini-1.0-pro-vision-latest` - Visão mais recente
+
+**Nota:** Os modelos com sufixo `-latest` são atualizados automaticamente para a versão mais recente disponível.
 
 ### Groq
 
@@ -164,13 +168,17 @@ pip install google-generativeai
 
 ### Erro: "404 models/gemini-1.5-pro is not found for API version v1beta"
 
-**Causa:** Os modelos antigos (`gemini-1.0-pro`, `gemini-1.5-pro`) foram descontinuados ou renomeados na API v1beta do Gemini.
+**Causa:** Uso de nomes de modelo incorretos ou sem o sufixo `-latest` recomendado.
 
-**Solução:** ✅ JÁ CORRIGIDO! O código agora usa os modelos atualizados e suportados pela API v1beta:
-- `gemini-2.5-flash` (mais recente e recomendado)
-- `gemini-1.5-flash` (estável)
-- `gemini-2.5-pro` (avançado)
-- `gemini-pro` (uso geral)
+**Solução:** ✅ JÁ CORRIGIDO! O código agora usa os modelos corretos disponíveis na API v1beta:
+- `gemini-1.5-pro-latest` ⭐ (recomendado)
+- `gemini-1.5-flash-latest`
+- `gemini-1.0-pro-latest`
+- `gemini-pro`
+- `gemini-pro-vision`
+- `gemini-1.0-pro-vision-latest`
+
+**Importante:** Use sempre os modelos com `-latest` quando disponível para garantir acesso à versão mais recente.
 
 Se ainda tiver problemas:
 
@@ -190,13 +198,15 @@ pip install google-generativeai
 ### Escolha do Modelo
 
 **Para análises detalhadas e raciocínio complexo:**
-- Gemini: Use `gemini-2.5-pro`
+- Gemini: Use `gemini-1.5-pro-latest` ⭐ **RECOMENDADO**
 - Groq: Use `mixtral-8x7b-32768` ou `llama-3.1-70b-versatile`
 
 **Para análises rápidas e eficientes:**
-- Gemini: Use `gemini-2.5-flash` ⭐ **RECOMENDADO** (mais recente)
-- Gemini: Use `gemini-1.5-flash` (alternativa estável)
+- Gemini: Use `gemini-1.5-flash-latest` ⭐ **RECOMENDADO**
 - Groq: Use `llama-3.1-8b-instant`
+
+**Para análise de imagens:**
+- Gemini: Use `gemini-pro-vision` ou `gemini-1.0-pro-vision-latest`
 
 ### Segurança da API Key
 
