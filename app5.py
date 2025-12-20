@@ -33,6 +33,13 @@ try:
 except ImportError:
     ADVANCED_OPTIMIZERS_AVAILABLE = False
 
+# Importar timm para Vision Transformers
+try:
+    import timm
+    TIMM_AVAILABLE = True
+except ImportError:
+    TIMM_AVAILABLE = False
+
 # Import new modules
 from visualization_3d import visualize_pca_3d, visualize_activation_heatmap_3d, create_interactive_3d_visualization
 from ai_chat_module import AIAnalyzer, describe_gradcam_regions
@@ -130,19 +137,23 @@ def get_augmentation_transforms(augmentation_type='standard'):
             transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
         ])
     else:
-        # Standard ou base para mixup/cutmix
+        # Standard ou base para mixup/cutmix - MELHORADO para melhor robustez
         train_transform = transforms.Compose([
             transforms.Lambda(EnhancedImagePreprocessor.enhance_image_quality),
+            # Aplicar transformações mais robustas
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomVerticalFlip(p=0.2),
+            transforms.RandomRotation(degrees=30),
+            transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.15),
+            transforms.RandomResizedCrop(224, scale=(0.7, 1.0), ratio=(0.8, 1.2)),
+            transforms.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1), shear=15),
+            # Adicionar pequenos blurs para simular variações de foco
             transforms.RandomApply([
-                transforms.RandomHorizontalFlip(),
-                transforms.RandomRotation(degrees=90),
-                transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-                transforms.RandomResizedCrop(224, scale=(0.8, 1.0)),
-                transforms.RandomAffine(degrees=0, shear=10),
-            ], p=0.5),
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
+                transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0))
+            ], p=0.2),
             transforms.ToTensor(),
+            # RandomErasing para simular oclusões
+            transforms.RandomErasing(p=0.2, scale=(0.02, 0.15), ratio=(0.3, 3.3)),
             transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
         ])
     
@@ -420,6 +431,7 @@ def visualize_pca_features(features, labels, classes, n_components=2):
 def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
     """
     Retorna o modelo pré-treinado selecionado.
+    Suporta CNNs (ResNet, DenseNet) e Vision Transformers (ViT, Swin).
     """
     if model_name == 'ResNet18':
         model = models.resnet18(weights='DEFAULT')
@@ -427,8 +439,37 @@ def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
         model = models.resnet50(weights='DEFAULT')
     elif model_name == 'DenseNet121':
         model = models.densenet121(weights='DEFAULT')
+    elif model_name == 'ViT-B/16' and TIMM_AVAILABLE:
+        model = timm.create_model('vit_base_patch16_224', pretrained=True, num_classes=num_classes, drop_rate=dropout_p)
+        # ViT já tem a camada de classificação configurada
+        if not fine_tune:
+            for name, param in model.named_parameters():
+                if 'head' not in name:  # Congela tudo exceto o classificador
+                    param.requires_grad = False
+        return model.to(device)
+    elif model_name == 'ViT-L/16' and TIMM_AVAILABLE:
+        model = timm.create_model('vit_large_patch16_224', pretrained=True, num_classes=num_classes, drop_rate=dropout_p)
+        if not fine_tune:
+            for name, param in model.named_parameters():
+                if 'head' not in name:
+                    param.requires_grad = False
+        return model.to(device)
+    elif model_name == 'Swin-T' and TIMM_AVAILABLE:
+        model = timm.create_model('swin_tiny_patch4_window7_224', pretrained=True, num_classes=num_classes, drop_rate=dropout_p)
+        if not fine_tune:
+            for name, param in model.named_parameters():
+                if 'head' not in name:
+                    param.requires_grad = False
+        return model.to(device)
+    elif model_name == 'Swin-B' and TIMM_AVAILABLE:
+        model = timm.create_model('swin_base_patch4_window7_224', pretrained=True, num_classes=num_classes, drop_rate=dropout_p)
+        if not fine_tune:
+            for name, param in model.named_parameters():
+                if 'head' not in name:
+                    param.requires_grad = False
+        return model.to(device)
     else:
-        st.error("Modelo não suportado.")
+        st.error(f"Modelo {model_name} não suportado ou timm não está disponível.")
         return None
 
     if not fine_tune:
@@ -460,7 +501,37 @@ def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
     model = model.to(device)
     return model
 
-def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, l1_lambda, patience, optimizer_name='Adam', scheduler_name='None', augmentation_type='standard'):
+# Label Smoothing Loss para melhor generalização
+class LabelSmoothingCrossEntropy(nn.Module):
+    """
+    Label smoothing cross entropy loss.
+    Previne overconfident predictions e melhora generalização.
+    """
+    def __init__(self, smoothing=0.1, weight=None):
+        super().__init__()
+        self.smoothing = smoothing
+        self.weight = weight
+    
+    def forward(self, pred, target):
+        n_classes = pred.size(-1)
+        log_preds = torch.nn.functional.log_softmax(pred, dim=-1)
+        
+        # Create smoothed distribution
+        with torch.no_grad():
+            true_dist = torch.zeros_like(log_preds)
+            true_dist.fill_(self.smoothing / (n_classes - 1))
+            true_dist.scatter_(1, target.unsqueeze(1), 1.0 - self.smoothing)
+        
+        # Apply class weights if provided
+        if self.weight is not None:
+            # Weight each sample based on its target class
+            sample_weights = self.weight[target]
+            loss = torch.sum(-true_dist * log_preds, dim=-1) * sample_weights
+            return loss.mean()
+        else:
+            return torch.mean(torch.sum(-true_dist * log_preds, dim=-1))
+
+def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, l1_lambda, patience, optimizer_name='Adam', scheduler_name='None', augmentation_type='standard', label_smoothing=0.1, use_gradient_clipping=True):
     """
     Função principal para treinamento do modelo.
     
@@ -481,6 +552,8 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
         optimizer_name: Nome do otimizador (Adam, AdamW, SGD, Ranger, Lion)
         scheduler_name: Nome do scheduler (None, CosineAnnealingLR, OneCycleLR)
         augmentation_type: Tipo de aumento de dados (none, standard, mixup, cutmix)
+        label_smoothing: Valor de label smoothing (0.0-0.3, padrão 0.1)
+        use_gradient_clipping: Se deve usar gradient clipping (padrão True)
     
     Returns:
         tuple: (model, classes) ou None em caso de erro
@@ -580,9 +653,15 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
         class_counts = class_counts + 1e-6  # Para evitar divisão por zero
         class_weights = 1.0 / class_counts
         class_weights = torch.FloatTensor(class_weights).to(device)
-        criterion = nn.CrossEntropyLoss(weight=class_weights)
+        if label_smoothing > 0:
+            criterion = LabelSmoothingCrossEntropy(smoothing=label_smoothing, weight=class_weights)
+        else:
+            criterion = nn.CrossEntropyLoss(weight=class_weights)
     else:
-        criterion = nn.CrossEntropyLoss()
+        if label_smoothing > 0:
+            criterion = LabelSmoothingCrossEntropy(smoothing=label_smoothing)
+        else:
+            criterion = nn.CrossEntropyLoss()
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, worker_init_fn=seed_worker, generator=g)
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False, worker_init_fn=seed_worker, generator=g)
@@ -684,6 +763,11 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
                 loss = loss + l1_lambda * l1_reg
             
             loss.backward()
+            
+            # Gradient clipping para estabilizar o treinamento
+            if use_gradient_clipping:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
             optimizer.step()
             
             # Atualizar scheduler OneCycleLR a cada batch
@@ -1019,6 +1103,21 @@ def visualize_activations(model, image, class_names, gradcam_type='SmoothGradCAM
             target_layer = model.layer4[-1]
         elif 'DenseNet' in model_type:
             target_layer = model.features.denseblock4.denselayer16
+        elif 'VisionTransformer' in model_type or 'vit' in str(type(model)).lower():
+            # Para Vision Transformers, usar a última camada de blocos
+            if hasattr(model, 'blocks'):
+                target_layer = model.blocks[-1].norm1
+            else:
+                st.warning("⚠️ Grad-CAM pode não funcionar perfeitamente com este modelo ViT. Usando última camada disponível.")
+                # Tentar encontrar última camada
+                target_layer = list(model.children())[-2]
+        elif 'Swin' in model_type or 'swin' in str(type(model)).lower():
+            # Para Swin Transformers, usar última camada do último estágio
+            if hasattr(model, 'layers'):
+                target_layer = model.layers[-1].blocks[-1].norm1
+            else:
+                st.warning("⚠️ Grad-CAM pode não funcionar perfeitamente com este modelo Swin. Usando última camada disponível.")
+                target_layer = list(model.children())[-2]
         else:
             st.error("Modelo não suportado para Grad-CAM.")
             return None
@@ -1384,7 +1483,16 @@ def main():
             - Zhang, B., Wang, C., Shen, Y., & Liu, Y. (2018). Fully connected conditional random fields for high-resolution remote sensing land use/land cover classification with convolutional neural networks. *Remote Sensing*, 10(12), 1889. https://doi.org/10.3390/rs10121889
             """)
 
-    model_name = st.sidebar.selectbox("Modelo Pré-treinado:", options=['ResNet18', 'ResNet50', 'DenseNet121'])
+    # Definir opções de modelos disponíveis
+    model_options = ['ResNet18', 'ResNet50', 'DenseNet121']
+    if TIMM_AVAILABLE:
+        model_options.extend(['ViT-B/16', 'ViT-L/16', 'Swin-T', 'Swin-B'])
+    
+    model_name = st.sidebar.selectbox(
+        "Modelo Pré-treinado:", 
+        options=model_options,
+        help="Selecione o modelo. Vision Transformers (ViT, Swin) usam mecanismos de atenção para capturar relações globais na imagem."
+    )
 
     #________________________________________________________________________________________
     # Fine-Tuning Completo em Redes Neurais Profundas
@@ -1634,6 +1742,23 @@ def main():
     l2_lambda = st.sidebar.number_input("L2 Regularization (Weight Decay):", min_value=0.0, max_value=0.1, value=0.01, step=0.01)
     l1_lambda = st.sidebar.number_input("L1 Regularization:", min_value=0.0, max_value=0.01, value=0.0, step=0.001, 
                                         help="Adiciona regularização L1 (Lasso) ao treinamento. Promove esparsidade nos pesos.")
+    
+    # Label Smoothing
+    label_smoothing = st.sidebar.number_input(
+        "Label Smoothing:", 
+        min_value=0.0, 
+        max_value=0.3, 
+        value=0.1, 
+        step=0.05,
+        help="Suaviza os rótulos para prevenir overconfidence. Valores típicos: 0.1-0.2. Melhora generalização."
+    )
+    
+    # Gradient Clipping
+    use_gradient_clipping = st.sidebar.checkbox(
+        "Usar Gradient Clipping",
+        value=True,
+        help="Limita a norma dos gradientes para estabilizar o treinamento. Recomendado para Vision Transformers."
+    )
     
     #________________________________________________________________________________________
     # Novos parâmetros de treinamento
@@ -1925,7 +2050,7 @@ def main():
         st.write("Iniciando o treinamento supervisionado...")
         model_data = train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, 
                                 batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, l1_lambda, 
-                                patience, optimizer_name, scheduler_name, augmentation_type)
+                                patience, optimizer_name, scheduler_name, augmentation_type, label_smoothing, use_gradient_clipping)
 
         if model_data is None:
             st.error("Erro no treinamento do modelo.")
@@ -1943,6 +2068,26 @@ def main():
         elif model_name.startswith('DenseNet'):
             feature_extractor = nn.Sequential(*list(model.features))
             feature_extractor.add_module('global_pool', nn.AdaptiveAvgPool2d((1,1)))
+        elif model_name.startswith('ViT') or model_name.startswith('Swin'):
+            # Para Vision Transformers, criar um extrator que remove apenas o head
+            class ViTFeatureExtractor(nn.Module):
+                def __init__(self, base_model):
+                    super().__init__()
+                    self.base_model = base_model
+                    
+                def forward(self, x):
+                    # Forward até antes do classificador
+                    if hasattr(self.base_model, 'forward_features'):
+                        return self.base_model.forward_features(x)
+                    else:
+                        # Fallback: tentar pegar features antes do head
+                        features = self.base_model.patch_embed(x) if hasattr(self.base_model, 'patch_embed') else x
+                        if hasattr(self.base_model, 'blocks'):
+                            for block in self.base_model.blocks:
+                                features = block(features)
+                        return features.mean(dim=1) if len(features.shape) > 2 else features
+            
+            feature_extractor = ViTFeatureExtractor(model)
         else:
             st.error("Modelo não suportado para extração de características.")
             return
