@@ -58,13 +58,16 @@ except ImportError:
 try:
     import google.genai as genai
     GEMINI_AVAILABLE = True
+    GEMINI_NEW_API = True  # New google-genai package
 except ImportError:
     # Fallback to old package if new one not available
     try:
         import google.generativeai as genai
         GEMINI_AVAILABLE = True
+        GEMINI_NEW_API = False  # Old google-generativeai package
     except ImportError:
         GEMINI_AVAILABLE = False
+        GEMINI_NEW_API = False
 
 try:
     from groq import Groq
@@ -1822,10 +1825,11 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
         return "Google Generative AI não está disponível. Instale com: pip install google-genai"
     
     try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(model_name)
-        
-        prompt = f"""
+        if GEMINI_NEW_API:
+            # New google-genai package API
+            client = genai.Client(api_key=api_key)
+            
+            prompt = f"""
         Você é um especialista em análise de imagens e interpretação técnica e forense.
         
         **Contexto da Classificação:**
@@ -1857,12 +1861,74 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
         
         Seja detalhado, técnico e preciso na sua análise.
         """
+            
+            # Convert PIL image to bytes
+            img_byte_arr = io.BytesIO()
+            image.save(img_byte_arr, format='PNG')
+            img_byte_arr = img_byte_arr.getvalue()
+            
+            response = client.models.generate_content(
+                model=model_name,
+                contents=[prompt, {"mime_type": "image/png", "data": img_byte_arr}]
+            )
+            return response.text
+        else:
+            # Old google-generativeai package API
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel(model_name)
+            
+            prompt = f"""
+        Você é um especialista em análise de imagens e interpretação técnica e forense.
         
-        response = model.generate_content([prompt, image])
-        return response.text
+        **Contexto da Classificação:**
+        - Classe Predita: {class_name}
+        - Confiança: {confidence:.4f} ({confidence*100:.2f}%)
+        - Análise Grad-CAM: {gradcam_description if gradcam_description else 'Não disponível'}
+        
+        Por favor, realize uma análise COMPLETA e DETALHADA da imagem fornecida, incluindo:
+        
+        1. **Descrição Visual Detalhada:**
+           - Descreva todos os elementos visuais presentes na imagem
+           - Identifique padrões, texturas, cores e formas relevantes
+           - Analise a qualidade e características da imagem
+        
+        2. **Interpretação Técnica:**
+           - Avalie se a classificação como "{class_name}" é compatível com o que você observa
+           - Identifique características específicas que suportam ou contradizem a classificação
+           - Analise a confiança de {confidence*100:.2f}% em relação aos padrões visuais
+        
+        3. **Análise Forense:**
+           - Identifique possíveis artefatos ou anomalias na imagem
+           - Avalie a integridade e autenticidade da imagem
+           - Destaque áreas de interesse ou preocupação
+        
+        4. **Recomendações:**
+           - Sugira se a classificação deve ser aceita ou revista
+           - Recomende análises adicionais se necessário
+           - Forneça orientações para melhorar a confiança na classificação
+        
+        Seja detalhado, técnico e preciso na sua análise.
+        """
+            
+            response = model.generate_content([prompt, image])
+            return response.text
     
     except Exception as e:
-        return f"Erro ao analisar com Gemini: {str(e)}"
+        error_msg = f"Erro ao analisar com Gemini: {str(e)}\n\n"
+        
+        # Provide helpful guidance based on error type
+        if "configure" in str(e).lower():
+            error_msg += "💡 Dica: Parece que há um problema de configuração da API.\n"
+            error_msg += "   Este erro foi corrigido! Tente reinstalar: pip install --upgrade google-generativeai\n"
+        elif "api key" in str(e).lower() or "401" in str(e):
+            error_msg += "🔑 Verifique se a API key está correta e se você tem créditos disponíveis.\n"
+            error_msg += "   Obtenha sua API key em: https://ai.google.dev/\n"
+        elif "quota" in str(e).lower() or "rate limit" in str(e).lower():
+            error_msg += "⏱️ Limite de requisições atingido. Aguarde alguns minutos.\n"
+        else:
+            error_msg += "📖 Consulte o guia: API_SETUP_GUIDE.md para mais detalhes.\n"
+        
+        return error_msg
 
 def analyze_image_with_groq_vision(image, api_key, model_name, class_name, confidence, gradcam_description=""):
     """

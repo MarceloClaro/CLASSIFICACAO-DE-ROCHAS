@@ -13,13 +13,16 @@ import numpy as np
 try:
     import google.genai as genai
     GEMINI_AVAILABLE = True
+    GEMINI_NEW_API = True  # New google-genai package
 except ImportError:
     # Fallback to old package if new one not available
     try:
         import google.generativeai as genai
         GEMINI_AVAILABLE = True
+        GEMINI_NEW_API = False  # Old google-generativeai package
     except ImportError:
         GEMINI_AVAILABLE = False
+        GEMINI_NEW_API = False
 
 try:
     from groq import Groq
@@ -48,8 +51,14 @@ class AIAnalyzer:
         self.model_name = model_name
         
         if self.api_provider == 'gemini' and GEMINI_AVAILABLE:
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel(model_name)
+            if GEMINI_NEW_API:
+                # New google-genai package API
+                self.client = genai.Client(api_key=api_key)
+                self.model = None  # Will be set when generating content
+            else:
+                # Old google-generativeai package API
+                genai.configure(api_key=api_key)
+                self.model = genai.GenerativeModel(model_name)
         elif self.api_provider == 'groq' and GROQ_AVAILABLE:
             self.client = Groq(api_key=api_key)
         else:
@@ -125,41 +134,48 @@ realize uma interpretação METICULOSAMENTE DESCRITIVA e ANAMNÉSICA dos seguint
 
 Por favor, forneça uma interpretação APROFUNDADA e DIAGNÓSTICA que inclua:
 
-1. **ANÁLISE CLÍNICA/FORENSE DETALHADA:**
+1. **📝 RESUMO EXECUTIVO (OBRIGATÓRIO):**
+   - **Resumo Original (Inglês):** Breve resumo em inglês dos achados principais
+   - **Resumo Traduzido (PT-BR):** Tradução completa do resumo para português brasileiro
+   - **Resenha Crítica:** Análise crítica dos resultados, apontando forças, limitações e pontos de atenção
+
+2. **ANÁLISE CLÍNICA/FORENSE DETALHADA:**
    - Interpretação minuciosa dos resultados
    - Significado clínico/científico da classificação
    - Fatores que podem ter influenciado a predição
    - Análise da confiança do modelo e suas implicações
 
-2. **CORRELAÇÃO COM PADRÕES CONHECIDOS:**
+3. **CORRELAÇÃO COM PADRÕES CONHECIDOS:**
    - Comparação com casos similares na literatura
    - Padrões característicos observados
    - Desvios ou peculiaridades notáveis
 
-3. **INTERPRETAÇÃO MULTI-ANGULAR:**
+4. **INTERPRETAÇÃO MULTI-ANGULAR:**
    - Visão do ponto de vista morfológico
    - Análise de características texturais
    - Considerações contextuais
    - Implicações práticas
 
-4. **DIAGNÓSTICO DIFERENCIAL:**
+5. **DIAGNÓSTICO DIFERENCIAL:**
    - Classes alternativas consideradas
    - Razões para descarte de outras hipóteses
    - Casos limítrofes ou ambíguos
 
-5. **RECOMENDAÇÕES E CONSIDERAÇÕES:**
+6. **RECOMENDAÇÕES E CONSIDERAÇÕES:**
    - Sugestões para confirmação diagnóstica
    - Limitações da análise atual
    - Necessidade de exames complementares
    - Considerações éticas e de boas práticas
 
-6. **EMBASAMENTO CIENTÍFICO:**
+7. **EMBASAMENTO CIENTÍFICO:**
    - Citações e referências relevantes
    - Metodologias estabelecidas
    - Evidências científicas de suporte
 
-IMPORTANTE: Mantenha um tom profissional, técnico e científico, como esperado em um
-diagnóstico de residência médica ou perícia forense de alto nível.
+IMPORTANTE: 
+- SEMPRE comece com o Resumo Executivo em três partes (Original em inglês, Traduzido em PT-BR, e Resenha Crítica)
+- Mantenha um tom profissional, técnico e científico, como esperado em um diagnóstico de residência médica ou perícia forense de alto nível
+- A resenha crítica deve ser imparcial e apontar tanto aspectos positivos quanto limitações
 """
         
         return prompt
@@ -176,8 +192,17 @@ diagnóstico de residência médica ou perícia forense de alto nível.
         """
         try:
             if self.api_provider == 'gemini':
-                response = self.model.generate_content(prompt)
-                return response.text
+                if GEMINI_NEW_API:
+                    # New google-genai package API
+                    response = self.client.models.generate_content(
+                        model=self.model_name,
+                        contents=prompt
+                    )
+                    return response.text
+                else:
+                    # Old google-generativeai package API
+                    response = self.model.generate_content(prompt)
+                    return response.text
             elif self.api_provider == 'groq':
                 chat_completion = self.client.chat.completions.create(
                     messages=[
@@ -198,7 +223,22 @@ diagnóstico de residência médica ou perícia forense de alto nível.
             else:
                 return "Provider not supported"
         except Exception as e:
-            return f"Error generating analysis: {str(e)}"
+            error_msg = f"Erro ao gerar análise com IA: {str(e)}\n\n"
+            
+            # Provide helpful guidance based on error type
+            if "configure" in str(e).lower():
+                error_msg += "💡 Dica: Parece que há um problema de configuração da API.\n"
+                error_msg += "   Tente reinstalar o pacote: pip install --upgrade google-generativeai\n"
+            elif "api key" in str(e).lower() or "401" in str(e):
+                error_msg += "🔑 Verifique se a API key está correta e se você tem créditos disponíveis.\n"
+                error_msg += "   Para Gemini: https://ai.google.dev/\n"
+                error_msg += "   Para Groq: https://console.groq.com/\n"
+            elif "quota" in str(e).lower() or "rate limit" in str(e).lower():
+                error_msg += "⏱️ Limite de requisições atingido. Aguarde alguns minutos antes de tentar novamente.\n"
+            else:
+                error_msg += "📖 Consulte o guia de configuração: API_SETUP_GUIDE.md\n"
+            
+            return error_msg
     
     def generate_comprehensive_analysis(
         self,
