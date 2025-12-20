@@ -90,10 +90,16 @@ except ImportError:
     VISUALIZATION_3D_AVAILABLE = False
 
 try:
-    from ai_chat_module import AIAnalyzer, describe_gradcam_regions
+    from ai_chat_module import AIAnalyzer, describe_gradcam_regions, get_gemini_model_path
     AI_CHAT_AVAILABLE = True
 except ImportError:
     AI_CHAT_AVAILABLE = False
+    # Define fallback function if module not available
+    def get_gemini_model_path(model_name: str) -> str:
+        """Fallback: Get the correct model path for Gemini API calls."""
+        if not model_name.startswith('models/'):
+            return f'models/{model_name}'
+        return model_name
 
 try:
     from academic_references import AcademicReferenceFetcher, format_references_for_display
@@ -1868,7 +1874,7 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
             img_byte_arr = img_byte_arr.getvalue()
             
             # The new API requires the 'models/' prefix
-            model_path = f'models/{model_name}' if not model_name.startswith('models/') else model_name
+            model_path = get_gemini_model_path(model_name)
             response = client.models.generate_content(
                 model=model_path,
                 contents=[prompt, {"mime_type": "image/png", "data": img_byte_arr}]

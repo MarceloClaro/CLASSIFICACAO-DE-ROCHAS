@@ -31,6 +31,24 @@ except ImportError:
     GROQ_AVAILABLE = False
 
 
+def get_gemini_model_path(model_name: str) -> str:
+    """
+    Get the correct model path for Gemini API calls.
+    
+    For the new google-genai package, model names must include the 'models/' prefix.
+    This function ensures the prefix is added if not already present.
+    
+    Args:
+        model_name: Model name (e.g., 'gemini-1.5-pro' or 'models/gemini-1.5-pro')
+    
+    Returns:
+        Model path with 'models/' prefix (e.g., 'models/gemini-1.5-pro')
+    """
+    if not model_name.startswith('models/'):
+        return f'models/{model_name}'
+    return model_name
+
+
 class AIAnalyzer:
     """
     AI-powered diagnostic analyzer that uses LLMs to provide
@@ -195,7 +213,7 @@ IMPORTANTE:
                 if GEMINI_NEW_API:
                     # New google-genai package API
                     # The new API requires the 'models/' prefix
-                    model_path = f'models/{self.model_name}' if not self.model_name.startswith('models/') else self.model_name
+                    model_path = get_gemini_model_path(self.model_name)
                     response = self.client.models.generate_content(
                         model=model_path,
                         contents=prompt
@@ -236,7 +254,9 @@ IMPORTANTE:
                 error_msg += "   1. O nome do modelo está correto (gemini-1.0-pro, gemini-1.5-pro, gemini-1.5-flash)\n"
                 error_msg += "   2. O modelo está disponível na sua região\n"
                 error_msg += "   3. Você tem acesso ao modelo com sua API key\n"
-                error_msg += "   Para usar o pacote estável, instale: pip install --force-reinstall google-generativeai\n"
+                error_msg += "   Para usar o pacote estável, execute:\n"
+                error_msg += "     pip uninstall google-genai\n"
+                error_msg += "     pip install google-generativeai\n"
             elif "api key" in str(e).lower() or "401" in str(e):
                 error_msg += "🔑 Verifique se a API key está correta e se você tem créditos disponíveis.\n"
                 error_msg += "   Para Gemini: https://ai.google.dev/\n"
