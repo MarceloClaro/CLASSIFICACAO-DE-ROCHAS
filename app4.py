@@ -168,23 +168,28 @@ def validate_model_name(model_name, provider):
     
     Args:
         model_name: The model name from session state or user input
-        provider: The AI provider ('Gemini' or 'Groq')
+        provider: The AI provider ('Gemini', 'gemini', 'Groq', 'groq')
     
     Returns:
         str: Valid model name or default model for the provider
     """
     if not model_name:
         # Return default model if none specified
-        return 'gemini-2.5-flash' if provider == 'Gemini' else 'mixtral-8x7b-32768'
+        # Normalize provider to lowercase for comparison
+        provider_lower = provider.lower() if provider else ''
+        return 'gemini-2.5-flash' if provider_lower == 'gemini' else 'mixtral-8x7b-32768'
+    
+    # Normalize provider to lowercase for case-insensitive comparison
+    provider_lower = provider.lower() if provider else ''
     
     # Check if model is in valid list
-    if provider == 'Gemini':
+    if provider_lower == 'gemini':
         if model_name in VALID_GEMINI_MODELS:
             return model_name
         else:
             # Model is deprecated or invalid, return recommended default
             return 'gemini-2.5-flash'
-    elif provider == 'Groq':
+    elif provider_lower == 'groq':
         if model_name in VALID_GROQ_MODELS:
             return model_name
         else:
@@ -4453,14 +4458,23 @@ def main():
                     with col2:
                         if api_provider == 'gemini':
                             model_options = [
+                                'gemini-2.5-flash',  # ⭐ Recommended
+                                'gemini-2.5-flash-lite',
+                                'gemini-2.5-pro',
+                                'gemini-3-flash-preview',
+                                'gemini-3-pro-preview',
+                                # Legacy models (not recommended)
                                 'gemini-1.5-pro-latest',
-                                'gemini-1.5-flash-latest',
-                                'gemini-1.0-pro-latest',
-                                'gemini-pro',
-                                'gemini-1.0-pro-vision-latest'
+                                'gemini-1.5-flash-latest'
                             ]
                         else:
-                            model_options = ['mixtral-8x7b-32768', 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant']
+                            model_options = [
+                                'meta-llama/llama-4-scout-17b-16e-instruct',
+                                'meta-llama/llama-4-maverick-17b-128e-instruct',
+                                'mixtral-8x7b-32768',
+                                'llama-3.1-70b-versatile',
+                                'llama-3.1-8b-instant'
+                            ]
                         
                         ai_model = st.selectbox(
                             "Modelo:",
@@ -4484,21 +4498,14 @@ def main():
                                             try:
                                                 st.write("🔍 Consultando bases de dados científicas...")
                                                 
-                                                # Get API configuration if available
-                                                ai_provider = None
-                                                ai_api_key = None
-                                                ai_model = None
-                                                if 'api_configured' in st.session_state and st.session_state['api_configured']:
-                                                    ai_provider = st.session_state.get('api_provider')
-                                                    ai_api_key = st.session_state.get('api_key')
-                                                    ai_model_raw = st.session_state.get('api_model')
-                                                    # Validate and sanitize model name
-                                                    ai_model = validate_model_name(ai_model_raw, ai_provider)
+                                                # Use the API configuration from the current section (not sidebar)
+                                                # This ensures we use the provider and model selected by the user in this dialog
+                                                # Variables api_provider, api_key, and ai_model are already defined above from user input
                                                 
-                                                # Initialize fetcher with AI capabilities
+                                                # Initialize fetcher with AI capabilities using current section config
                                                 ref_fetcher = AcademicReferenceFetcher(
-                                                    ai_provider=ai_provider,
-                                                    ai_api_key=ai_api_key,
+                                                    ai_provider=api_provider,
+                                                    ai_api_key=api_key,
                                                     ai_model=ai_model
                                                 )
                                                 
@@ -4512,7 +4519,7 @@ def main():
                                                     status.update(label=f"📚 {len(references)} referências encontradas!", state="running")
                                                     
                                                     # Enrich references with translations and critical reviews
-                                                    if ai_provider and ai_api_key:
+                                                    if api_provider and api_key:
                                                         st.write("🌐 Traduzindo resumos e gerando resenhas críticas...")
                                                         references = ref_fetcher.enrich_references_with_analysis(references)
                                                         status.update(label=f"📚 {len(references)} referências processadas com traduções e resenhas!", state="complete")
