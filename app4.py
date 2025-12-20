@@ -7,6 +7,7 @@ import zipfile
 import shutil
 import tempfile
 import random
+import time
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -1891,7 +1892,72 @@ def encode_image_to_base64(image):
     image.save(buffered, format="PNG")
     return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence, gradcam_description="", gradcam_image=None):
+def optimize_image_for_api(image, max_size=(1024, 1024), quality=85):
+    """
+    Otimiza uma imagem PIL para envio à API, reduzindo tamanho se necessário.
+    
+    Args:
+        image: PIL Image
+        max_size: Tupla (largura, altura) do tamanho máximo
+        quality: Qualidade JPEG (1-100)
+    
+    Returns:
+        PIL Image otimizada
+    """
+    if image is None:
+        return None
+        
+    # Se a imagem já está dentro do tamanho máximo, retornar cópia
+    if image.size[0] <= max_size[0] and image.size[1] <= max_size[1]:
+        return image.copy()
+    
+    # Redimensionar mantendo proporção
+    image_copy = image.copy()
+    image_copy.thumbnail(max_size, Image.Resampling.LANCZOS)
+    return image_copy
+
+def retry_api_call(func, max_retries=3, initial_delay=2.0, backoff_factor=2.0):
+    """
+    Wrapper para tentar chamar uma função de API com retry exponencial.
+    
+    Args:
+        func: Função a ser executada (deve retornar tupla (sucesso, resultado))
+        max_retries: Número máximo de tentativas
+        initial_delay: Atraso inicial em segundos
+        backoff_factor: Fator multiplicativo para cada retry
+    
+    Returns:
+        Resultado da função ou mensagem de erro
+    """
+    delay = initial_delay
+    last_error = None
+    
+    for attempt in range(max_retries):
+        try:
+            success, result = func()
+            if success:
+                return result
+            # Se não teve sucesso mas também não teve exceção, não retry
+            return result
+        except Exception as e:
+            last_error = e
+            error_str = str(e).lower()
+            
+            # Se for erro de quota/rate limit, fazer retry
+            if "429" in str(e) or "quota" in error_str or "rate limit" in error_str:
+                if attempt < max_retries - 1:
+                    time.sleep(delay)
+                    delay *= backoff_factor
+                    continue
+            # Para outros erros, não fazer retry
+            raise e
+    
+    # Se esgotou tentativas
+    if last_error:
+        raise last_error
+    return "Erro desconhecido ao tentar chamada de API"
+
+def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence, gradcam_description="", gradcam_image=None, max_retries=2):
     """
     Analisa uma imagem usando Google Gemini com visão computacional.
     
@@ -1903,6 +1969,7 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
         confidence: Confiança da predição
         gradcam_description: Descrição textual do Grad-CAM
         gradcam_image: PIL Image com Grad-CAM sobreposto (opcional)
+        max_retries: Número máximo de tentativas em caso de rate limit
     
     Returns:
         str: Análise técnica e forense da imagem
@@ -1910,99 +1977,104 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
     if not GEMINI_AVAILABLE:
         return "Google Generative AI não está disponível. Instale com: pip install google-generativeai"
     
-    try:
-        # Construir prompt baseado na disponibilidade de Grad-CAM
-        if gradcam_image is not None:
-            prompt = f"""
-    Você é um especialista em análise de imagens e interpretação técnica e forense.
+    # Otimizar imagens antes de enviar (reduz custos e melhora performance)
+    optimized_image = optimize_image_for_api(image, max_size=(1024, 1024))
+    optimized_gradcam = optimize_image_for_api(gradcam_image, max_size=(1024, 1024)) if gradcam_image is not None else None
     
-    **Contexto da Classificação:**
-    - Classe Predita: {class_name}
-    - Confiança: {confidence:.4f} ({confidence*100:.2f}%)
-    - Análise Grad-CAM: {gradcam_description if gradcam_description else 'Veja a segunda imagem'}
+    # Construir prompt baseado na disponibilidade de Grad-CAM
+    if optimized_gradcam is not None:
+        prompt = f"""
+Você é um especialista em análise de imagens e interpretação técnica e forense.
+
+**Contexto da Classificação:**
+- Classe Predita: {class_name}
+- Confiança: {confidence:.4f} ({confidence*100:.2f}%)
+- Análise Grad-CAM: {gradcam_description if gradcam_description else 'Veja a segunda imagem'}
+
+**IMPORTANTE:** Você receberá DUAS imagens:
+1. **Primeira imagem**: A imagem ORIGINAL classificada
+2. **Segunda imagem**: A mesma imagem com sobreposição de Grad-CAM (mapa de calor vermelho-amarelo)
+
+O Grad-CAM (Gradient-weighted Class Activation Mapping) mostra onde a rede neural focou sua "atenção" 
+para fazer a classificação. Regiões em vermelho/amarelo indicam áreas de alta importância para a decisão.
+
+Por favor, realize uma análise COMPLETA e DETALHADA das DUAS imagens, incluindo:
+
+1. **Descrição Visual da Imagem Original:**
+   - Descreva todos os elementos visuais presentes na imagem original
+   - Identifique padrões, texturas, cores e formas relevantes
+   - Analise a qualidade e características da imagem
+
+2. **Análise do Grad-CAM (Segunda Imagem):**
+   - Identifique quais regiões da imagem têm maior ativação (vermelho/amarelo intenso)
+   - Descreva O QUE está presente nessas regiões de alta ativação
+   - Avalie se essas regiões fazem sentido para a classificação como "{class_name}"
+   - Compare: O modelo está focando nas características corretas?
+
+3. **Interpretação Técnica Integrada:**
+   - Avalie se a classificação como "{class_name}" é compatível com o que você observa
+   - Relacione as características visuais da imagem original com as regiões de ativação
+   - Analise se a confiança de {confidence*100:.2f}% é justificada pelas regiões focadas
+   - Identifique se há características importantes ignoradas pelo modelo
+
+4. **Análise Forense:**
+   - Identifique possíveis artefatos ou anomalias nas imagens
+   - Avalie a integridade e autenticidade da imagem
+   - Verifique se o Grad-CAM está focando em artefatos em vez de características reais
+   - Destaque áreas de interesse ou preocupação
+
+5. **Recomendações:**
+   - Sugira se a classificação deve ser aceita ou revista
+   - Baseie-se na correlação entre características visuais e regiões de ativação
+   - Recomende análises adicionais se necessário
+   - Forneça orientações para melhorar a confiança na classificação
+
+Seja detalhado, técnico e preciso na sua análise. Relacione SEMPRE os dois aspectos: 
+o que você vê na imagem original e onde o modelo está focando no Grad-CAM.
+"""
+    else:
+        prompt = f"""
+Você é um especialista em análise de imagens e interpretação técnica e forense.
+
+**Contexto da Classificação:**
+- Classe Predita: {class_name}
+- Confiança: {confidence:.4f} ({confidence*100:.2f}%)
+- Análise Grad-CAM: {gradcam_description if gradcam_description else 'Não disponível'}
+
+Por favor, realize uma análise COMPLETA e DETALHADA da imagem fornecida, incluindo:
+
+1. **Descrição Visual Detalhada:**
+   - Descreva todos os elementos visuais presentes na imagem
+   - Identifique padrões, texturas, cores e formas relevantes
+   - Analise a qualidade e características da imagem
+
+2. **Interpretação Técnica:**
+   - Avalie se a classificação como "{class_name}" é compatível com o que você observa
+   - Identifique características específicas que suportam ou contradizem a classificação
+   - Analise a confiança de {confidence*100:.2f}% em relação aos padrões visuais
+
+3. **Análise Forense:**
+   - Identifique possíveis artefatos ou anomalias na imagem
+   - Avalie a integridade e autenticidade da imagem
+   - Destaque áreas de interesse ou preocupação
+
+4. **Recomendações:**
+   - Sugira se a classificação deve ser aceita ou revista
+   - Recomende análises adicionais se necessário
+   - Forneça orientações para melhorar a confiança na classificação
+
+Seja detalhado, técnico e preciso na sua análise.
+"""
     
-    **IMPORTANTE:** Você receberá DUAS imagens:
-    1. **Primeira imagem**: A imagem ORIGINAL classificada
-    2. **Segunda imagem**: A mesma imagem com sobreposição de Grad-CAM (mapa de calor vermelho-amarelo)
-    
-    O Grad-CAM (Gradient-weighted Class Activation Mapping) mostra onde a rede neural focou sua "atenção" 
-    para fazer a classificação. Regiões em vermelho/amarelo indicam áreas de alta importância para a decisão.
-    
-    Por favor, realize uma análise COMPLETA e DETALHADA das DUAS imagens, incluindo:
-    
-    1. **Descrição Visual da Imagem Original:**
-       - Descreva todos os elementos visuais presentes na imagem original
-       - Identifique padrões, texturas, cores e formas relevantes
-       - Analise a qualidade e características da imagem
-    
-    2. **Análise do Grad-CAM (Segunda Imagem):**
-       - Identifique quais regiões da imagem têm maior ativação (vermelho/amarelo intenso)
-       - Descreva O QUE está presente nessas regiões de alta ativação
-       - Avalie se essas regiões fazem sentido para a classificação como "{class_name}"
-       - Compare: O modelo está focando nas características corretas?
-    
-    3. **Interpretação Técnica Integrada:**
-       - Avalie se a classificação como "{class_name}" é compatível com o que você observa
-       - Relacione as características visuais da imagem original com as regiões de ativação
-       - Analise se a confiança de {confidence*100:.2f}% é justificada pelas regiões focadas
-       - Identifique se há características importantes ignoradas pelo modelo
-    
-    4. **Análise Forense:**
-       - Identifique possíveis artefatos ou anomalias nas imagens
-       - Avalie a integridade e autenticidade da imagem
-       - Verifique se o Grad-CAM está focando em artefatos em vez de características reais
-       - Destaque áreas de interesse ou preocupação
-    
-    5. **Recomendações:**
-       - Sugira se a classificação deve ser aceita ou revista
-       - Baseie-se na correlação entre características visuais e regiões de ativação
-       - Recomende análises adicionais se necessário
-       - Forneça orientações para melhorar a confiança na classificação
-    
-    Seja detalhado, técnico e preciso na sua análise. Relacione SEMPRE os dois aspectos: 
-    o que você vê na imagem original e onde o modelo está focando no Grad-CAM.
-    """
-        else:
-            prompt = f"""
-    Você é um especialista em análise de imagens e interpretação técnica e forense.
-    
-    **Contexto da Classificação:**
-    - Classe Predita: {class_name}
-    - Confiança: {confidence:.4f} ({confidence*100:.2f}%)
-    - Análise Grad-CAM: {gradcam_description if gradcam_description else 'Não disponível'}
-    
-    Por favor, realize uma análise COMPLETA e DETALHADA da imagem fornecida, incluindo:
-    
-    1. **Descrição Visual Detalhada:**
-       - Descreva todos os elementos visuais presentes na imagem
-       - Identifique padrões, texturas, cores e formas relevantes
-       - Analise a qualidade e características da imagem
-    
-    2. **Interpretação Técnica:**
-       - Avalie se a classificação como "{class_name}" é compatível com o que você observa
-       - Identifique características específicas que suportam ou contradizem a classificação
-       - Analise a confiança de {confidence*100:.2f}% em relação aos padrões visuais
-    
-    3. **Análise Forense:**
-       - Identifique possíveis artefatos ou anomalias na imagem
-       - Avalie a integridade e autenticidade da imagem
-       - Destaque áreas de interesse ou preocupação
-    
-    4. **Recomendações:**
-       - Sugira se a classificação deve ser aceita ou revista
-       - Recomende análises adicionais se necessário
-       - Forneça orientações para melhorar a confiança na classificação
-    
-    Seja detalhado, técnico e preciso na sua análise.
-    """
-        
+    # Função interna para fazer a chamada da API
+    def make_api_call():
         if GEMINI_NEW_API:
             # New beta google-genai package API
             client = genai.Client(api_key=api_key)
             
             # Convert PIL images to bytes
             img_byte_arr = io.BytesIO()
-            image.save(img_byte_arr, format='PNG')
+            optimized_image.save(img_byte_arr, format='PNG')
             img_byte_arr = img_byte_arr.getvalue()
             
             # Get correct model path for beta API
@@ -2012,9 +2084,9 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
             content_parts = [prompt, {"mime_type": "image/png", "data": img_byte_arr}]
             
             # Add Grad-CAM image if available
-            if gradcam_image is not None:
+            if optimized_gradcam is not None:
                 gradcam_byte_arr = io.BytesIO()
-                gradcam_image.save(gradcam_byte_arr, format='PNG')
+                optimized_gradcam.save(gradcam_byte_arr, format='PNG')
                 gradcam_byte_arr = gradcam_byte_arr.getvalue()
                 content_parts.append({"mime_type": "image/png", "data": gradcam_byte_arr})
             
@@ -2022,22 +2094,25 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
                 model=model_path,
                 contents=content_parts
             )
-            return response.text
+            return (True, response.text)
         else:
             # Stable google-generativeai package API (recommended)
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel(model_name)
             
             # Build content list
-            content_parts = [prompt, image]
+            content_parts = [prompt, optimized_image]
             
             # Add Grad-CAM image if available
-            if gradcam_image is not None:
-                content_parts.append(gradcam_image)
+            if optimized_gradcam is not None:
+                content_parts.append(optimized_gradcam)
             
             response = model.generate_content(content_parts)
-            return response.text
+            return (True, response.text)
     
+    # Tentar fazer a chamada com retry
+    try:
+        return retry_api_call(make_api_call, max_retries=max_retries, initial_delay=2.0, backoff_factor=2.0)
     except Exception as e:
         error_msg = f"Erro ao analisar com Gemini: {str(e)}\n\n"
         error_type = str(e).lower()
@@ -2054,13 +2129,11 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
                 "   📚 Baseado no cookbook oficial: https://github.com/google-gemini/cookbook\n"
                 "   \n"
                 "   Modelos recomendados (todos com suporte multimodal/visão):\n"
-                "   - gemini-2.5-flash ⭐ RECOMENDADO (rápido e eficiente)\n"
-                "   - gemini-2.5-flash-lite (ainda mais rápido)\n"
-                "   - gemini-2.5-pro (avançado com capacidade de raciocínio)\n"
-                "   - gemini-3-flash-preview (próxima geração - preview)\n"
-                "   - gemini-3-pro-preview (avançado próxima geração - preview)\n"
+                "   - gemini-2.0-flash-exp ⭐ RECOMENDADO (última versão, grátis)\n"
+                "   - gemini-1.5-flash (rápido e eficiente)\n"
+                "   - gemini-1.5-pro (avançado com capacidade de raciocínio)\n"
                 "   \n"
-                "   ⚠️ Modelos legados (1.5, 1.0) não são mais recomendados\n"
+                "   ⚠️ Modelos legados (1.0) não são mais recomendados\n"
             )
         elif "api key" in error_type or "401" in str(e) or "403" in str(e):
             error_msg += (
@@ -2070,6 +2143,11 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
         elif "quota" in error_type or "rate limit" in error_type or "429" in str(e):
             error_msg += (
                 "⏱️ Limite de requisições atingido. Aguarde alguns minutos.\n"
+                f"   Tentativas realizadas: {max_retries}\n"
+                "   💡 Sugestões:\n"
+                "   - Aguarde 1-2 minutos antes de tentar novamente\n"
+                "   - Verifique seu limite em: https://ai.google.dev/\n"
+                "   - Use a análise Multi-Agente como alternativa (não requer API externa)\n"
             )
         elif "resource" in error_type and "exhausted" in error_type:
             error_msg += (
