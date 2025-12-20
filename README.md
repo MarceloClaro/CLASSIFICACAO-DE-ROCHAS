@@ -13,6 +13,15 @@ Sistema avançado de classificação de imagens utilizando Deep Learning com an�
 - 💾 **Exportação de Resultados**: Relatórios em CSV para análise posterior
 - 🎓 **Qualidade Acadêmica**: Metodologia rigorosa alinhada com Qualis A1
 
+### ✨ Novas Funcionalidades (v3.0)
+
+- 🎨 **Pré-processamento Avançado**: Melhoria automática de qualidade das imagens
+- 🔄 **Técnicas de Augmentation**: None, Standard, Mixup, CutMix
+- 📉 **LR Schedulers**: None, CosineAnnealingLR, OneCycleLR
+- ⚙️ **Múltiplos Otimizadores**: Adam, AdamW, SGD, Ranger, Lion
+- 🎯 **Regularização L1 e L2**: Controle fino de overfitting
+- 🔍 **4 Tipos de Grad-CAM**: GradCAM, GradCAM++, SmoothGradCAM++, LayerCAM
+
 ## 🚀 Instalação
 
 ### Pré-requisitos
@@ -35,11 +44,15 @@ streamlit run app3.py
 ```
 
 **Funcionalidades**:
-- ✅ Treinamento de modelos com aumento de dados
+- ✅ Treinamento de modelos com aumento de dados avançado
+- ✅ Múltiplas técnicas de augmentation (Mixup, CutMix)
+- ✅ 5 otimizadores diferentes para experimentação
+- ✅ Learning Rate Schedulers para melhor convergência
+- ✅ Regularização L1 e L2 configuráveis
 - ✅ Análise automática de eficiência e desempenho
 - ✅ Visualização de métricas detalhadas
 - ✅ Exportação de relatórios
-- ✅ Grad-CAM para interpretabilidade
+- ✅ 4 variantes de Grad-CAM para interpretabilidade
 - ✅ Clustering não supervisionado
 
 ### 2. Guia de Comparação de Modelos
@@ -102,6 +115,7 @@ streamlit run model_comparison_guide.py
 
 - [📊 Análise de Performance](PERFORMANCE_ANALYSIS.md) - Documentação completa do sistema de análise
 - [🔬 Guia de Comparação](model_comparison_guide.py) - Interface interativa para comparação de modelos
+- [✨ Melhorias no Treinamento](TRAINING_IMPROVEMENTS.md) - Documentação detalhada das novas funcionalidades v3.0
 
 ## 🛠️ Estrutura do Projeto
 
@@ -178,14 +192,44 @@ Score de Eficiência Geral: 0.8650
 - **Taxa de Aprendizagem**: 0.0001-0.1 (padrão: 0.0001)
 - **Batch Size**: 4-64 (padrão: 16)
 - **Fine-Tuning**: Habilitar para ajustar todas as camadas
-- **L2 Regularization**: 0.0-0.1 (padrão: 0.01)
+- **L1 Regularization**: 0.0-0.01 (padrão: 0.0) - Promove esparsidade
+- **L2 Regularization**: 0.0-0.1 (padrão: 0.01) - Weight decay
 - **Early Stopping Patience**: 1-10 (padrão: 3)
+
+### Técnicas de Aumento de Dados (Novas!)
+
+- ✅ **None**: Sem augmentation, apenas normalização
+- ✅ **Standard**: Rotação, flip, color jitter, crop, affine
+- ✅ **Mixup**: Mistura linear de imagens e labels
+- ✅ **CutMix**: Recorta e cola regiões entre imagens
+
+### Otimizadores Disponíveis (Novos!)
+
+- ✅ **Adam**: Adaptativo padrão (recomendado)
+- ✅ **AdamW**: Adam com weight decay melhorado
+- ✅ **SGD**: Gradiente descendente com momentum Nesterov
+- ✅ **Ranger**: Lookahead + RAdam (avançado)
+- ✅ **Lion**: Otimizador eficiente do Google (2023)
+
+### Learning Rate Schedulers (Novos!)
+
+- ✅ **None**: LR constante
+- ✅ **CosineAnnealingLR**: Redução suave em formato cosseno
+- ✅ **OneCycleLR**: Super-convergência (aumenta depois reduz)
+
+### Variantes de Grad-CAM (Expandido!)
+
+- ✅ **GradCAM**: Implementação básica
+- ✅ **GradCAM++**: Pesos melhorados
+- ✅ **SmoothGradCAM++**: Mapas suavizados
+- ✅ **LayerCAM**: Análise por camada
 
 ### Técnicas de Regularização
 
-- ✅ **Data Augmentation**: Rotação, flip, color jitter
+- ✅ **Data Augmentation**: Standard, Mixup, CutMix
 - ✅ **Dropout**: p=0.5 na camada final
-- ✅ **L2 Regularization**: Weight decay
+- ✅ **L1 Regularization**: Promove esparsidade nos pesos
+- ✅ **L2 Regularization**: Weight decay para pesos menores
 - ✅ **Early Stopping**: Para evitar overfitting
 - ✅ **Weighted Loss**: Para classes desbalanceadas
 
@@ -197,6 +241,12 @@ As técnicas e métricas implementadas são baseadas em:
 2. Huang, G., et al. (2017). "Densely Connected Convolutional Networks"
 3. Powers, D. M. (2011). "Evaluation: from precision, recall and F-measure to ROC"
 4. Strubell, E., et al. (2019). "Energy and Policy Considerations for Deep Learning"
+5. Zhang, H., et al. (2018). "mixup: Beyond Empirical Risk Minimization"
+6. Yun, S., et al. (2019). "CutMix: Regularization Strategy to Train Strong Classifiers"
+7. Smith, L. N., & Topin, N. (2019). "Super-Convergence: Very Fast Training of Neural Networks"
+8. Loshchilov, I., & Hutter, F. (2019). "Decoupled Weight Decay Regularization"
+9. Selvaraju, R. R., et al. (2017). "Grad-CAM: Visual Explanations from Deep Networks"
+10. Chattopadhay, A., et al. (2018). "Grad-CAM++: Generalized Gradient-Based Visual Explanations"
 
 ## 👥 Contribuindo
 
@@ -229,6 +279,6 @@ Desenvolvido no contexto do Laboratório de Educação e Inteligência Artificia
 ---
 
 **Última atualização**: 2024  
-**Versão**: 2.0 (com análise de performance)
+**Versão**: 3.0 (com melhorias avançadas de treinamento)
 
 CLASSIFICAÇÃO DE PELE: https://g.co/gemini/share/6c65af20056b
