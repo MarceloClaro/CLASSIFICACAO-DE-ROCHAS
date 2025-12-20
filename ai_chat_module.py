@@ -255,7 +255,7 @@ IMPORTANTE:
                 error_msg += "   2. O modelo está disponível na sua região\n"
                 error_msg += "   3. Você tem acesso ao modelo com sua API key\n"
                 error_msg += "   Para usar o pacote estável, execute:\n"
-                error_msg += "     pip uninstall google-genai\n"
+                error_msg += "     pip uninstall google-genai -y\n"
                 error_msg += "     pip install google-generativeai\n"
             elif "api key" in str(e).lower() or "401" in str(e):
                 error_msg += "🔑 Verifique se a API key está correta e se você tem créditos disponíveis.\n"
