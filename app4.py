@@ -1210,7 +1210,7 @@ class ReinforcementLearningTrainer:
 
 def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, l1_lambda, patience, optimizer_name='Adam', scheduler_name='None', augmentation_type='standard', label_smoothing=0.1, use_gradient_clipping=True, use_ema=True, use_rl=False, use_crewai=False):
     """
-    Função principal para treinamento do modelo.
+    Função principal para treinamento do modelo com melhorias avançadas.
     
     Args:
         data_dir: Diretório com os dados
@@ -1229,6 +1229,11 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
         optimizer_name: Nome do otimizador (Adam, AdamW, SGD, Ranger, Lion)
         scheduler_name: Nome do scheduler (None, CosineAnnealingLR, OneCycleLR)
         augmentation_type: Tipo de aumento de dados (none, standard, mixup, cutmix)
+        label_smoothing: Suavização de labels (0.0-0.3, padrão 0.1)
+        use_gradient_clipping: Se deve usar gradient clipping
+        use_ema: Se deve usar Exponential Moving Average nos pesos
+        use_rl: Se deve usar Reinforcement Learning para ajuste dinâmico
+        use_crewai: Se deve usar CrewAI para pesquisa de estratégias
     
     Returns:
         tuple: (model, classes) ou None em caso de erro
@@ -1322,15 +1327,38 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     g = torch.Generator()
     g.manual_seed(42)
 
+    # Inicializar agentes inteligentes se habilitados
+    research_agent = None
+    rl_trainer = None
+    
+    if use_crewai:
+        st.write("🤖 **Inicializando Agente CrewAI para pesquisa de estratégias...**")
+        research_agent = TrainingResearchAgent(use_crewai=True)
+        research_results = research_agent.research_training_strategies(model_name, "rock classification")
+        if research_results and 'insights' in research_results:
+            st.info(f"📚 **Insights do Agente:** {research_results['insights']}")
+    
+    if use_rl:
+        st.write("🎯 **Inicializando Reinforcement Learning para ajuste dinâmico...**")
+        rl_trainer = ReinforcementLearningTrainer(initial_lr=learning_rate)
+    
     if use_weighted_loss:
         targets = [full_dataset.targets[i] for i in train_indices]
         class_counts = np.bincount(targets)
         class_counts = class_counts + 1e-6  # Para evitar divisão por zero
         class_weights = 1.0 / class_counts
         class_weights = torch.FloatTensor(class_weights).to(device)
-        criterion = nn.CrossEntropyLoss(weight=class_weights)
+        if label_smoothing > 0:
+            criterion = LabelSmoothingCrossEntropy(smoothing=label_smoothing, weight=class_weights)
+            st.info(f"✨ **Usando Label Smoothing ({label_smoothing}) com pesos de classe**")
+        else:
+            criterion = nn.CrossEntropyLoss(weight=class_weights)
     else:
-        criterion = nn.CrossEntropyLoss()
+        if label_smoothing > 0:
+            criterion = LabelSmoothingCrossEntropy(smoothing=label_smoothing)
+            st.info(f"✨ **Usando Label Smoothing ({label_smoothing})**")
+        else:
+            criterion = nn.CrossEntropyLoss()
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, worker_init_fn=seed_worker, generator=g)
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False, worker_init_fn=seed_worker, generator=g)
@@ -1390,6 +1418,12 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
     
     # Cache de parâmetros para regularização L1 (otimização)
     trainable_params_list = list(filter(lambda p: p.requires_grad, model.parameters())) if l1_lambda > 0 else []
+    
+    # Inicializar EMA se habilitado
+    model_ema = None
+    if use_ema:
+        model_ema = ModelEMA(model, decay=0.999)
+        st.info("📊 **Usando Exponential Moving Average (EMA) para pesos do modelo**")
 
     # Treinamento
     for epoch in range(epochs):
@@ -1432,7 +1466,16 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
                 loss = loss + l1_lambda * l1_reg
             
             loss.backward()
+            
+            # Gradient clipping para estabilizar o treinamento
+            if use_gradient_clipping:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
             optimizer.step()
+            
+            # Atualizar EMA se habilitado
+            if model_ema is not None:
+                model_ema.update()
             
             # Atualizar scheduler OneCycleLR a cada batch
             if scheduler_name == 'OneCycleLR' and scheduler is not None:
@@ -1471,6 +1514,11 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
         st.write(f'**Época {epoch+1}/{epochs}**')
         st.write(f'Perda de Treino: {epoch_loss:.4f} | Acurácia de Treino: {epoch_acc:.4f}')
         st.write(f'Perda de Validação: {valid_epoch_loss:.4f} | Acurácia de Validação: {valid_epoch_acc:.4f}')
+        
+        # Aplicar Reinforcement Learning se habilitado
+        if rl_trainer is not None:
+            rl_result = rl_trainer.step(valid_epoch_loss, valid_epoch_acc.item(), epoch, optimizer)
+            st.write(f"🎯 **RL Action:** {rl_result['action']} | **New LR:** {rl_result['new_lr']:.6f} | **Reward:** {rl_result['reward']:.4f}")
 
         # Atualizar scheduler CosineAnnealingLR após cada época
         if scheduler_name == 'CosineAnnealingLR' and scheduler is not None:
@@ -1490,6 +1538,11 @@ def train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_r
 
     # Carregar os melhores pesos do modelo
     model.load_state_dict(best_model_wts)
+    
+    # Aplicar pesos EMA se habilitado
+    if model_ema is not None:
+        st.info("📊 **Aplicando pesos EMA ao modelo final...**")
+        model_ema.apply_shadow()
 
     # Gráficos de Perda e Acurácia
     plot_metrics(epochs, train_losses, valid_losses, train_accuracies, valid_accuracies)
@@ -2987,7 +3040,9 @@ def main():
         st.sidebar.info("🔷 **CNNs** são excelentes para capturar padrões locais e hierárquicos em imagens através de convoluções.")
     else:
         model_options = ['ViT-B/16', 'ViT-B/32', 'ViT-L/16']
-        st.sidebar.info("🔶 **Vision Transformers** usam mecanismos de atenção para capturar relações globais na imagem. Requerem mais dados mas podem ter melhor desempenho.")
+        if TIMM_AVAILABLE:
+            model_options.extend(['ViT-B/16-timm', 'ViT-L/16-timm', 'Swin-T', 'Swin-B'])
+        st.sidebar.info("🔶 **Vision Transformers** usam mecanismos de atenção para capturar relações globais na imagem. Modelos timm e Swin são mais robustos!")
         st.sidebar.warning("⚠️ ViT requer mais memória GPU. Use batch size menor se necessário.")
     
     model_name = st.sidebar.selectbox("Modelo Pré-treinado:", options=model_options)
@@ -3006,6 +3061,14 @@ def main():
             st.write("**ViT-B/32:** Base model, patches 32x32, ~88M parâmetros. Mais rápido, menos preciso.")
         elif model_name == 'ViT-L/16':
             st.write("**ViT-L/16:** Large model, patches 16x16, ~307M parâmetros. Máxima precisão, requer muitos recursos.")
+        elif model_name == 'ViT-B/16-timm':
+            st.write("**ViT-B/16-timm:** Versão timm do ViT Base. Mais robusto e melhor treinado que a versão torchvision.")
+        elif model_name == 'ViT-L/16-timm':
+            st.write("**ViT-L/16-timm:** Versão timm do ViT Large. Melhor desempenho e robustez.")
+        elif model_name == 'Swin-T':
+            st.write("**Swin-T:** Swin Transformer Tiny, ~28M parâmetros. Arquitetura hierárquica eficiente. Melhor que ViT para muitos casos!")
+        elif model_name == 'Swin-B':
+            st.write("**Swin-B:** Swin Transformer Base, ~88M parâmetros. Excelente performance, arquitetura state-of-the-art.")
 
     #________________________________________________________________________________________
     # Fine-Tuning Completo em Redes Neurais Profundas
@@ -3287,6 +3350,44 @@ def main():
         options=['None', 'CosineAnnealingLR', 'OneCycleLR'],
         index=0,
         help="None: LR constante | CosineAnnealingLR: Reduz LR com coseno | OneCycleLR: Aumenta e depois reduz LR"
+    )
+    
+    # Label Smoothing
+    label_smoothing = st.sidebar.number_input(
+        "Label Smoothing:", 
+        min_value=0.0, 
+        max_value=0.3, 
+        value=0.1, 
+        step=0.05,
+        help="Suaviza os rótulos para prevenir overconfidence. Valores típicos: 0.1-0.2. Melhora generalização especialmente em ViT."
+    )
+    
+    # Gradient Clipping
+    use_gradient_clipping = st.sidebar.checkbox(
+        "Usar Gradient Clipping",
+        value=True,
+        help="Limita a norma dos gradientes para estabilizar o treinamento. ESSENCIAL para Vision Transformers."
+    )
+    
+    # Exponential Moving Average
+    use_ema = st.sidebar.checkbox(
+        "Usar EMA (Exponential Moving Average)",
+        value=True,
+        help="Mantém média móvel dos pesos. Melhora generalização e estabilidade. Recomendado para todos os modelos."
+    )
+    
+    # Reinforcement Learning
+    use_rl = st.sidebar.checkbox(
+        "Usar Reinforcement Learning",
+        value=False,
+        help="Ajusta dinamicamente learning rate usando Q-Learning baseado no desempenho. EXPERIMENTAL mas pode melhorar resultados!"
+    )
+    
+    # CrewAI Research Agent
+    use_crewai = st.sidebar.checkbox(
+        "Usar Agente CrewAI (Pesquisa Web)",
+        value=False,
+        help="Usa agentes inteligentes para buscar estratégias de treinamento na web. Requer API keys. EXPERIMENTAL."
     )
     
     # Tipo de Grad-CAM
@@ -3595,7 +3696,8 @@ def main():
         st.write("Iniciando o treinamento supervisionado...")
         model_data = train_model(data_dir, num_classes, model_name, fine_tune, epochs, learning_rate, 
                                 batch_size, train_split, valid_split, use_weighted_loss, l2_lambda, l1_lambda, 
-                                patience, optimizer_name, scheduler_name, augmentation_type)
+                                patience, optimizer_name, scheduler_name, augmentation_type, 
+                                label_smoothing, use_gradient_clipping, use_ema, use_rl, use_crewai)
 
         if model_data is None:
             st.error("Erro no treinamento do modelo.")
