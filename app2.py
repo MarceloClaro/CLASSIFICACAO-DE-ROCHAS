@@ -104,6 +104,7 @@ def visualize_data(dataset, classes):
         axes[i].set_title(classes[label])
         axes[i].axis('off')
     st.pyplot(fig)
+    plt.close(fig)
 
 def plot_class_distribution(dataset, classes):
     """
@@ -131,6 +132,7 @@ def plot_class_distribution(dataset, classes):
     ax.set_ylabel("Número de Imagens")
     
     st.pyplot(fig)
+    plt.close(fig)
 
 def get_model(model_name, num_classes, dropout_p=0.5, fine_tune=False):
     """
@@ -352,6 +354,7 @@ def plot_metrics(epochs, train_losses, valid_losses, train_accuracies, valid_acc
     ax[1].legend()
 
     st.pyplot(fig)
+    plt.close(fig)
 
 def compute_metrics(model, dataloader, classes):
     """
@@ -388,6 +391,7 @@ def compute_metrics(model, dataloader, classes):
     ax.set_ylabel('Verdadeiro')
     ax.set_title('Matriz de Confusão Normalizada')
     st.pyplot(fig)
+    plt.close(fig)
 
     # Curva ROC
     if len(classes) == 2:
@@ -401,6 +405,7 @@ def compute_metrics(model, dataloader, classes):
         ax.set_title('Curva ROC')
         ax.legend(loc='lower right')
         st.pyplot(fig)
+        plt.close(fig)
     else:
         # Multiclasse
         binarized_labels = label_binarize(all_labels, classes=range(len(classes)))
@@ -441,6 +446,7 @@ def error_analysis(model, dataloader, classes):
             axes[i].set_title(f"V: {classes[misclassified_labels[i]]}\nP: {classes[misclassified_preds[i]]}")
             axes[i].axis('off')
         st.pyplot(fig)
+        plt.close(fig)
     else:
         st.write("Nenhuma imagem mal classificada encontrada.")
 
@@ -526,6 +532,7 @@ def visualize_clusters(features, true_labels, hierarchical_labels, kmeans_labels
 
     # Exibir os gráficos
     st.pyplot(fig)
+    plt.close(fig)
 
 def evaluate_image(model, image, classes):
     """
@@ -608,6 +615,7 @@ def visualize_activations(model, image, class_names):
     
     # Exibir as imagens com o Streamlit
     st.pyplot(fig)
+    plt.close(fig)
 
 
 

@@ -64,6 +64,34 @@ set_seed(42)  # Definir a seed para reprodutibilidade
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
+def denormalize_image(tensor, mean=IMAGENET_MEAN, std=IMAGENET_STD):
+    """
+    Denormaliza um tensor de imagem normalizado com valores ImageNet.
+    
+    Args:
+        tensor: Tensor de imagem (C, H, W) ou array numpy (H, W, C)
+        mean: Média usada na normalização
+        std: Desvio padrão usado na normalização
+    
+    Returns:
+        Array numpy (H, W, C) com valores no intervalo [0, 1]
+    """
+    if isinstance(tensor, torch.Tensor):
+        # Convert tensor to numpy
+        image = tensor.permute(1, 2, 0).cpu().numpy()
+    else:
+        image = tensor
+    
+    # Denormalize
+    mean = np.array(mean)
+    std = np.array(std)
+    image = std * image + mean
+    
+    # Clip to valid range
+    image = np.clip(image, 0, 1)
+    
+    return image
+
 # Enhanced image preprocessing class
 class EnhancedImagePreprocessor:
     """Classe para melhorar o tratamento de imagens antes do treinamento"""
@@ -223,6 +251,7 @@ def visualize_data(dataset, classes):
         axes[i].set_title(classes[label])
         axes[i].axis('off')
     st.pyplot(fig)
+    plt.close(fig)
 
 def plot_class_distribution(dataset, classes, title="Distribuição das Classes"):
     """
@@ -251,6 +280,7 @@ def plot_class_distribution(dataset, classes, title="Distribuição das Classes"
     ax.set_ylabel("Número de Imagens")
     
     st.pyplot(fig)
+    plt.close(fig)
     
     return class_counts
 
@@ -279,13 +309,8 @@ def show_augmented_images(dataset, transform, classes, num_augmentations=5):
         # Mostrar imagens aumentadas
         for i in range(1, num_augmentations + 1):
             augmented_image = transform(original_image)
-            # Desnormalizar para visualização
-            augmented_np = augmented_image.permute(1, 2, 0).numpy()
-            # Reverter normalização ImageNet
-            mean = np.array(IMAGENET_MEAN)
-            std = np.array(IMAGENET_STD)
-            augmented_np = std * augmented_np + mean
-            augmented_np = np.clip(augmented_np, 0, 1)
+            # Desnormalizar para visualização usando a função helper
+            augmented_np = denormalize_image(augmented_image)
             
             axes[i].imshow(augmented_np)
             axes[i].set_title(f'Aumentada {i}')
@@ -293,6 +318,7 @@ def show_augmented_images(dataset, transform, classes, num_augmentations=5):
         
         plt.tight_layout()
         st.pyplot(fig)
+        plt.close(fig)
 
 def calculate_dataset_statistics(dataset, classes):
     """
@@ -387,6 +413,7 @@ def visualize_pca_features(features, labels, classes, n_components=2):
     
     plt.tight_layout()
     st.pyplot(fig)
+    plt.close(fig)
     
     return features_pca, explained_var
 
@@ -757,6 +784,7 @@ def plot_metrics(epochs, train_losses, valid_losses, train_accuracies, valid_acc
     ax[1].legend()
 
     st.pyplot(fig)
+    plt.close(fig)
 
 def compute_metrics(model, dataloader, classes):
     """
@@ -793,6 +821,7 @@ def compute_metrics(model, dataloader, classes):
     ax.set_ylabel('Verdadeiro')
     ax.set_title('Matriz de Confusão Normalizada')
     st.pyplot(fig)
+    plt.close(fig)
 
     # Curva ROC
     if len(classes) == 2:
@@ -806,6 +835,7 @@ def compute_metrics(model, dataloader, classes):
         ax.set_title('Curva ROC')
         ax.legend(loc='lower right')
         st.pyplot(fig)
+        plt.close(fig)
     else:
         # Multiclasse
         binarized_labels = label_binarize(all_labels, classes=range(len(classes)))
@@ -847,11 +877,13 @@ def error_analysis(model, dataloader, classes):
             
         for i in range(num_images):
             image = misclassified_images[i]
-            image = image.permute(1, 2, 0).numpy()
+            # Denormalize the image for proper display
+            image = denormalize_image(image)
             axes[i].imshow(image)
             axes[i].set_title(f"V: {classes[misclassified_labels[i]]}\nP: {classes[misclassified_preds[i]]}")
             axes[i].axis('off')
         st.pyplot(fig)
+        plt.close(fig)
     else:
         st.write("Nenhuma imagem mal classificada encontrada.")
 
@@ -937,6 +969,7 @@ def visualize_clusters(features, true_labels, hierarchical_labels, kmeans_labels
 
     # Exibir os gráficos
     st.pyplot(fig)
+    plt.close(fig)
 
 def evaluate_image(model, image, classes):
     """
@@ -1047,6 +1080,7 @@ def visualize_activations(model, image, class_names, gradcam_type='SmoothGradCAM
         
         # Exibir as imagens com o Streamlit
         st.pyplot(fig)
+        plt.close(fig)
         
         return activation_map_resized
         
