@@ -47,6 +47,13 @@ try:
 except ImportError:
     GROQ_AVAILABLE = False
 
+# Import multi-agent system
+try:
+    from multi_agent_system import ManagerAgent
+    MULTI_AGENT_AVAILABLE = True
+except ImportError:
+    MULTI_AGENT_AVAILABLE = False
+
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -2519,6 +2526,36 @@ def main():
                             st.success("✅ Análise Completa Gerada!")
                             st.write("### 📋 Relatório de Análise com IA")
                             st.markdown(ai_analysis_text)
+                            
+                            # ========== MULTI-AGENT SYSTEM ANALYSIS (15 AGENTS + MANAGER) ==========
+                            if MULTI_AGENT_AVAILABLE:
+                                st.write("---")
+                                st.write("## 🤖 Sistema Multi-Agente (15 Agentes + 1 Gerente)")
+                                
+                                use_multiagent = st.checkbox("Ativar Análise com Sistema Multi-Agente (15 Especialistas)", value=True)
+                                
+                                if use_multiagent:
+                                    with st.spinner("Coordenando análise de 15 agentes especializados + 1 gerente..."):
+                                        try:
+                                            manager = ManagerAgent()
+                                            
+                                            # Preparar contexto
+                                            agent_context = {
+                                                'gradcam_description': gradcam_desc,
+                                                'ai_analysis': ai_analysis_text
+                                            }
+                                            
+                                            multi_agent_report = manager.coordinate_analysis(
+                                                predicted_class=class_name,
+                                                confidence=confidence,
+                                                context=agent_context
+                                            )
+                                            
+                                            st.markdown(multi_agent_report)
+                                            st.success("✅ Análise Multi-Agente Concluída! 15 especialistas + 1 gerente coordenador")
+                                            
+                                        except Exception as e:
+                                            st.error(f"Erro ao gerar análise multi-agente: {str(e)}")
                             
                             # Preparar dados para exportação
                             ai_analysis_result = {

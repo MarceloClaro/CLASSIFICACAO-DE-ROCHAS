@@ -38,6 +38,7 @@ from visualization_3d import visualize_pca_3d, visualize_activation_heatmap_3d, 
 from ai_chat_module import AIAnalyzer, describe_gradcam_regions
 from academic_references import AcademicReferenceFetcher, format_references_for_display
 from genetic_interpreter import GeneticDiagnosticInterpreter
+from multi_agent_system import ManagerAgent
 
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -2090,6 +2091,39 @@ def main():
                                     st.write("---")
                                     st.write("## 📋 Análise Diagnóstica Completa")
                                     st.markdown(analysis)
+                                    
+                                    # ========== MULTI-AGENT SYSTEM ANALYSIS (15 AGENTS + MANAGER) ==========
+                                    st.write("---")
+                                    st.write("## 🤖 Sistema Multi-Agente (15 Agentes + 1 Gerente)")
+                                    
+                                    use_multiagent = st.checkbox("Ativar Análise com Sistema Multi-Agente", value=True)
+                                    
+                                    if use_multiagent:
+                                        with st.spinner("Coordenando análise de 15 agentes especializados..."):
+                                            try:
+                                                manager = ManagerAgent()
+                                                
+                                                # Preparar contexto com informações disponíveis
+                                                agent_context = {
+                                                    'training_stats': training_stats,
+                                                    'statistical_results': statistical_results,
+                                                    'gradcam_description': gradcam_desc,
+                                                    'references': references
+                                                }
+                                                
+                                                multi_agent_report = manager.coordinate_analysis(
+                                                    predicted_class=class_name,
+                                                    confidence=confidence,
+                                                    context=agent_context
+                                                )
+                                                
+                                                st.markdown(multi_agent_report)
+                                                st.success("✅ Análise Multi-Agente Concluída! 15 especialistas + 1 gerente coordenador")
+                                                
+                                            except Exception as e:
+                                                st.error(f"Erro ao gerar análise multi-agente: {str(e)}")
+                                                import traceback
+                                                st.code(traceback.format_exc())
                                     
                                     # ========== GENETIC ALGORITHM MULTI-ANGLE INTERPRETATION ==========
                                     st.write("---")
