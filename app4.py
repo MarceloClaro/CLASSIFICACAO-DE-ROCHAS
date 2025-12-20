@@ -3827,6 +3827,18 @@ def main():
         model, classes, training_history = model_data
         st.success("Treinamento concluído!")
         
+        # Store training history in session state for later use in AI analysis
+        st.session_state['training_history'] = training_history
+        st.session_state['trained_model_name'] = model_name
+        st.session_state['training_config'] = {
+            'epochs': epochs,
+            'learning_rate': learning_rate,
+            'batch_size': batch_size,
+            'optimizer': optimizer_name,
+            'scheduler': scheduler_name,
+            'augmentation': augmentation_type
+        }
+        
         # Adicionar botão de download do CSV com histórico de treinamento
         st.write("---")
         st.write("## 📊 Exportar Resultados de Treinamento")
@@ -4061,6 +4073,22 @@ def main():
                 st.write("---")
                 st.write("## 🤖 Análise Diagnóstica Avançada com IA")
                 
+                st.info("""
+                **💡 Sobre a Análise Diagnóstica com IA:**
+                
+                Esta análise utiliza modelos de linguagem avançados para fornecer:
+                - 📊 Interpretação detalhada dos resultados de classificação
+                - 📚 Correlação com referências acadêmicas (PubMed, arXiv, Semantic Scholar)
+                - 🔬 Análise multi-perspectiva baseada em algoritmos genéticos
+                - 🎯 Recomendações e diagnósticos diferenciais
+                
+                **Fluxo de Análise:**
+                1. Configuração da API (Gemini ou Groq)
+                2. Busca de referências acadêmicas automáticas
+                3. Geração de análise diagnóstica completa
+                4. (Opcional) Análise multi-perspectiva com algoritmos genéticos
+                """)
+                
                 enable_ai_analysis = st.checkbox(
                     "Ativar Análise Diagnóstica Completa com IA", 
                     value=False,
@@ -4100,44 +4128,79 @@ def main():
                         if st.button("🔬 Gerar Análise Diagnóstica Completa"):
                             with st.spinner("Gerando análise diagnóstica aprofundada..."):
                                 try:
-                                    # Fetch academic references
-                                    st.write("📚 Buscando referências acadêmicas...")
-                                    references = []
-                                    if ACADEMIC_REF_AVAILABLE:
-                                        try:
-                                            ref_fetcher = AcademicReferenceFetcher()
-                                            references = ref_fetcher.get_references_for_classification(
-                                                class_name=class_name,
-                                                domain="image classification",
-                                                max_per_source=3
-                                            )
-                                            
-                                            if references:
-                                                with st.expander("📚 Referências Acadêmicas Encontradas"):
-                                                    st.markdown(format_references_for_display(references))
-                                        except Exception as e:
-                                            st.warning(f"⚠️ Não foi possível buscar referências: {str(e)}")
+                                    # Fetch academic references with improved status
+                                    with st.status("📚 Buscando referências acadêmicas...", expanded=True) as status:
+                                        references = []
+                                        if ACADEMIC_REF_AVAILABLE:
+                                            try:
+                                                st.write("🔍 Consultando bases de dados científicas...")
+                                                ref_fetcher = AcademicReferenceFetcher()
+                                                references = ref_fetcher.get_references_for_classification(
+                                                    class_name=class_name,
+                                                    domain="image classification",
+                                                    max_per_source=3
+                                                )
+                                                
+                                                if references:
+                                                    status.update(label=f"📚 {len(references)} referências encontradas!", state="complete")
+                                                    with st.expander("📚 Referências Acadêmicas Encontradas", expanded=True):
+                                                        st.markdown(format_references_for_display(references))
+                                                else:
+                                                    status.update(label="📚 Nenhuma referência encontrada", state="complete")
+                                                    st.info("ℹ️ Continuando análise sem referências acadêmicas externas")
+                                            except Exception as e:
+                                                status.update(label="⚠️ Erro ao buscar referências", state="error")
+                                                st.warning(f"⚠️ Não foi possível buscar referências: {str(e)}")
+                                        else:
+                                            status.update(label="⚠️ Módulo de referências não disponível", state="complete")
+                                            st.info("ℹ️ Continuando análise sem referências acadêmicas externas")
                                     
                                     # Generate Grad-CAM description
                                     gradcam_desc = ""
                                     if activation_map is not None:
                                         gradcam_desc = describe_gradcam_regions(activation_map)
                                     
-                                    # Collect training statistics
+                                    # Collect training statistics with more details
                                     training_stats = {
                                         "Épocas Treinadas": epochs,
                                         "Taxa de Aprendizagem": learning_rate,
                                         "Batch Size": batch_size,
                                         "Modelo": model_name,
                                         "Tipo de Augmentação": augmentation_type,
-                                        "Otimizador": optimizer_name
+                                        "Otimizador": optimizer_name,
+                                        "Scheduler": scheduler_name if scheduler_name != 'None' else 'Não utilizado'
                                     }
                                     
-                                    # Collect statistical results
+                                    # Collect statistical results from training history if available
                                     statistical_results = {
-                                        "Informação": "Métricas baseadas no treinamento realizado",
-                                        "Nota": "Para análise completa, avalie em conjunto de teste separado"
+                                        "Tipo de Análise": "Métricas baseadas no treinamento realizado"
                                     }
+                                    
+                                    if 'training_history' in st.session_state:
+                                        hist = st.session_state['training_history']
+                                        # Calculate final and best metrics
+                                        if 'valid_accuracy' in hist and len(hist['valid_accuracy']) > 0:
+                                            statistical_results["Acurácia Final (Validação)"] = f"{hist['valid_accuracy'][-1]:.4f}"
+                                            statistical_results["Melhor Acurácia (Validação)"] = f"{max(hist['valid_accuracy']):.4f}"
+                                        if 'train_accuracy' in hist and len(hist['train_accuracy']) > 0:
+                                            statistical_results["Acurácia Final (Treino)"] = f"{hist['train_accuracy'][-1]:.4f}"
+                                        if 'valid_loss' in hist and len(hist['valid_loss']) > 0:
+                                            statistical_results["Loss Final (Validação)"] = f"{hist['valid_loss'][-1]:.4f}"
+                                            statistical_results["Melhor Loss (Validação)"] = f"{min(hist['valid_loss']):.4f}"
+                                        if 'train_loss' in hist and len(hist['train_loss']) > 0:
+                                            statistical_results["Loss Final (Treino)"] = f"{hist['train_loss'][-1]:.4f}"
+                                        
+                                        # Calculate convergence metrics
+                                        if 'valid_accuracy' in hist and len(hist['valid_accuracy']) > 1:
+                                            last_5_acc = hist['valid_accuracy'][-5:]
+                                            acc_variance = np.var(last_5_acc) if len(last_5_acc) > 1 else 0
+                                            statistical_results["Estabilidade da Convergência"] = "Alta" if acc_variance < 0.001 else "Média" if acc_variance < 0.01 else "Baixa"
+                                    else:
+                                        statistical_results["Nota"] = "Para análise completa, avalie em conjunto de teste separado"
+                                    
+                                    # Add confidence-specific metrics
+                                    statistical_results["Confiança da Predição Atual"] = f"{confidence:.4f} ({confidence*100:.2f}%)"
+                                    statistical_results["Nível de Certeza"] = "Alto" if confidence > 0.9 else "Médio" if confidence > 0.7 else "Baixo"
                                     
                                     # Initialize AI analyzer
                                     ai_analyzer = AIAnalyzer(
