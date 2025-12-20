@@ -135,6 +135,55 @@ except ImportError:
 # Constants
 CONVERGENCE_CHECK_EPOCHS = 5  # Number of recent epochs to check for convergence stability
 
+# Valid model lists
+VALID_GEMINI_MODELS = [
+    'gemini-1.5-pro-latest',
+    'gemini-1.5-flash-latest', 
+    'gemini-1.0-pro-latest',
+    'gemini-pro',
+    'gemini-1.0-pro-vision-latest'
+]
+
+VALID_GROQ_MODELS = [
+    'meta-llama/llama-4-scout-17b-16e-instruct',
+    'meta-llama/llama-4-maverick-17b-128e-instruct',
+    'mixtral-8x7b-32768',
+    'llama-3.1-70b-versatile',
+    'llama-3.1-8b-instant'
+]
+
+def validate_model_name(model_name, provider):
+    """
+    Validate and sanitize model name to ensure deprecated models are not used.
+    
+    Args:
+        model_name: The model name from session state or user input
+        provider: The AI provider ('Gemini' or 'Groq')
+    
+    Returns:
+        str: Valid model name or default model for the provider
+    """
+    if not model_name:
+        # Return default model if none specified
+        return 'gemini-1.5-pro-latest' if provider == 'Gemini' else 'mixtral-8x7b-32768'
+    
+    # Check if model is in valid list
+    if provider == 'Gemini':
+        if model_name in VALID_GEMINI_MODELS:
+            return model_name
+        else:
+            # Model is deprecated or invalid, return default
+            return 'gemini-1.5-pro-latest'
+    elif provider == 'Groq':
+        if model_name in VALID_GROQ_MODELS:
+            return model_name
+        else:
+            # Model is invalid, return default
+            return 'mixtral-8x7b-32768'
+    else:
+        # Unknown provider, return the model as-is
+        return model_name
+
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -4260,7 +4309,9 @@ def main():
                                                 if 'api_configured' in st.session_state and st.session_state['api_configured']:
                                                     ai_provider = st.session_state.get('api_provider')
                                                     ai_api_key = st.session_state.get('api_key')
-                                                    ai_model = st.session_state.get('api_model')
+                                                    ai_model_raw = st.session_state.get('api_model')
+                                                    # Validate and sanitize model name
+                                                    ai_model = validate_model_name(ai_model_raw, ai_provider)
                                                 
                                                 # Initialize fetcher with AI capabilities
                                                 ref_fetcher = AcademicReferenceFetcher(
@@ -4410,7 +4461,9 @@ def main():
                 if 'api_configured' in st.session_state and st.session_state['api_configured']:
                     st.write("---")
                     st.write("## 🤖 Análise Diagnóstica com IA (Visão Computacional)")
-                    st.write(f"**API Configurada:** {st.session_state['api_provider']} - {st.session_state['api_model']}")
+                    # Display validated model name
+                    validated_model = validate_model_name(st.session_state.get('api_model'), st.session_state.get('api_provider'))
+                    st.write(f"**API Configurada:** {st.session_state['api_provider']} - {validated_model}")
                     
                     # Info about multi-image analysis
                     if gradcam_image is not None:
@@ -4430,16 +4483,21 @@ def main():
                             # Gerar descrição do Grad-CAM
                             gradcam_desc = generate_gradcam_description(activation_map) if activation_map is not None else ""
                             
+                            # Validate and sanitize model name
+                            api_provider = st.session_state['api_provider']
+                            api_model = validate_model_name(st.session_state['api_model'], api_provider)
+                            api_key = st.session_state['api_key']
+                            
                             # Executar análise com IA apropriada
-                            if st.session_state['api_provider'] == 'Gemini':
+                            if api_provider == 'Gemini':
                                 if not GEMINI_AVAILABLE:
                                     st.error("❌ Google Generative AI não está instalado. Execute: pip install google-generativeai")
                                     ai_analysis_text = "Erro: Biblioteca não disponível"
                                 else:
                                     ai_analysis_text = analyze_image_with_gemini(
                                         eval_image,
-                                        st.session_state['api_key'],
-                                        st.session_state['api_model'],
+                                        api_key,
+                                        api_model,
                                         class_name,
                                         confidence,
                                         gradcam_desc,
@@ -4452,8 +4510,8 @@ def main():
                                 else:
                                     ai_analysis_text = analyze_image_with_groq_vision(
                                         eval_image,
-                                        st.session_state['api_key'],
-                                        st.session_state['api_model'],
+                                        api_key,
+                                        api_model,
                                         class_name,
                                         confidence,
                                         gradcam_desc
@@ -4516,8 +4574,8 @@ def main():
                                 'imagem': eval_image_file.name,
                                 'classe_predita': class_name,
                                 'confianca': confidence,
-                                'api_provider': st.session_state['api_provider'],
-                                'api_model': st.session_state['api_model'],
+                                'api_provider': api_provider,
+                                'api_model': api_model,
                                 'gradcam_description': gradcam_desc,
                                 'analise_completa': ai_analysis_text,
                                 'modelo_classificacao': model_name,
