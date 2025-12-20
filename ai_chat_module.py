@@ -223,7 +223,22 @@ IMPORTANTE:
             else:
                 return "Provider not supported"
         except Exception as e:
-            return f"Error generating analysis: {str(e)}"
+            error_msg = f"Erro ao gerar análise com IA: {str(e)}\n\n"
+            
+            # Provide helpful guidance based on error type
+            if "configure" in str(e).lower():
+                error_msg += "💡 Dica: Parece que há um problema de configuração da API.\n"
+                error_msg += "   Tente reinstalar o pacote: pip install --upgrade google-generativeai\n"
+            elif "api key" in str(e).lower() or "401" in str(e):
+                error_msg += "🔑 Verifique se a API key está correta e se você tem créditos disponíveis.\n"
+                error_msg += "   Para Gemini: https://ai.google.dev/\n"
+                error_msg += "   Para Groq: https://console.groq.com/\n"
+            elif "quota" in str(e).lower() or "rate limit" in str(e).lower():
+                error_msg += "⏱️ Limite de requisições atingido. Aguarde alguns minutos antes de tentar novamente.\n"
+            else:
+                error_msg += "📖 Consulte o guia de configuração: API_SETUP_GUIDE.md\n"
+            
+            return error_msg
     
     def generate_comprehensive_analysis(
         self,

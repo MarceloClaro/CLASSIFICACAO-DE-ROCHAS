@@ -1914,7 +1914,21 @@ def analyze_image_with_gemini(image, api_key, model_name, class_name, confidence
             return response.text
     
     except Exception as e:
-        return f"Erro ao analisar com Gemini: {str(e)}"
+        error_msg = f"Erro ao analisar com Gemini: {str(e)}\n\n"
+        
+        # Provide helpful guidance based on error type
+        if "configure" in str(e).lower():
+            error_msg += "💡 Dica: Parece que há um problema de configuração da API.\n"
+            error_msg += "   Este erro foi corrigido! Tente reinstalar: pip install --upgrade google-generativeai\n"
+        elif "api key" in str(e).lower() or "401" in str(e):
+            error_msg += "🔑 Verifique se a API key está correta e se você tem créditos disponíveis.\n"
+            error_msg += "   Obtenha sua API key em: https://ai.google.dev/\n"
+        elif "quota" in str(e).lower() or "rate limit" in str(e).lower():
+            error_msg += "⏱️ Limite de requisições atingido. Aguarde alguns minutos.\n"
+        else:
+            error_msg += "📖 Consulte o guia: API_SETUP_GUIDE.md para mais detalhes.\n"
+        
+        return error_msg
 
 def analyze_image_with_groq_vision(image, api_key, model_name, class_name, confidence, gradcam_description=""):
     """
