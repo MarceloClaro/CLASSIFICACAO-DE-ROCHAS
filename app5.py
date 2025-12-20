@@ -2213,7 +2213,14 @@ def main():
                                 try:
                                     # Fetch academic references
                                     st.write("📚 Buscando referências acadêmicas...")
-                                    ref_fetcher = AcademicReferenceFetcher()
+                                    
+                                    # Initialize fetcher with AI capabilities
+                                    ref_fetcher = AcademicReferenceFetcher(
+                                        ai_provider=api_provider,
+                                        ai_api_key=api_key,
+                                        ai_model=ai_model
+                                    )
+                                    
                                     references = ref_fetcher.get_references_for_classification(
                                         class_name=class_name,
                                         domain="image classification",
@@ -2221,6 +2228,10 @@ def main():
                                     )
                                     
                                     if references:
+                                        # Enrich references with translations and critical reviews
+                                        st.write("🌐 Traduzindo resumos e gerando resenhas críticas...")
+                                        references = ref_fetcher.enrich_references_with_analysis(references)
+                                        
                                         with st.expander("📚 Referências Acadêmicas Encontradas"):
                                             st.markdown(format_references_for_display(references))
                                     
@@ -2320,7 +2331,8 @@ def main():
                                                 
                                                 multi_angle_report = genetic_interpreter.generate_multi_angle_report(
                                                     predicted_class=class_name,
-                                                    confidence=confidence
+                                                    confidence=confidence,
+                                                    academic_references=references if references else None
                                                 )
                                                 
                                                 st.markdown(multi_angle_report)

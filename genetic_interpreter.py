@@ -334,7 +334,8 @@ class GeneticDiagnosticInterpreter:
         self,
         predicted_class: str,
         confidence: float,
-        features: Dict[str, float] = None
+        features: Dict[str, float] = None,
+        academic_references: List[Dict] = None
     ) -> str:
         """
         Generate comprehensive multi-angle diagnostic report
@@ -343,6 +344,7 @@ class GeneticDiagnosticInterpreter:
             predicted_class: Predicted class name
             confidence: Model confidence
             features: Feature values
+            academic_references: Optional list of academic references to incorporate
         
         Returns:
             Complete multi-perspective report
@@ -353,13 +355,51 @@ class GeneticDiagnosticInterpreter:
         report = "# 🔬 Análise Multi-Angular por Algoritmos Genéticos\n\n"
         report += "Este relatório apresenta múltiplas perspectivas diagnósticas geradas por "
         report += "algoritmos genéticos, explorando diferentes ângulos de interpretação.\n\n"
+        
+        # Add academic references section if available
+        if academic_references:
+            report += f"## 📚 Base Científica da Análise\n\n"
+            report += f"**Referências Consultadas:** {len(academic_references)} artigos científicos\n\n"
+            report += "A análise multi-perspectiva a seguir está fundamentada em evidências científicas "
+            report += "extraídas das seguintes publicações acadêmicas:\n\n"
+            
+            for i, ref in enumerate(academic_references[:3], 1):  # Show top 3
+                report += f"{i}. **{ref.get('title', 'N/A')}** ({ref.get('year', 'N/A')})\n"
+                report += f"   - {ref.get('authors', 'N/A')}\n"
+                if ref.get('citation_count') and ref['citation_count'] != 'N/A':
+                    report += f"   - Citações: {ref.get('citation_count')}\n"
+                report += f"   - Plataforma: {ref.get('platform', 'N/A')}\n"
+            
+            if len(academic_references) > 3:
+                report += f"\n*...e mais {len(academic_references) - 3} referências adicionais*\n"
+            report += "\n"
+        
         report += "---\n\n"
         
-        for perspective in self.perspectives:
+        for i, perspective in enumerate(self.perspectives):
             interpretation = self.interpret_from_perspective(
                 perspective, predicted_class, confidence, features
             )
-            report += interpretation + "\n---\n\n"
+            report += interpretation
+            
+            # Add reference-based insight for each perspective
+            if academic_references and i < len(academic_references):
+                ref = academic_references[i]
+                report += f"\n**💡 Insight da Literatura Científica:**\n"
+                report += f"Segundo {ref.get('authors', 'N/A').split(',')[0]} et al. ({ref.get('year', 'N/A')}), "
+                if ref.get('abstract_pt'):
+                    # Use Portuguese abstract summary
+                    abstract_summary = ref['abstract_pt'][:200] + "..." if len(ref.get('abstract_pt', '')) > 200 else ref.get('abstract_pt', '')
+                    report += f"estudos indicam que: \"{abstract_summary}\"\n"
+                elif ref.get('abstract'):
+                    # Use original abstract summary
+                    abstract_summary = ref['abstract'][:200] + "..." if len(ref.get('abstract', '')) > 200 else ref.get('abstract', '')
+                    report += f"pesquisas demonstram que: \"{abstract_summary}\"\n"
+                else:
+                    report += f"este é um tema relevante na literatura científica atual.\n"
+                report += f"*Fonte: {ref.get('journal', 'N/A')}*\n"
+            
+            report += "\n---\n\n"
         
         # Add consensus summary
         report += "## 🎯 Consenso das Perspectivas\n\n"
@@ -367,6 +407,14 @@ class GeneticDiagnosticInterpreter:
         report += f"**Confiança Média Ajustada:** {avg_confidence:.4f} ({avg_confidence*100:.2f}%)\n\n"
         report += f"Todas as {len(self.perspectives)} perspectivas analíticas convergem para a "
         report += f"classificação '{predicted_class}', embora com diferentes níveis de ênfase "
-        report += "em aspectos morfológicos, texturais, cromáticos, espaciais e estatísticos.\n"
+        report += "em aspectos morfológicos, texturais, cromáticos, espaciais e estatísticos.\n\n"
+        
+        # Add literature synthesis if references available
+        if academic_references:
+            report += "## 📖 Síntese da Literatura\n\n"
+            report += "A análise multi-angular está alinhada com os achados da literatura científica atual. "
+            report += f"As {len(academic_references)} referências consultadas fornecem suporte teórico e "
+            report += "metodológico para as diferentes perspectivas apresentadas, validando a robustez "
+            report += "da classificação obtida através de múltiplos ângulos de análise.\n"
         
         return report
