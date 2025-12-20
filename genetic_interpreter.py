@@ -93,7 +93,8 @@ class GeneticDiagnosticInterpreter:
             normalized = [w/total for w in weights[:5]]
             normalized.append(weights[5])  # Keep confidence modifier as is
             return normalized
-        return weights
+        # If total is 0, return equal weights
+        return [0.2, 0.2, 0.2, 0.2, 0.2, weights[5]]
     
     def _fitness_function(self, individual: List[float], confidence: float, 
                          feature_importance: Dict[str, float]) -> Tuple[float]:
@@ -270,18 +271,19 @@ class GeneticDiagnosticInterpreter:
             perspective: The diagnostic perspective to use
             predicted_class: Predicted class name
             confidence: Model confidence
-            features: Feature values
+            features: Feature values (if None, uses qualitative description)
         
         Returns:
             Textual interpretation from this perspective
         """
+        # Use qualitative descriptions instead of random values
         if features is None:
             features = {
-                'morphology': random.uniform(0.5, 1.0),
-                'texture': random.uniform(0.5, 1.0),
-                'color': random.uniform(0.5, 1.0),
-                'spatial': random.uniform(0.5, 1.0),
-                'statistical': random.uniform(0.5, 1.0)
+                'morphology': perspective.weight_morphology,
+                'texture': perspective.weight_texture,
+                'color': perspective.weight_color,
+                'spatial': perspective.weight_spatial,
+                'statistical': perspective.weight_statistical
             }
         
         # Calculate adjusted confidence

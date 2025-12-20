@@ -187,16 +187,10 @@ def visualize_feature_importance_3d(
     dy = np.ones(n_features) * 0.8
     dz = np.array(importances)
     
-    # Create 3D bar chart
-    fig = go.Figure(data=[go.Mesh3d(
-        x=[],
-        y=[],
-        z=[],
-        opacity=0.8,
-        color='lightblue'
-    )])
+    # Create 3D bar chart - start with traces directly
+    fig = go.Figure()
     
-    # Add bars manually
+    # Add bars
     colors = px.colors.sequential.Viridis
     for i in range(n_features):
         fig.add_trace(go.Mesh3d(

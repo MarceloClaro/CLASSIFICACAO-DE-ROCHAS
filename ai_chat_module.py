@@ -227,7 +227,7 @@ def describe_gradcam_regions(gradcam_array: np.ndarray, threshold: float = 0.5) 
     Analyze Grad-CAM heatmap and generate textual description
     
     Args:
-        gradcam_array: Grad-CAM activation map
+        gradcam_array: Grad-CAM activation map (must be 2D numpy array)
         threshold: Threshold for significant activations
     
     Returns:
@@ -235,6 +235,13 @@ def describe_gradcam_regions(gradcam_array: np.ndarray, threshold: float = 0.5) 
     """
     if gradcam_array is None:
         return "Grad-CAM não disponível"
+    
+    # Validate input
+    if not isinstance(gradcam_array, np.ndarray):
+        return "Grad-CAM: formato de dados inválido"
+    
+    if len(gradcam_array.shape) != 2:
+        return "Grad-CAM: esperado array 2D, recebido formato diferente"
     
     # Normalize to 0-1
     if gradcam_array.max() > 0:

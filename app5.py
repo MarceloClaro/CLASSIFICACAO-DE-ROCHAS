@@ -2059,12 +2059,13 @@ def main():
                                         "Otimizador": optimizer_name
                                     }
                                     
-                                    # Collect statistical results (mock for now, would come from actual analysis)
+                                    # Collect statistical results
+                                    # Note: These are placeholder values. In a production system,
+                                    # these should be computed from actual test set evaluation.
+                                    # TODO: Integrate with actual test metrics from trained model
                                     statistical_results = {
-                                        "Acurácia de Teste": 0.95,  # Would be actual value
-                                        "Precisão": 0.94,
-                                        "Recall": 0.93,
-                                        "F1-Score": 0.935
+                                        "Informação": "Métricas baseadas no treinamento realizado",
+                                        "Nota": "Para análise completa, avalie em conjunto de teste separado"
                                     }
                                     
                                     # Initialize AI analyzer

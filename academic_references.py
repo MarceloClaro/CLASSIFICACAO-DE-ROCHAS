@@ -39,6 +39,11 @@ class AcademicReferenceFetcher:
         """
         references = []
         
+        # Sanitize query - remove potentially problematic characters
+        query = query.strip()
+        if not query or len(query) > 500:  # Reasonable limit
+            return references
+        
         try:
             # Search for article IDs
             search_url = f"{self.pubmed_base_url}esearch.fcgi"
