@@ -16,44 +16,44 @@
 
 ---
 
-## 🎯 Overview
+## 🎯 Visão Geral
 
-**DiagnostiCAI** is an enterprise-grade AI diagnostic platform combining state-of-the-art deep learning with industry-first statistical validation. Built to Qualis A1 academic standards and FDA regulatory requirements, it delivers actionable insights with quantified uncertainty for high-stakes applications.
+**DiagnostiCAI** é uma plataforma de diagnóstico de IA de nível empresarial combinando deep learning de ponta com validação estatística pioneira na indústria. Construída com padrões acadêmicos Qualis A1 e requisitos regulatórios FDA, entrega insights acionáveis com incerteza quantificada para aplicações de alto risco.
 
-### Executive Summary: For Investors & Academic Review
+### Sumário Executivo: Para Investidores e Revisão Acadêmica
 
-**Market Opportunity**:
-- $12B addressable market for validated AI diagnostics (35.8% CAGR through 2032)
-- FDA Digital Health Pre-Cert pathway reduces time-to-market by 6-12 months
-- Premium pricing (3-5x vs basic tools) justified by regulatory-grade validation
+**Oportunidade de Mercado**:
+- Mercado endereçável de $12B para diagnósticos de IA validados (CAGR 35,8% até 2032)
+- Caminho FDA Digital Health Pre-Cert reduz tempo de entrada no mercado em 6-12 meses
+- Precificação premium (3-5x vs ferramentas básicas) justificada por validação de grau regulatório
 
-**Competitive Moat**:
-- ✅ **Industry-First**: Only platform with comprehensive 10-component statistical framework
-- ✅ **Regulatory Ready**: FDA 21 CFR 820, ISO 13485, EU AI Act compliant
-- ✅ **Risk Quantification**: Reduces liability exposure 40-60% through explicit error probabilities
-- ✅ **Academic Rigor**: Nature/Science-grade methodology, 15+ peer-reviewed methods
+**Fosso Competitivo**:
+- ✅ **Pioneiro na Indústria**: Única plataforma com framework estatístico abrangente de 10 componentes
+- ✅ **Pronto para Regulação**: Compatível com FDA 21 CFR 820, ISO 13485, EU AI Act
+- ✅ **Quantificação de Risco**: Reduz exposição de responsabilidade em 40-60% através de probabilidades de erro explícitas
+- ✅ **Rigor Acadêmico**: Metodologia grau Nature/Science, 15+ métodos revisados por pares
 
-**Performance Metrics** (Validated):
-- **Accuracy**: 94.5% [93.8%, 95.2% 95% CI] - statistically superior (p<0.001)  
-- **Speed**: 18ms inference, 54 samples/sec - real-time capable
-- **Uncertainty Reduction**: 85% via Bayesian decomposition + 200-iteration bootstrap
-- **Expert Agreement**: κ=0.84 (substantial), IoU=0.87 on activation maps
+**Métricas de Desempenho** (Validadas):
+- **Acurácia**: 94,5% [93,8%, 95,2% IC 95%] - estatisticamente superior (p<0,001)  
+- **Velocidade**: 18ms inferência, 54 amostras/seg - capaz de tempo real
+- **Redução de Incerteza**: 85% via decomposição Bayesiana + bootstrap de 200 iterações
+- **Concordância com Especialistas**: κ=0,84 (substancial), IoU=0,87 em mapas de ativação
 
-**ROI for Enterprises**:
-- $156K net annual benefit per deployment (typical enterprise)
-- 75% reduction in manual validation time  
-- 45% reduction in diagnostic errors ($2.4M avoided costs per 1,000 patients)
-- Payback period: 1.6 months
+**ROI para Empresas**:
+- $156K benefício líquido anual por implantação (empresa típica)
+- 75% redução no tempo de validação manual  
+- 45% redução em erros diagnósticos ($2,4M custos evitados por 1.000 pacientes)
+- Período de payback: 1,6 meses
 
-**Academic Impact**:
-- Dissertation-ready methodology chapters
-- High-impact journal submission standards (JMLR, Nature Methods, IEEE TPAMI)
-- Complete reproducibility (open-source, documented algorithms)
-- 38,000+ combined citations for underlying methods
+**Impacto Acadêmico**:
+- Capítulos de metodologia prontos para dissertação
+- Padrões de submissão para periódicos de alto impacto (JMLR, Nature Methods, IEEE TPAMI)
+- Reprodutibilidade completa (open-source, algoritmos documentados)
+- 38.000+ citações combinadas para métodos subjacentes
 
 ---
 
-### Why DiagnostiCAI?
+### Por Que DiagnostiCAI?
 
 🏥 **Clinical Excellence**: >94% accuracy with full explainability for medical applications  
 ⚡ **Enterprise Performance**: 18ms inference time, 54 samples/second throughput  
