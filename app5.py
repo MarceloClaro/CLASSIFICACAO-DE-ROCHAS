@@ -3,6 +3,7 @@ import zipfile
 import shutil
 import tempfile
 import random
+import traceback
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -46,6 +47,10 @@ from ai_chat_module import AIAnalyzer, describe_gradcam_regions
 from academic_references import AcademicReferenceFetcher, format_references_for_display
 from genetic_interpreter import GeneticDiagnosticInterpreter
 from multi_agent_system import ManagerAgent
+from statistical_analysis import (
+    StatisticalAnalyzer, DiagnosticAnalyzer, UncertaintyAnalyzer,
+    evaluate_image_with_statistics, format_statistical_report
+)
 
 # Definir o dispositivo (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -2160,6 +2165,178 @@ def main():
                 # Visualizar ativações com o tipo de Grad-CAM selecionado
                 activation_map = visualize_activations(model, eval_image, classes, gradcam_type)
                 
+                # ========== STATISTICAL ANALYSIS ==========
+                st.write("---")
+                st.write("## 📊 Análise Estatística Avançada")
+                
+                enable_stats = st.checkbox(
+                    "Ativar Análise Estatística Completa", 
+                    value=True,
+                    help="Inclui intervalos de confiança, testes de significância, bootstrap, análise de incerteza e mais"
+                )
+                
+                if enable_stats:
+                    # Configurações de análise estatística
+                    with st.expander("⚙️ Configurações da Análise Estatística"):
+                        n_bootstrap = st.slider(
+                            "Número de Iterações Bootstrap:",
+                            min_value=50,
+                            max_value=500,
+                            value=100,
+                            step=50,
+                            help="Mais iterações = análise mais precisa, mas mais lenta"
+                        )
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            min_acceptable = st.slider(
+                                "Confiança Mínima Aceitável:",
+                                min_value=0.5,
+                                max_value=0.9,
+                                value=0.7,
+                                step=0.05
+                            )
+                        with col2:
+                            target_confidence = st.slider(
+                                "Confiança Alvo:",
+                                min_value=0.7,
+                                max_value=0.99,
+                                value=0.9,
+                                step=0.05
+                            )
+                    
+                    if st.button("🔬 Executar Análise Estatística Completa"):
+                        with st.spinner("Executando análise estatística avançada..."):
+                            try:
+                                # Perform comprehensive statistical analysis
+                                statistical_results = evaluate_image_with_statistics(
+                                    model=model,
+                                    image=eval_image,
+                                    classes=classes,
+                                    device=device,
+                                    n_bootstrap=n_bootstrap
+                                )
+                                
+                                # Update safety analysis with custom thresholds
+                                uncertainty_analyzer = UncertaintyAnalyzer()
+                                statistical_results['safety_analysis'] = uncertainty_analyzer.safety_margin(
+                                    statistical_results['bootstrap_results']['confidence_bootstrap'],
+                                    min_acceptable=min_acceptable,
+                                    target=target_confidence
+                                )
+                                
+                                # Add activation map analysis if available
+                                if activation_map is not None:
+                                    diagnostic_analyzer = DiagnosticAnalyzer()
+                                    distinctive_features = diagnostic_analyzer.distinctive_features(
+                                        activation_map,
+                                        threshold_percentile=75
+                                    )
+                                    statistical_results['distinctive_features'] = distinctive_features
+                                
+                                # Format and display the report
+                                report = format_statistical_report(statistical_results, classes)
+                                st.markdown(report)
+                                
+                                # Add visualizations
+                                st.write("### 📈 Visualizações Estatísticas")
+                                
+                                # Bootstrap distribution plot
+                                col1, col2 = st.columns(2)
+                                
+                                with col1:
+                                    st.write("#### Distribuição Bootstrap - Top 3 Classes")
+                                    fig, ax = plt.subplots(figsize=(10, 6))
+                                    
+                                    # Create mapping for efficient lookups
+                                    class_to_idx = {cls: idx for idx, cls in enumerate(classes)}
+                                    
+                                    for i, diag in enumerate(statistical_results['differential_diagnoses'][:3]):
+                                        class_name_diag = diag['class']
+                                        idx = class_to_idx[class_name_diag]
+                                        bootstrap_dist = statistical_results['bootstrap_results']['predictions_distribution'][:, idx]
+                                        ax.hist(bootstrap_dist, bins=30, alpha=0.5, label=class_name_diag)
+                                    
+                                    ax.set_xlabel('Probabilidade')
+                                    ax.set_ylabel('Frequência')
+                                    ax.set_title('Distribuição de Probabilidades (Bootstrap)')
+                                    ax.legend()
+                                    ax.grid(True, alpha=0.3)
+                                    st.pyplot(fig)
+                                    plt.close(fig)
+                                
+                                with col2:
+                                    st.write("#### Intervalos de Confiança")
+                                    fig, ax = plt.subplots(figsize=(10, 6))
+                                    
+                                    class_names_ci = []
+                                    means_ci = []
+                                    errors_ci = []
+                                    
+                                    for class_name_ci, ci in statistical_results['confidence_intervals'].items():
+                                        class_names_ci.append(class_name_ci)
+                                        means_ci.append(ci['mean'])
+                                        errors_ci.append(ci['margin_error'])
+                                    
+                                    y_pos = np.arange(len(class_names_ci))
+                                    ax.barh(y_pos, means_ci, xerr=errors_ci, alpha=0.7, capsize=5)
+                                    ax.set_yticks(y_pos)
+                                    ax.set_yticklabels(class_names_ci)
+                                    ax.set_xlabel('Probabilidade')
+                                    ax.set_title('Intervalos de Confiança (95%)')
+                                    ax.grid(True, alpha=0.3, axis='x')
+                                    st.pyplot(fig)
+                                    plt.close(fig)
+                                
+                                # Uncertainty breakdown
+                                st.write("#### Decomposição da Incerteza")
+                                uncertainty_data = statistical_results['uncertainty_analysis']
+                                
+                                col1, col2, col3 = st.columns(3)
+                                with col1:
+                                    st.metric(
+                                        "Variação do Modelo",
+                                        f"{uncertainty_data['sources']['model_variation']:.4f}"
+                                    )
+                                with col2:
+                                    st.metric(
+                                        "Ambiguidade da Predição",
+                                        f"{uncertainty_data['sources']['prediction_ambiguity']:.4f}"
+                                    )
+                                with col3:
+                                    st.metric(
+                                        "Nível de Incerteza",
+                                        uncertainty_data['uncertainty_level']
+                                    )
+                                
+                                # Safety margin visualization
+                                st.write("#### Margem de Segurança")
+                                safety = statistical_results['safety_analysis']
+                                
+                                fig, ax = plt.subplots(figsize=(10, 3))
+                                
+                                # Create horizontal bar showing confidence vs thresholds
+                                ax.barh([0], [safety['confidence']], color='green', alpha=0.7, label='Confiança Atual')
+                                ax.axvline(safety['min_acceptable'], color='red', linestyle='--', linewidth=2, label='Mínimo Aceitável')
+                                ax.axvline(safety['target'], color='blue', linestyle='--', linewidth=2, label='Alvo')
+                                
+                                ax.set_xlim(0, 1)
+                                ax.set_ylim(-0.5, 0.5)
+                                ax.set_yticks([])
+                                ax.set_xlabel('Confiança')
+                                ax.set_title('Análise de Margem de Segurança')
+                                ax.legend(loc='upper right')
+                                ax.grid(True, alpha=0.3, axis='x')
+                                
+                                st.pyplot(fig)
+                                plt.close(fig)
+                                
+                                st.success("✅ Análise estatística completa concluída!")
+                                
+                            except Exception as e:
+                                st.error(f"Erro ao executar análise estatística: {str(e)}")
+                                st.code(traceback.format_exc())
+                
                 # ========== 3D GRAD-CAM VISUALIZATION ==========
                 if activation_map is not None:
                     st.write("---")
@@ -2338,7 +2515,6 @@ def main():
                                                 
                                             except Exception as e:
                                                 st.error(f"Erro ao gerar análise multi-agente: {str(e)}")
-                                                import traceback
                                                 st.code(traceback.format_exc())
                                     
                                     # ========== GENETIC ALGORITHM MULTI-ANGLE INTERPRETATION ==========
@@ -2377,7 +2553,6 @@ def main():
                                                 
                                             except Exception as e:
                                                 st.error(f"Erro ao gerar análise multi-angular: {str(e)}")
-                                                import traceback
                                                 st.code(traceback.format_exc())
                                     
                                 except Exception as e:
