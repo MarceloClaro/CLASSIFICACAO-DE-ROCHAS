@@ -64,6 +64,7 @@ from torchvision import transforms, models, datasets
 import torchvision.ops.boxes as box_ops
 
 # Scikit-learn
+import sklearn
 from sklearn.cluster import AgglomerativeClustering, KMeans, DBSCAN
 from sklearn.metrics import (
     adjusted_rand_score, normalized_mutual_info_score,
