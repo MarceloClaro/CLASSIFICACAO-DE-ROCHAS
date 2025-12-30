@@ -1,27 +1,159 @@
-numpy
-pandas
-matplotlib
-seaborn
-Pillow
-torch
-torchvision
-scikit-learn
-streamlit
-torchcam
-opencv-python
-torch_optimizer
-psutil
-plotly
-google-generativeai
-groq
-requests
-beautifulsoup4
-scholarly
-deap
-scipy
-timm
-crewai
-crewai-tools
-langchain
-langchain-community
-faiss-cpu
+
+# =============================================================================
+# GEOMAKER v2.0 - REQUIREMENTS STREAMLIT
+# Dependências essenciais para a interface web e funcionalidades principais
+# =============================================================================
+
+# =============================================================================
+# STREAMLIT E DEPENDÊNCIAS BÁSICAS
+# =============================================================================
+
+# Streamlit - Framework principal da aplicação web
+streamlit>=1.28.0,<2.0.0
+
+# =============================================================================
+# PYTORCH (Deep Learning) - Versões compatíveis
+# =============================================================================
+# NOTA IMPORTANTE:
+# Para CPU:
+#   pip install torch==2.3.0 torchvision==0.18.0 --index-url https://download.pytorch.org/whl/cpu
+#
+# Para CUDA 11.8:
+#   pip install torch==2.3.0 torchvision==0.18.0 --index-url https://download.pytorch.org/whl/cu118
+#
+# Para CUDA 12.1:
+#   pip install torch==2.3.0 torchvision==0.18.0 --index-url https://download.pytorch.org/whl/cu121
+# =============================================================================
+
+torch>=2.0.0,<2.4.0
+torchvision>=0.15.0,<0.19.0
+
+# =============================================================================
+# BIBLIOTECAS CIENTÍFICAS ESTATÍSTICAS
+# =============================================================================
+
+# NumPy - Computação numérica fundamental
+numpy>=1.23.0,<2.0.0
+
+# Pandas - Manipulação de dados tabulares e exibição no Streamlit
+pandas>=2.0.0,<3.0.0
+
+# SciPy - Funções científicas e estatísticas
+scipy>=1.10.0,<2.0.0
+
+# Scikit-Learn - Métricas de avaliação e clustering
+scikit-learn>=1.3.0,<1.6.0
+
+# =============================================================================
+# VISUALIZAÇÃO (Streamlit nativamente suporta estas bibliotecas)
+# =============================================================================
+
+# Matplotlib - Gráficos estáticos para Streamlit
+matplotlib>=3.7.0,<4.0.0
+
+# Seaborn - Visualizações estatísticas
+seaborn>=0.12.0,<0.14.0
+
+# Plotly - Gráficos interativos (3D, zoom, hover)
+plotly>=5.14.0,<6.0.0
+
+# Kaleido - Exportação de gráficos Plotly
+kaleido>=0.2.0,<1.0.0
+
+# Altair - Declarative visualization (nativa do Streamlit)
+altair>=5.0.0,<6.0.0
+
+# =============================================================================
+# PROCESSAMENTO DE IMAGEM E VISÃO COMPUTACIONAL
+# =============================================================================
+
+# Pillow (PIL) - Manipulação de imagens
+Pillow>=10.0.0,<11.0.0
+
+# OpenCV - Processamento de imagens (para Grad-CAM)
+opencv-python>=4.8.0,<5.0.0
+
+# =============================================================================
+# DEEP LEARNING ADICIONAL
+# =============================================================================
+
+# TIMM - PyTorch Image Models (Vision Transformers)
+timm>=0.9.0,<1.0.0
+
+# TorchCAM - Class Activation Maps (Grad-CAM)
+torchcam>=0.4.0,<1.0.0
+
+# =============================================================================
+# REDUÇÃO DE DIMENSIONALIDADE (para visualização 3D)
+# =============================================================================
+
+# UMAP - Uniform Manifold Approximation and Projection
+umap-learn>=0.5.0,<1.0.0
+
+# =============================================================================
+# AUMENTO DE DADOS
+# =============================================================================
+
+# Albumentations - Aumento rápido de imagens
+albumentations>=1.3.0,<2.0.0
+
+# =============================================================================
+# API DE IA (opcional, para módulos de chat e análise)
+# =============================================================================
+
+# Google Generative AI (para Gemini)
+google-generativeai>=0.3.0,<1.0.0
+
+# OpenAI (para GPT)
+openai>=1.0.0,<2.0.0
+
+# =============================================================================
+# UTILITÁRIOS E FERRAMENTAS DE DESENVOLVIMENTO
+# =============================================================================
+
+# TQDM - Barras de progresso
+tqdm>=4.65.0,<5.0.0
+
+# PyYAML - Configurações
+PyYAML>=6.0.0,<7.0.0
+
+# Requests - Requisições HTTP
+requests>=2.31.0,<3.0.0
+
+# Joblib - Paralelização e caching
+joblib>=1.3.0,<2.0.0
+
+# Pydantic - Validação de dados
+pydantic>=2.0.0,<3.0.0
+
+# =============================================================================
+# DEPENDÊNCIAS DO STREAMLIT (automáticas, mas listadas para referência)
+# =============================================================================
+
+# Werkzeug - WSGI utilities
+Werkzeug>=2.3.0,<4.0.0
+
+# Click - CLI
+click>=8.1.0,<9.0.0
+
+# MarkupSafe - HTML escaping
+MarkupSafe>=2.1.0,<3.0.0
+
+# =============================================================================
+
+# VERSÕES COMPATÍVEIS TESTADAS:
+# Python: 3.9, 3.10, 3.11
+# Streamlit: 1.28.0, 1.29.0, 1.30.0, 1.31.0
+# PyTorch: 2.0.0, 2.1.0, 2.2.0, 2.3.0
+# CUDA: 11.8, 12.1
+
+# INSTALAÇÃO RÁPIDA:
+#   pip install -r requirements.txt
+#
+# Para GPU (CUDA 11.8):
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+#   pip install -r requirements.txt
+
+# VERIFICAÇÃO:
+#   streamlit --version
+#   python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
