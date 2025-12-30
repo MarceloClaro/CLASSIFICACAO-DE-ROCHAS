@@ -25,8 +25,11 @@ try:
 except ImportError:
     print("✗ google.genai (NEW package) is NOT available")
     try:
-        import google.generativeai as genai_old
-        print("✓ google.generativeai (OLD package) is available")
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=FutureWarning)
+            import google.generativeai as genai_old
+        print("✓ google.generativeai (OLD DEPRECATED package) is available")
         GEMINI_NEW_API = False
         genai = genai_old
     except ImportError:

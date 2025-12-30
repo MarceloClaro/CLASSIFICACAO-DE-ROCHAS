@@ -1,163 +1,249 @@
-
 # =============================================================================
-# GEOMAKER v2.0 - REQUIREMENTS STREAMLIT
-# Dependências essenciais para a interface web e funcionalidades principais
+# GEOMAKER v2.0 - REQUIREMENTS.TXT
+# Sistema Avançado de Classificação de Imagens com Deep Learning
+# Nível Publicação Qualis A1
 # =============================================================================
-
-# =============================================================================
-# STREAMLIT E DEPENDÊNCIAS BÁSICAS
-# =============================================================================
-
-# Streamlit - Framework principal da aplicação web
-streamlit>=1.28.0,<2.0.0
-
-# =============================================================================
-# PYTORCH (Deep Learning) - Versões compatíveis
-# =============================================================================
-# NOTA IMPORTANTE:
-# Este projeto requer Python 3.9, 3.10 ou 3.11 (ver .python-version)
-# PyTorch 2.0.0-2.3.x não possui wheels para Python 3.12+
 #
-# Para CPU:
-#   pip install torch==2.3.0 torchvision==0.18.0 --index-url https://download.pytorch.org/whl/cpu
+# Instalação:
+#   pip install -r requirements.txt
+#
+# Para instalação completa com todas as dependências opcionais:
+#   pip install -r requirements-full.txt
+#
+# Data: 2025-12-30
+# Python: 3.9 - 3.12 (recomendado: 3.10)
+# =============================================================================
+
+# =============================================================================
+# PYTORCH E ECOSISTEMA (Versões compatíveis)
+# =============================================================================
+# NOTA: Para GPU CUDA, use os comandos específicos do PyTorch
+# Visit: https://pytorch.org/get-started/locally/
 #
 # Para CUDA 11.8:
 #   pip install torch==2.3.0 torchvision==0.18.0 --index-url https://download.pytorch.org/whl/cu118
 #
 # Para CUDA 12.1:
 #   pip install torch==2.3.0 torchvision==0.18.0 --index-url https://download.pytorch.org/whl/cu121
+#
+# Para CPU apenas:
+#   pip install torch==2.3.0 torchvision==0.18.0 --index-url https://download.pytorch.org/whl/cpu
 # =============================================================================
 
-torch>=2.0.0,<2.4.0
-torchvision>=0.15.0,<0.19.0
+torch>=2.0.0,<2.5.0
+torchvision>=0.15.0,<0.20.0
+torchaudio>=2.0.0,<2.5.0  # Opcional, para aplicações de áudio
 
 # =============================================================================
-# BIBLIOTECAS CIENTÍFICAS ESTATÍSTICAS
+# BIBLIOTECAS CIENTÍFICAS
 # =============================================================================
 
-# NumPy - Computação numérica fundamental
+# NumPy - Computação numérica
 numpy>=1.23.0,<2.0.0
 
-# Pandas - Manipulação de dados tabulares e exibição no Streamlit
+# Pandas - Manipulação de dados tabulares
 pandas>=2.0.0,<3.0.0
 
 # SciPy - Funções científicas e estatísticas
 scipy>=1.10.0,<2.0.0
 
-# Scikit-Learn - Métricas de avaliação e clustering
+# Scikit-Learn - Machine Learning clássico e métricas
 scikit-learn>=1.3.0,<1.6.0
 
 # =============================================================================
-# VISUALIZAÇÃO (Streamlit nativamente suporta estas bibliotecas)
+# VISUALIZAÇÃO
 # =============================================================================
 
-# Matplotlib - Gráficos estáticos para Streamlit
+# Matplotlib - Plotagem científica
 matplotlib>=3.7.0,<4.0.0
 
-# Seaborn - Visualizações estatísticas
+# Seaborn - Visualização estatística
 seaborn>=0.12.0,<0.14.0
 
-# Plotly - Gráficos interativos (3D, zoom, hover)
+# Plotly - Visualização interativa (3D, gráficos dinâmicos)
 plotly>=5.14.0,<6.0.0
 
-# Kaleido - Exportação de gráficos Plotly
+# Kaleido - Exportação de gráficos Plotly para imagens estáticas
 kaleido>=0.2.0,<1.0.0
 
-# Altair - Declarative visualization (nativa do Streamlit)
-altair>=5.0.0,<6.0.0
+# =============================================================================
+# VISÃO COMPUTACIONAL E PROCESSAMENTO DE IMAGEM
+# =============================================================================
 
-# =============================================================================
-# PROCESSAMENTO DE IMAGEM E VISÃO COMPUTACIONAL
-# =============================================================================
+# OpenCV - Processamento de imagens
+opencv-python>=4.8.0,<5.0.0
+# Alternativa headless para servidores (sem GUI):
+# opencv-python-headless>=4.8.0,<5.0.0
 
 # Pillow (PIL) - Manipulação de imagens
-Pillow>=10.0.0,<11.0.0
-
-# OpenCV - Processamento de imagens (para Grad-CAM)
-opencv-python>=4.8.0,<5.0.0
+Pillow>=10.0.0,<12.0.0
 
 # =============================================================================
 # DEEP LEARNING ADICIONAL
 # =============================================================================
 
-# TIMM - PyTorch Image Models (Vision Transformers)
+# TIMM (PyTorch Image Models) - Vision Transformers e CNNs state-of-the-art
 timm>=0.9.0,<1.0.0
 
-# TorchCAM - Class Activation Maps (Grad-CAM)
+# TorchCAM - Class Activation Maps (Grad-CAM e variantes)
 torchcam>=0.4.0,<1.0.0
 
+# Torch-Optimizer - Otimizadores avançados (Ranger, AdaBound, etc.)
+torch-optimizer>=0.3.0,<1.0.0
+
 # =============================================================================
-# REDUÇÃO DE DIMENSIONALIDADE (para visualização 3D)
+# TRANSFORMERS (para ViT e modelos baseados em HuggingFace)
+# =============================================================================
+
+# Transformers - Modelos pré-treinados
+transformers>=4.30.0,<5.0.0
+
+# Tokenizers - Tokenização rápida
+tokenizers>=0.13.0,<1.0.0
+
+# HuggingFace Hub - Download de modelos
+huggingface-hub>=0.15.0,<1.0.0
+
+# =============================================================================
+# REDUÇÃO DE DIMENSIONALIDADE E MANIFOLD LEARNING
 # =============================================================================
 
 # UMAP - Uniform Manifold Approximation and Projection
 umap-learn>=0.5.0,<1.0.0
 
+# hdbscan - Clustering baseado em densidade (opcional)
+# hdbscan>=0.8.0,<1.0.0
+
 # =============================================================================
-# AUMENTO DE DADOS
+# AUMENTO DE DADOS AVANÇADO
 # =============================================================================
 
-# Albumentations - Aumento rápido de imagens
+# Albumentations - Biblioteca rápida de aumento de dados
 albumentations>=1.3.0,<2.0.0
 
 # =============================================================================
-# API DE IA (opcional, para módulos de chat e análise)
+# INTERFACE WEB E FLUXO DE TRABALHO
 # =============================================================================
 
-# Google Generative AI (para Gemini)
-google-generativeai>=0.3.0,<1.0.0
+# Streamlit - Interface web interativa
+streamlit>=1.28.0,<2.0.0
 
-# OpenAI (para GPT)
+# Streamlit-aggrid - Tabelas avançadas (opcional)
+# streamlit-aggrid>=0.3.0,<1.0.0
+
+# =============================================================================
+# MONITORAMENTO E LOGGING
+# =============================================================================
+
+# Weights & Biases - Experiment tracking (opcional, altamente recomendado)
+wandb>=0.15.0,<1.0.0
+
+# TensorBoard - Monitoramento de treinamento (opcional)
+tensorboard>=2.13.0,<3.0.0
+
+# =============================================================================
+# INTEGRAÇÃO COM API DE IA (para módulos de análise diagnóstica)
+# =============================================================================
+
+# OpenAI SDK (para GPT-4, etc.)
 openai>=1.0.0,<2.0.0
 
+# Google Generative AI SDK (para Gemini) - NEW API
+google-genai>=0.3.0,<1.0.0
+
+# Groq SDK (para APIs rápidas)
+# groq>=0.3.0,<1.0.0
+
 # =============================================================================
-# UTILITÁRIOS E FERRAMENTAS DE DESENVOLVIMENTO
+# UTILITÁRIOS E OUTRAS DEPENDÊNCIAS
 # =============================================================================
 
 # TQDM - Barras de progresso
 tqdm>=4.65.0,<5.0.0
 
-# PyYAML - Configurações
+# PyYAML - Manipulação de arquivos YAML
 PyYAML>=6.0.0,<7.0.0
 
 # Requests - Requisições HTTP
 requests>=2.31.0,<3.0.0
 
-# Joblib - Paralelização e caching
-joblib>=1.3.0,<2.0.0
-
-# Pydantic - Validação de dados
+# Pydantic - Validação de dados (útil para configurações)
 pydantic>=2.0.0,<3.0.0
 
-# =============================================================================
-# DEPENDÊNCIAS DO STREAMLIT (automáticas, mas listadas para referência)
-# =============================================================================
+# Joblib - Caching e paralelização
+joblib>=1.3.0,<2.0.0
 
-# Werkzeug - WSGI utilities
+# Werkzeug - Utilitários WSGI (dependência do Streamlit)
 Werkzeug>=2.3.0,<4.0.0
 
-# Click - CLI
+# Click - CLI (dependência do Streamlit)
 click>=8.1.0,<9.0.0
 
-# MarkupSafe - HTML escaping
+# MarkupSafe - Escapamento de HTML/Markdown
 MarkupSafe>=2.1.0,<3.0.0
 
+# Altair - Declarative visualization (dependência do Streamlit)
+altair>=5.0.0,<6.0.0
+
+# =============================================================================
+# DEPENDÊNCIAS DE DESENVOLVIMENTO (Opcional - para desenvolvimento)
+# =============================================================================
+# Descomente se for desenvolver o código
+
+# black>=23.0.0,<24.0.0           # Formatação de código
+# isort>=5.12.0,<6.0.0            # Ordenação de imports
+# flake8>=6.0.0,<7.0.0            # Linting
+# mypy>=1.4.0,<2.0.0              # Type checking
+# pytest>=7.4.0,<8.0.0             # Testes
+# pytest-cov>=4.1.0,<5.0.0         # Coverage
+# pre-commit>=3.3.0,<4.0.0         # Git hooks
+
+# =============================================================================
+# NOTAS IMPORTANTES
 # =============================================================================
 
-# VERSÕES COMPATÍVEIS TESTADAS:
-# Python: 3.9, 3.10, 3.11 (especificado em .python-version)
-# IMPORTANTE: Python 3.12+ não é compatível com PyTorch 2.0.0-2.3.x
-# Streamlit: 1.28.0, 1.29.0, 1.30.0, 1.31.0
-# PyTorch: 2.0.0, 2.1.0, 2.2.0, 2.3.0
-# CUDA: 11.8, 12.1
+# 1. VERSÕES DE PYTHON
+#    - Mínimo: 3.9
+#    - Recomendado: 3.10
+#    - Compatível até: 3.12
+#    - Python 3.13+ pode ter problemas com algumas bibliotecas (não recomendado ainda)
 
-# INSTALAÇÃO RÁPIDA:
-#   pip install -r requirements.txt
-#
-# Para GPU (CUDA 11.8):
-#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-#   pip install -r requirements.txt
+# 2. CUDA E GPU
+#    - Para usar GPU CUDA, instale PyTorch com os comandos específicos acima
+#    - CUDA 11.8 é mais estável para PyTorch 2.0+
+#    - CUDA 12.1 é mais recente mas pode ter bugs em alguns casos
+#    - Verifique sua versão CUDA com: nvidia-smi
 
-# VERIFICAÇÃO:
-#   streamlit --version
-#   python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
+# 3. DEPENDÊNCIAS OPCIONAIS
+#    - Algumas funcionalidades são opcionais (marcadas acima)
+#    - O código funciona sem elas, mas com recursos limitados
+#    - Para produção, recomenda-se instalar todas as dependências
+
+# 4. INSTALAÇÃO EM AMBIENTES VIRTUAIS
+#    - Sempre use ambientes virtuais (conda ou venv)
+#    - Exemplo com venv:
+#      python -m venv geomaker_env
+#      source geomaker_env/bin/activate  # Linux/Mac
+#      geomaker_env\Scripts\activate     # Windows
+#      pip install -r requirements.txt
+
+# 5. CONDA (Alternativa)
+#    - Para usuários de conda:
+#      conda create -n geomaker python=3.10
+#      conda activate geomaker
+#      conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
+#      pip install -r requirements.txt
+
+# 6. SOLUÇÃO DE PROBLEMAS COMUNS
+#    - Erro de importação: Verifique se todas as dependências foram instaladas
+#    - Erro de CUDA: Verifique se o PyTorch foi instalado com suporte CUDA
+#    - Conflito de versões: Atualize pip primeiro: pip install --upgrade pip
+#    - Memória insuficiente: Reduza o batch_size no treinamento
+
+# 7. VERIFICAÇÃO DE INSTALAÇÃO
+#    - Execute: python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA disponível: {torch.cuda.is_available()}')"
+#    - Execute: python -c "import streamlit; print(f'Streamlit: {streamlit.__version__}')"
+
+# =============================================================================
+# FIM DO REQUIREMENTS.TXT
+# =============================================================================

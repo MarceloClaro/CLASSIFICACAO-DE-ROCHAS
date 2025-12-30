@@ -58,16 +58,19 @@ except ImportError:
 
 # Importar APIs com suporte de visão
 try:
-    # Prioritize stable google-generativeai package (recommended)
-    import google.generativeai as genai
+    # Prioritize new google-genai package (recommended)
+    import google.genai as genai
     GEMINI_AVAILABLE = True
-    GEMINI_NEW_API = False  # Stable google-generativeai package
+    GEMINI_NEW_API = True  # New google-genai package
 except ImportError:
-    # Fallback to new beta package if stable not available
+    # Fallback to deprecated google-generativeai package if new not available
     try:
-        import google.genai as genai
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=FutureWarning)
+            import google.generativeai as genai
         GEMINI_AVAILABLE = True
-        GEMINI_NEW_API = True  # Beta google-genai package
+        GEMINI_NEW_API = False  # Deprecated google-generativeai package
     except ImportError:
         GEMINI_AVAILABLE = False
         GEMINI_NEW_API = False
