@@ -75,7 +75,7 @@ from sklearn.metrics import (
 )
 from sklearn.preprocessing import label_binarize, StandardScaler
 from sklearn.decomposition import PCA, FastICA
-from sklearn.manifold import TSNE, UMAP
+from sklearn.manifold import TSNE
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.calibration import calibration_curve, CalibratedClassifierCV
 from sklearn.utils import resample

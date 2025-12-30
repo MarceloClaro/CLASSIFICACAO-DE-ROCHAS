@@ -13,7 +13,7 @@ This guide provides comprehensive instructions for deploying the AI-powered imag
 - **RAM**: 8 GB
 - **Storage**: 20 GB free space
 - **OS**: Ubuntu 20.04+, macOS 11+, Windows 10+ with WSL2
-- **Python**: 3.8 - 3.11
+- **Python**: 3.9 - 3.11 (3.11 recommended for Streamlit Cloud)
 - **Internet**: Stable connection for package downloads
 
 #### Recommended Requirements (Production)
@@ -51,7 +51,7 @@ source venv/bin/activate  # Linux/macOS
 .\venv\Scripts\activate  # Windows
 
 # Using conda
-conda create -n diagnosticai python=3.10
+conda create -n diagnosticai python=3.11
 conda activate diagnosticai
 ```
 
@@ -806,7 +806,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
