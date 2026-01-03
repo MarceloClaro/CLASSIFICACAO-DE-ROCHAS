@@ -11,16 +11,19 @@ from io import BytesIO
 import numpy as np
 
 try:
-    # Prioritize stable google-generativeai package (recommended)
-    import google.generativeai as genai
+    # Prioritize new google-genai package (recommended)
+    import google.genai as genai
     GEMINI_AVAILABLE = True
-    GEMINI_NEW_API = False  # Stable google-generativeai package
+    GEMINI_NEW_API = True  # New google-genai package
 except ImportError:
-    # Fallback to new beta package if stable not available
+    # Fallback to deprecated google-generativeai package if new not available
     try:
-        import google.genai as genai
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=FutureWarning)
+            import google.generativeai as genai
         GEMINI_AVAILABLE = True
-        GEMINI_NEW_API = True  # Beta google-genai package
+        GEMINI_NEW_API = False  # Deprecated google-generativeai package
     except ImportError:
         GEMINI_AVAILABLE = False
         GEMINI_NEW_API = False
@@ -36,12 +39,12 @@ def get_gemini_model_path(model_name: str, use_new_api: bool = False) -> str:
     """
     Get the correct model path for Gemini API calls.
     
-    For the new beta google-genai package, model names must include the 'models/' prefix.
-    For the stable google-generativeai package, use the model name directly.
+    For the new google-genai package, model names must include the 'models/' prefix.
+    For the deprecated google-generativeai package, use the model name directly.
     
     Args:
         model_name: Model name (e.g., 'gemini-1.5-pro' or 'models/gemini-1.5-pro')
-        use_new_api: Whether using the new beta API (google-genai)
+        use_new_api: Whether using the new API (google-genai)
     
     Returns:
         Model path formatted correctly for the API version
@@ -49,7 +52,7 @@ def get_gemini_model_path(model_name: str, use_new_api: bool = False) -> str:
     # Remove 'models/' prefix if present
     clean_name = model_name.replace('models/', '')
     
-    # Add prefix only for new beta API
+    # Add prefix only for new API
     if use_new_api:
         return f'models/{clean_name}'
     else:
@@ -78,11 +81,11 @@ class AIAnalyzer:
         
         if self.api_provider == 'gemini' and GEMINI_AVAILABLE:
             if GEMINI_NEW_API:
-                # New beta google-genai package API
+                # New google-genai package API (recommended)
                 self.client = genai.Client(api_key=api_key)
                 self.model = None  # Will be set when generating content
             else:
-                # Stable google-generativeai package API (recommended)
+                # Deprecated google-generativeai package API
                 genai.configure(api_key=api_key)
                 self.model = genai.GenerativeModel(model_name)
         elif self.api_provider == 'groq' and GROQ_AVAILABLE:

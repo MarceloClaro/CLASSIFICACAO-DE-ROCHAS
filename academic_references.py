@@ -25,10 +25,22 @@ except ImportError:
 
 # Try to import AI modules for translation and critical review
 try:
-    import google.generativeai as genai
+    # Prioritize new google-genai package (recommended)
+    import google.genai as genai
     GEMINI_AVAILABLE = True
+    GEMINI_NEW_API = True
 except ImportError:
-    GEMINI_AVAILABLE = False
+    # Fallback to deprecated google-generativeai package if new not available
+    try:
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=FutureWarning)
+            import google.generativeai as genai
+        GEMINI_AVAILABLE = True
+        GEMINI_NEW_API = False
+    except ImportError:
+        GEMINI_AVAILABLE = False
+        GEMINI_NEW_API = False
 
 try:
     from groq import Groq
